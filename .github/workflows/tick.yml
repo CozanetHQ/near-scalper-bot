@@ -10,17 +10,20 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Call tick endpoint
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run tick engine
+        env:
+          TICK_SECRET: ${{ secrets.TICK_SECRET }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          echo "Sending tick to NEAR scalper bot..."
-          RESPONSE=$(curl -s -w "\n%{http_code}" --max-time 280 -X POST \
-            "https://superagent-ae0aaf02.base44.app/functions/nearScalperTick" \
-            -H "Content-Type: application/json" \
-            -d '{}')
-          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
-          BODY=$(echo "$RESPONSE" | head -n -1)
-          echo "HTTP Status: $HTTP_CODE"
-          echo "Response: $BODY"
-          if [ "$HTTP_CODE" != "200" ]; then
-            echo "::warning::Tick returned HTTP $HTTP_CODE"
-          fi
+          echo "Starting NEAR scalper tick engine..."
+          python tick.py
+          echo "Tick run finished with exit code $?"
