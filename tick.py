@@ -58,7 +58,7 @@ def http_get(url, timeout=8):
 
 def http_post(url, payload, headers=None, timeout=8):
     data = json.dumps(payload).encode()
-    h = {"Content-Type": "application/json", **(headers or {})}
+    h = {"Content-Type": "application/json", **HEADERS, **(headers or {})}
     req = urllib.request.Request(url, data=data, headers=h, method="POST")
     with urllib.request.urlopen(req, timeout=timeout) as res:
         return json.loads(res.read().decode())
