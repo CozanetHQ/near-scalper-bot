@@ -1,0 +1,26 @@
+name: NEAR Scalper Tick
+on:
+  schedule:
+    # Every 5 minutes, 24/7
+    - cron: '*/5 * * * *'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Call tick endpoint
+        run: |
+          echo "Sending tick to NEAR scalper bot..."
+          RESPONSE=$(curl -s -w "\n%{http_code}" --max-time 280 -X POST \
+            "https://superagent-ae0aaf02.base44.app/functions/nearScalperTick" \
+            -H "Content-Type: application/json" \
+            -d '{}')
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | head -n -1)
+          echo "HTTP Status: $HTTP_CODE"
+          echo "Response: $BODY"
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "::warning::Tick returned HTTP $HTTP_CODE"
+          fi
