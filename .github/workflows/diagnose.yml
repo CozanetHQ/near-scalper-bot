@@ -1,0 +1,26 @@
+name: Network Diagnostics
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Test endpoints
+        env:
+          TICK_SECRET: ${{ secrets.TICK_SECRET }}
+        run: |
+          echo "--- 1. Bitget candles GET ---"
+          curl -s -o /dev/null -w "HTTP %{http_code}\n" "https://api.bitget.com/api/v2/mix/market/candles?symbol=NEARUSDT&productType=USDT-FUTURES&granularity=1m&limit=3"
+          echo "--- 2. Bitget ticker GET ---"
+          curl -s -o /dev/null -w "HTTP %{http_code}\n" "https://api.bitget.com/api/v2/mix/market/ticker?symbol=NEARUSDT&productType=USDT-FUTURES"
+          echo "--- 3. Base44 dashboard GET ---"
+          curl -s -o /dev/null -w "HTTP %{http_code}\n" "https://superagent-ae0aaf02.base44.app/functions/nearScalperDashboard"
+          echo "--- 4. Base44 sync POST (with secret) ---"
+          curl -s -w "\nHTTP %{http_code}\n" -X POST "https://superagent-ae0aaf02.base44.app/functions/nearScalperSync" \
+            -H "Content-Type: application/json" \
+            -H "X-Tick-Secret: $TICK_SECRET" \
+            -d '{"state": {}, "trade": null}'
+          echo "--- 5. Telegram API GET (getMe) ---"
+          curl -s -o /dev/null -w "HTTP %{http_code}\n" "https://api.telegram.org"
