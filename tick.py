@@ -31,7 +31,7 @@ LEVERAGE = 10
 START_BALANCE = 3.0
 FEE_RATE = 0.0006
 POLL_INTERVAL = 15
-MAX_RUNTIME = int(os.environ.get('MAX_RUNTIME', 2900))  # ~48 min, fits hourly schedule
+MAX_RUNTIME = int(os.environ.get('MAX_RUNTIME', 240))  # ~4 min loop; next run chains immediately
 
 BASE44_DASHBOARD = "https://superagent-ae0aaf02.base44.app/functions/nearScalperDashboard"
 BASE44_SYNC = "https://superagent-ae0aaf02.base44.app/functions/nearScalperSync"
@@ -153,7 +153,7 @@ def process_tick(state):
         hit_tp = price >= state["tp_price"] if is_long else price <= state["tp_price"]
         hit_sl = price <= state["sl_price"] if is_long else price >= state["sl_price"]
         if not hit_tp and not hit_sl:
-            scan = fetch_candles("1m", 10)
+            scan = fetch_candles("1m", 15)
             for candle in scan:
                 if is_long:
                     c_sl = candle["low"] <= state["sl_price"]

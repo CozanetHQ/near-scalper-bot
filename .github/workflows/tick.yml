@@ -1,14 +1,23 @@
 name: NEAR Scalper Tick
 on:
   schedule:
-    # Hourly at :07 (GitHub throttles top-of-hour schedules; offset improves reliability)
+    # Watchdog: hourly at :07 in case the perpetual chain breaks
     - cron: '7 * * * *'
-  workflow_dispatch: # Allow manual trigger
+  workflow_dispatch:
+
+# Only one tick engine may run at a time; a new run replaces an older one.
+# This prevents double-opening positions from two concurrent pollers.
+concurrency:
+  group: tick
+  cancel-in-progress: true
+
+permissions:
+  actions: write
 
 jobs:
   tick:
     runs-on: ubuntu-latest
-    timeout-minutes: 52
+    timeout-minutes: 5
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -23,8 +32,16 @@ jobs:
           TICK_SECRET: ${{ secrets.TICK_SECRET }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          MAX_RUNTIME: '2900'
+          MAX_RUNTIME: '240'
         run: |
-          echo "Starting NEAR scalper tick engine (hourly long-run)..."
+          echo "Starting NEAR scalper tick engine..."
           python tick.py
-          echo "Tick run finished with exit code $?"
+
+      - name: Chain next run
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Perpetual chain: dispatch the next run immediately so the bot
+          # wakes ~every 5 min (scalper cadence). Hourly cron is the watchdog.
+          gh api -X POST repos/CozanetHQ/near-scalper-bot/actions/workflows/tick.yml/dispatches -f ref=main && echo "Chained next run" || echo "Chain dispatch failed (watchdog cron will recover)"
