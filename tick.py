@@ -9,7 +9,7 @@ Flow (every 15s for ~4.4 min):
   1. GET current state from Base44 (dashboard endpoint)
   2. Fetch forming 4H/15M/1M candles + ticker from Bitget
   3. Bias = 4H color == 15M color
-  4. If position open -> check TP ($0.20) / SL ($0.15)
+  4. If position open -> check TP ($0.02) / SL ($0.015)
   5. If flat + bias + 1M just turned to bias color -> open
   6. POST updates/trades to Base44 sync endpoint (secret protected)
 """
@@ -25,8 +25,8 @@ from datetime import datetime, timezone
 BITGET = "https://api.bitget.com/api/v2/mix/market"
 SYMBOL = "NEARUSDT"
 PRODUCT = "USDT-FUTURES"
-TP_DOLLAR = 0.20
-SL_DOLLAR = 0.15
+TP_DOLLAR = 0.02
+SL_DOLLAR = 0.015
 LEVERAGE = 10
 START_BALANCE = 3.0
 FEE_RATE = 0.0006
