@@ -1,14 +1,14 @@
 name: NEAR Scalper Tick
 on:
   schedule:
-    # Every 5 minutes, 24/7
-    - cron: '*/5 * * * *'
+    # Hourly at :07 (GitHub throttles top-of-hour schedules; offset improves reliability)
+    - cron: '7 * * * *'
   workflow_dispatch: # Allow manual trigger
 
 jobs:
   tick:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 52
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -23,7 +23,8 @@ jobs:
           TICK_SECRET: ${{ secrets.TICK_SECRET }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          MAX_RUNTIME: '2900'
         run: |
-          echo "Starting NEAR scalper tick engine..."
+          echo "Starting NEAR scalper tick engine (hourly long-run)..."
           python tick.py
           echo "Tick run finished with exit code $?"

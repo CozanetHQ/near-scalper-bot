@@ -31,7 +31,7 @@ LEVERAGE = 10
 START_BALANCE = 3.0
 FEE_RATE = 0.0006
 POLL_INTERVAL = 15
-MAX_RUNTIME = 265  # seconds, stays under Action timeout
+MAX_RUNTIME = int(os.environ.get('MAX_RUNTIME', 2900))  # ~48 min, fits hourly schedule
 
 BASE44_DASHBOARD = "https://superagent-ae0aaf02.base44.app/functions/nearScalperDashboard"
 BASE44_SYNC = "https://superagent-ae0aaf02.base44.app/functions/nearScalperSync"
@@ -147,8 +147,26 @@ def process_tick(state):
     # Position open -> check TP/SL
     if state.get("position_open"):
         is_long = state.get("side") == "long"
+
+        # Gap-aware: scan 1m candle highs/lows for TP/SL touches, not just current price.
+        # Catches hits that occur between polls or during schedule gaps.
         hit_tp = price >= state["tp_price"] if is_long else price <= state["tp_price"]
         hit_sl = price <= state["sl_price"] if is_long else price >= state["sl_price"]
+        if not hit_tp and not hit_sl:
+            scan = fetch_candles("1m", 10)
+            for candle in scan:
+                if is_long:
+                    c_sl = candle["low"] <= state["sl_price"]
+                    c_tp = candle["high"] >= state["tp_price"]
+                else:
+                    c_sl = candle["high"] >= state["sl_price"]
+                    c_tp = candle["low"] <= state["tp_price"]
+                if c_sl:  # conservative: assume SL first within a candle
+                    hit_sl = True
+                    break
+                if c_tp:
+                    hit_tp = True
+                    break
 
         if hit_tp or hit_sl:
             exit_price = state["tp_price"] if hit_tp else state["sl_price"]
