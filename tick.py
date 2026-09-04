@@ -27,6 +27,7 @@ SYMBOL = "NEARUSDT"
 PRODUCT = "USDT-FUTURES"
 TP_DOLLAR = 0.02
 SL_DOLLAR = 0.015
+SL_STREAK_REVERSAL = 3  # after N consecutive SLs on one side, flip the next entry
 LEVERAGE = 10
 START_BALANCE = 3.0
 FEE_RATE = 0.0006
@@ -199,20 +200,37 @@ def process_tick(state):
             wins = (state.get("wins") or 0) + (1 if net > 0 else 0)
             losses = (state.get("losses") or 0) + (1 if net <= 0 else 0)
 
+            # Anti-whipsaw streak tracking: count consecutive SLs on the SAME side.
+            # A TP (a real win) or a switch to the other side resets the streak.
+            closed_side = state["side"]
+            if reason == "SL":
+                if state.get("streak_side") == closed_side:
+                    streak_count = (state.get("streak_count") or 0) + 1
+                else:
+                    streak_count = 1
+                streak_side = closed_side
+            else:  # TP — the market rewarded this direction, streak is over
+                streak_count = 0
+                streak_side = "none"
+
             su.update({
                 "position_open": False, "side": "none", "entry_price": 0,
                 "tp_price": 0, "sl_price": 0, "notional": 0, "margin": 0,
                 "opened_at": None, "balance": round(new_balance, 6),
                 "total_trades": total_trades, "wins": wins, "losses": losses,
-                "last_error": "",
+                "last_error": "", "streak_side": streak_side, "streak_count": streak_count,
             })
 
             fresh = sync(state_update=su, trade=trade)
             pnl_str = f"+${net:.4f}" if net >= 0 else f"-${abs(net):.4f}"
+            streak_note = ""
+            if reason == "SL" and streak_count >= SL_STREAK_REVERSAL:
+                streak_note = f"\n⚠️ {streak_count}x consecutive {closed_side.upper()} SL — next signal will auto-reverse"
             send_telegram(
                 f"🔄 *Closed* {state['side'].upper()} ({reason})\n"
                 f"Entry ${entry:.4f} → Exit ${exit_price:.4f}\n"
                 f"PnL {pnl_str} | Balance ${new_balance:.4f}"
+                f"{streak_note}"
             )
             return "closed", f"{state['side']} {reason} @ ${exit_price:.4f} PnL {pnl_str}"
 
@@ -231,7 +249,18 @@ def process_tick(state):
                 sync(state_update=su)
                 return "none", "insufficient balance for margin"
 
-            is_long = bias == "bull"
+            natural_is_long = bias == "bull"
+            natural_side = "long" if natural_is_long else "short"
+
+            # Anti-whipsaw reversal: the technical signal (bias) has been wrong
+            # SL_STREAK_REVERSAL times in a row on this exact side. Instead of
+            # trusting it again and eating a 4th stop-out, take the opposite side.
+            reversed_entry = (
+                state.get("streak_side") == natural_side
+                and (state.get("streak_count") or 0) >= SL_STREAK_REVERSAL
+            )
+            is_long = (not natural_is_long) if reversed_entry else natural_is_long
+
             entry = price
             tp = entry + TP_DOLLAR if is_long else entry - TP_DOLLAR
             sl = entry - SL_DOLLAR if is_long else entry + SL_DOLLAR
@@ -242,14 +271,28 @@ def process_tick(state):
                 "notional": notional, "margin": margin, "opened_at": now,
                 "last_error": "",
             })
+            if reversed_entry:
+                # Fresh start post-flip — don't let the old streak carry over.
+                su.update({"streak_side": "none", "streak_count": 0, "last_reversal_at": now})
             sync(state_update=su)
-            send_telegram(
-                f"🟢 *Opened {'LONG' if is_long else 'SHORT'}*\n"
-                f"Entry ${entry:.4f}\n"
-                f"TP ${tp:.4f} | SL ${sl:.4f}\n"
-                f"Notional ${notional:.2f} | Balance ${balance:.4f}"
-            )
-            return "opened", f"{'LONG' if is_long else 'SHORT'} @ ${entry:.4f}"
+
+            if reversed_entry:
+                send_telegram(
+                    f"🔁 *Auto-Reversal* — {natural_side.upper()} signal ignored after "
+                    f"{SL_STREAK_REVERSAL}x consecutive SL\n"
+                    f"🟢 *Opened {'LONG' if is_long else 'SHORT'}* (reversed)\n"
+                    f"Entry ${entry:.4f}\n"
+                    f"TP ${tp:.4f} | SL ${sl:.4f}\n"
+                    f"Notional ${notional:.2f} | Balance ${balance:.4f}"
+                )
+            else:
+                send_telegram(
+                    f"🟢 *Opened {'LONG' if is_long else 'SHORT'}*\n"
+                    f"Entry ${entry:.4f}\n"
+                    f"TP ${tp:.4f} | SL ${sl:.4f}\n"
+                    f"Notional ${notional:.2f} | Balance ${balance:.4f}"
+                )
+            return "opened", f"{'LONG' if is_long else 'SHORT'} @ ${entry:.4f}" + (" (reversed)" if reversed_entry else "")
 
     # No action
     sync(state_update=su)
