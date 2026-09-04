@@ -177,7 +177,7 @@ def process_tick(state):
             gross = diff * (notional / entry)
             fees = notional * FEE_RATE * 2
             net = gross - fees
-            new_balance = state["balance"] + margin + net
+            new_balance = state["balance"] + net  # margin is virtual sizing only, never reserved from balance
             reason = "TP" if hit_tp else "SL"
 
             trade = {
