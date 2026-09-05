@@ -30,14 +30,15 @@ SL_ATR_MULT = 1.5     # SL distance = 1.5 x 1m ATR (scales with real movement)
 TP_SL_RATIO = 1.33    # TP distance = 1.33 x SL distance (same R:R as before)
 ATR_MIN = 0.0008      # scalper: trade in all but the deadest minutes
 MIN_SL_DIST = 0.004   # absolute floor so SL is never absurdly tight
-TRAIL_TRIGGER = 0.5   # trail activates once price is 50% of the way to TP
-TRAIL_DIST = 0.35     # trail stop follows 35% of TP-distance behind price
-TIME_STOP_MIN = 30    # recycle a stale position at market after N minutes
+TRAIL_TRIGGER = 0.3   # trail activates once price is 30% of the way to TP
+TRAIL_DIST = 0.25     # trail stop follows 25% of TP-distance behind price
+TIME_STOP_MIN = 20    # recycle a stale position at market after N minutes
 SL_STREAK_REVERSAL = 3  # after N consecutive SLs on one side, flip the next entry
 SL_COOLDOWN_SECONDS = 180  # after a stop-out, wait this long before re-entering (chop protection)
 RSI_PERIOD = 14
-RSI_LONG_ENTRY = 35   # in bull bias: buy when 1m RSI crosses back UP through this (dip ends)
-RSI_SHORT_ENTRY = 65  # in bear bias: sell when 1m RSI crosses back DOWN through this (spike ends)
+RSI_LONG_ENTRY = 40   # in bull bias: buy when 1m RSI crosses back UP through this (dip ends)
+RSI_SHORT_ENTRY = 60   # in bear bias: sell when 1m RSI crosses back DOWN through this (spike ends)
+RSI_EARLY_VELOCITY = 3  # early entry: RSI still below/above gate but swinging this fast
 LEVERAGE = 10
 START_BALANCE = 3.0
 FEE_RATE = 0.0006
@@ -332,10 +333,19 @@ def process_tick(state):
 
         just_turned = False
         if cur_rsi is not None and prev_rsi is not None:
-            if bias == "bull" and prev_rsi < RSI_LONG_ENTRY <= cur_rsi:
-                just_turned = True  # dip just ended — buy the discount
-            elif bias == "bear" and prev_rsi > RSI_SHORT_ENTRY >= cur_rsi:
-                just_turned = True  # spike just ended — sell the premium
+            if bias == "bull":
+                # cross: dip just ended — buy the discount
+                if prev_rsi < RSI_LONG_ENTRY <= cur_rsi:
+                    just_turned = True
+                # early: RSI still low but swinging up fast — catch the turn
+                # before the cross completes (more chances, same direction logic)
+                elif cur_rsi < RSI_LONG_ENTRY and cur_rsi - prev_rsi >= RSI_EARLY_VELOCITY:
+                    just_turned = True
+            elif bias == "bear":
+                if prev_rsi > RSI_SHORT_ENTRY >= cur_rsi:
+                    just_turned = True
+                elif cur_rsi > RSI_SHORT_ENTRY and prev_rsi - cur_rsi >= RSI_EARLY_VELOCITY:
+                    just_turned = True
 
         # SL cooldown: after a stop-out, wait before re-entering. The 2026-09-05
         # postmortem showed rapid-fire re-entries losing 9x in a row in chop.
