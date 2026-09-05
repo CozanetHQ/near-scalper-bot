@@ -28,6 +28,8 @@ PRODUCT = "USDT-FUTURES"
 TP_DOLLAR = 0.02
 SL_DOLLAR = 0.015
 SL_STREAK_REVERSAL = 3  # after N consecutive SLs on one side, flip the next entry
+SL_COOLDOWN_SECONDS = 180  # after a stop-out, wait this long before re-entering (chop protection)
+MIN_BODY_RATIO = 0.35  # turning candle body must be >= 35% of its range (filters doji noise)
 LEVERAGE = 10
 START_BALANCE = 3.0
 FEE_RATE = 0.0006
@@ -104,8 +106,14 @@ def send_telegram(text):
 
 
 def get_state():
-    data = http_get(BASE44_DASHBOARD)
-    return (data or {}).get("state") or {}
+    data = http_get(BASE44_DASHBOARD) or {}
+    state = data.get("state") or {}
+    # Attach the latest CLOSED trade (used for the post-SL cooldown).
+    trades = data.get("trades") or []
+    if trades:
+        state["_last_close"] = trades[0].get("closed_at")
+        state["_last_reason"] = trades[0].get("reason")
+    return state
 
 
 def sync(state_update=None, trade=None):
@@ -120,7 +128,7 @@ def process_tick(state):
     """One poll cycle. Returns (action, details)."""
     c4h = fetch_candles("4H", 2)
     c15m = fetch_candles("15m", 2)
-    c1m = fetch_candles("1m", 3)
+    c1m = fetch_candles("1m", 4)
     ticker = fetch_ticker()
 
     forming_4h = c4h[-1]
@@ -132,6 +140,10 @@ def process_tick(state):
     color_15m = candle_color(forming_15m)
     color_1m = candle_color(forming_1m)
     prev_color_1m = candle_color(prev_1m)
+    # Closed-candle confirmation data: the forming candle can flicker color
+    # mid-minute, so entries must be confirmed on candles that already closed.
+    last_closed_1m = c1m[-2]
+    prior_closed_1m = c1m[-3] if len(c1m) > 3 else last_closed_1m
     price = ticker["last"]
     bias = color_4h if color_4h == color_15m else "none"
 
@@ -240,7 +252,29 @@ def process_tick(state):
 
     # Flat -> check entry
     if bias != "none" and state.get("status") == "running":
-        just_turned = prev_color_1m != color_1m and color_1m == bias
+        # Entry signal confirmed on CLOSED 1m candles only — no mid-candle flicker entries.
+        just_turned = (candle_color(prior_closed_1m) != candle_color(last_closed_1m)
+                       and candle_color(last_closed_1m) == bias)
+
+        # Body-strength filter: the turning candle must have a real directional body,
+        # not a doji — filters noise flips in chop.
+        body = abs(last_closed_1m["close"] - last_closed_1m["open"])
+        rng = last_closed_1m["high"] - last_closed_1m["low"]
+        if rng > 0 and body < MIN_BODY_RATIO * rng:
+            just_turned = False
+
+        # SL cooldown: after a stop-out, wait before re-entering. The 2026-09-05
+        # postmortem showed rapid-fire re-entries losing 9x in a row in chop.
+        if just_turned and state.get("_last_reason") == "SL" and state.get("_last_close"):
+            try:
+                last_sl = datetime.fromisoformat(state["_last_close"])
+                elapsed = (datetime.now(timezone.utc) - last_sl).total_seconds()
+                if elapsed < SL_COOLDOWN_SECONDS:
+                    sync(state_update=su)
+                    return "none", f"SL cooldown {int(elapsed)}/{SL_COOLDOWN_SECONDS}s"
+            except (ValueError, TypeError):
+                pass  # unparsable timestamp — skip the cooldown check
+
         if just_turned:
             balance = state.get("balance") or START_BALANCE
             notional = min(balance * LEVERAGE * 0.8, 25)
