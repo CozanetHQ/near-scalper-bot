@@ -9,7 +9,7 @@ Flow (every 15s for ~4.4 min):
   1. GET current state from Base44 (dashboard endpoint)
   2. Fetch forming 4H/15M/1M candles + ticker from Bitget
   3. Bias = 4H color == 15M color
-  4. If position open -> check TP ($0.02) / SL ($0.015)
+  4. If position open -> ATR-scaled TP/SL, ratcheting trailing stop, time-stop
   5. If flat + bias + 1M RSI pullback trigger (dip-buy / spike-sell) -> open
   6. POST updates/trades to Base44 sync endpoint (secret protected)
 """
@@ -25,8 +25,14 @@ from datetime import datetime, timezone
 BITGET = "https://api.bitget.com/api/v2/mix/market"
 SYMBOL = "NEARUSDT"
 PRODUCT = "USDT-FUTURES"
-TP_DOLLAR = 0.02
-SL_DOLLAR = 0.015
+ATR_PERIOD = 14
+SL_ATR_MULT = 1.5     # SL distance = 1.5 x 1m ATR (scales with real movement)
+TP_SL_RATIO = 1.33    # TP distance = 1.33 x SL distance (same R:R as before)
+ATR_MIN = 0.0015      # skip entries when 1m ATR is below this (dead market)
+MIN_SL_DIST = 0.006   # absolute floor so SL is never absurdly tight
+TRAIL_TRIGGER = 0.5   # trail activates once price is 50% of the way to TP
+TRAIL_DIST = 0.35     # trail stop follows 35% of TP-distance behind price
+TIME_STOP_MIN = 30    # recycle a stale position at market after N minutes
 SL_STREAK_REVERSAL = 3  # after N consecutive SLs on one side, flip the next entry
 SL_COOLDOWN_SECONDS = 180  # after a stop-out, wait this long before re-entering (chop protection)
 RSI_PERIOD = 14
@@ -105,6 +111,72 @@ def compute_rsi(closes, period=RSI_PERIOD):
     if losses == 0:
         return 100.0
     return 100.0 - (100.0 / (1.0 + gains / losses))
+
+
+def compute_atr(candles, period=ATR_PERIOD):
+    """Simple ATR on CLOSED candles (oldest -> newest). Needs period+1 candles."""
+    if len(candles) < period + 1:
+        return None
+    trs = []
+    for i in range(1, len(candles)):
+        c, p = candles[i], candles[i - 1]
+        trs.append(max(c["high"] - c["low"], abs(c["high"] - p["close"]), abs(c["low"] - p["close"])))
+    return sum(trs[-period:]) / period
+
+
+def finalize_close(state, exit_price, reason, now, su):
+    """Close the open position at exit_price. Mutates su with the full close update.
+    Returns (trade, new_balance, streak_count, closed_side)."""
+    is_long = state["side"] == "long"
+    notional = state["notional"]
+    margin = state["margin"]
+    entry = state["entry_price"]
+    diff = (exit_price - entry) if is_long else (entry - exit_price)
+    gross = diff * (notional / entry)
+    fees = notional * FEE_RATE * 2
+    net = gross - fees
+    new_balance = state["balance"] + net  # margin is virtual sizing only, never reserved from balance
+
+    trade = {
+        "side": state["side"],
+        "entry_price": entry,
+        "exit_price": exit_price,
+        "notional": notional,
+        "margin": margin,
+        "gross_pnl": round(gross, 6),
+        "fees": round(fees, 6),
+        "net_pnl": round(net, 6),
+        "reason": reason,
+        "balance_after": round(new_balance, 6),
+        "opened_at": state.get("opened_at"),
+        "closed_at": now,
+    }
+
+    total_trades = (state.get("total_trades") or 0) + 1
+    wins = (state.get("wins") or 0) + (1 if net > 0 else 0)
+    losses = (state.get("losses") or 0) + (1 if net <= 0 else 0)
+
+    # Anti-whipsaw streak tracking: count consecutive SLs on the SAME side.
+    # A TP (or neutral time-stop exit) resets the streak.
+    closed_side = state["side"]
+    if reason == "SL":
+        if state.get("streak_side") == closed_side:
+            streak_count = (state.get("streak_count") or 0) + 1
+        else:
+            streak_count = 1
+        streak_side = closed_side
+    else:
+        streak_count = 0
+        streak_side = "none"
+
+    su.update({
+        "position_open": False, "side": "none", "entry_price": 0,
+        "tp_price": 0, "sl_price": 0, "notional": 0, "margin": 0,
+        "opened_at": None, "balance": round(new_balance, 6),
+        "total_trades": total_trades, "wins": wins, "losses": losses,
+        "last_error": "", "streak_side": streak_side, "streak_count": streak_count,
+    })
+    return trade, new_balance, streak_count, closed_side
 
 
 def send_telegram(text):
@@ -194,70 +266,57 @@ def process_tick(state):
 
         if hit_tp or hit_sl:
             exit_price = state["tp_price"] if hit_tp else state["sl_price"]
-            notional = state["notional"]
-            margin = state["margin"]
-            entry = state["entry_price"]
-            diff = (exit_price - entry) if is_long else (entry - exit_price)
-            gross = diff * (notional / entry)
-            fees = notional * FEE_RATE * 2
-            net = gross - fees
-            new_balance = state["balance"] + net  # margin is virtual sizing only, never reserved from balance
             reason = "TP" if hit_tp else "SL"
-
-            trade = {
-                "side": state["side"],
-                "entry_price": entry,
-                "exit_price": exit_price,
-                "notional": notional,
-                "margin": margin,
-                "gross_pnl": round(gross, 6),
-                "fees": round(fees, 6),
-                "net_pnl": round(net, 6),
-                "reason": reason,
-                "balance_after": round(new_balance, 6),
-                "opened_at": state.get("opened_at"),
-                "closed_at": now,
-            }
-
-            total_trades = (state.get("total_trades") or 0) + 1
-            wins = (state.get("wins") or 0) + (1 if net > 0 else 0)
-            losses = (state.get("losses") or 0) + (1 if net <= 0 else 0)
-
-            # Anti-whipsaw streak tracking: count consecutive SLs on the SAME side.
-            # A TP (a real win) or a switch to the other side resets the streak.
-            closed_side = state["side"]
-            if reason == "SL":
-                if state.get("streak_side") == closed_side:
-                    streak_count = (state.get("streak_count") or 0) + 1
-                else:
-                    streak_count = 1
-                streak_side = closed_side
-            else:  # TP — the market rewarded this direction, streak is over
-                streak_count = 0
-                streak_side = "none"
-
-            su.update({
-                "position_open": False, "side": "none", "entry_price": 0,
-                "tp_price": 0, "sl_price": 0, "notional": 0, "margin": 0,
-                "opened_at": None, "balance": round(new_balance, 6),
-                "total_trades": total_trades, "wins": wins, "losses": losses,
-                "last_error": "", "streak_side": streak_side, "streak_count": streak_count,
-            })
-
-            fresh = sync(state_update=su, trade=trade)
-            pnl_str = f"+${net:.4f}" if net >= 0 else f"-${abs(net):.4f}"
+            trade, new_balance, streak_count, closed_side = finalize_close(state, exit_price, reason, now, su)
+            sync(state_update=su, trade=trade)
+            pnl_str = f"+${trade['net_pnl']:.4f}" if trade["net_pnl"] >= 0 else f"-${abs(trade['net_pnl']):.4f}"
             streak_note = ""
             if reason == "SL" and streak_count >= SL_STREAK_REVERSAL:
                 streak_note = f"\n⚠️ {streak_count}x consecutive {closed_side.upper()} SL — next signal will auto-reverse"
             send_telegram(
                 f"🔄 *Closed* {state['side'].upper()} ({reason})\n"
-                f"Entry ${entry:.4f} → Exit ${exit_price:.4f}\n"
+                f"Entry ${state['entry_price']:.4f} → Exit ${exit_price:.4f}\n"
                 f"PnL {pnl_str} | Balance ${new_balance:.4f}"
                 f"{streak_note}"
             )
             return "closed", f"{state['side']} {reason} @ ${exit_price:.4f} PnL {pnl_str}"
 
-        # No hit — update market fields only
+        # Trailing stop: once the move is TRAIL_TRIGGER of the way to TP, the
+        # stop ratchets behind price — breakeven first, then a locked profit.
+        # It only tightens, never loosens.
+        entry = state["entry_price"]
+        tp_d = abs(state["tp_price"] - entry)
+        if tp_d > 0:
+            if is_long:
+                if price - entry >= TRAIL_TRIGGER * tp_d:
+                    new_sl = max(state["sl_price"], price - TRAIL_DIST * tp_d)
+                    if new_sl > state["sl_price"] + 1e-9:
+                        su["sl_price"] = new_sl
+            else:
+                if entry - price >= TRAIL_TRIGGER * tp_d:
+                    new_sl = min(state["sl_price"], price + TRAIL_DIST * tp_d)
+                    if new_sl < state["sl_price"] - 1e-9:
+                        su["sl_price"] = new_sl
+
+        # Time stop: a scalp that goes nowhere for TIME_STOP_MIN minutes gets
+        # recycled at market — dead capital is a loss of opportunity, not a position.
+        opened = state.get("opened_at")
+        if opened:
+            try:
+                held_min = (datetime.now(timezone.utc) - datetime.fromisoformat(opened)).total_seconds() / 60
+            except (ValueError, TypeError):
+                held_min = 0
+            if held_min >= TIME_STOP_MIN:
+                trade, new_balance, _sc, _cs = finalize_close(state, price, "TIME", now, su)
+                sync(state_update=su, trade=trade)
+                pnl_str = f"+${trade['net_pnl']:.4f}" if trade["net_pnl"] >= 0 else f"-${abs(trade['net_pnl']):.4f}"
+                send_telegram(
+                    f"⏱️ *Time-Stop* {state['side'].upper()} recycled after {int(held_min)}m\n"
+                    f"PnL {pnl_str} | Balance ${new_balance:.4f}"
+                )
+                return "closed", f"{state['side']} TIME @ ${price:.4f} PnL {pnl_str}"
+
+        # No hit — update market fields only (plus any tightened trail stop)
         sync(state_update=su)
         return "none", f"position open ({state['side']}) price=${price:.4f}"
 
@@ -310,9 +369,17 @@ def process_tick(state):
             )
             is_long = (not natural_is_long) if reversed_entry else natural_is_long
 
+            # Volatility-scaled targets: wide when the market actually moves,
+            # tight when it's dozing. Never trade a dead market.
+            atr = compute_atr(c1m[:-1])
+            if atr is None or atr < ATR_MIN:
+                sync(state_update=su)
+                return "none", f"entry skipped - dead market (atr={atr})"
+            sl_dist = max(SL_ATR_MULT * atr, MIN_SL_DIST)
+            tp_dist = TP_SL_RATIO * sl_dist
             entry = price
-            tp = entry + TP_DOLLAR if is_long else entry - TP_DOLLAR
-            sl = entry - SL_DOLLAR if is_long else entry + SL_DOLLAR
+            tp = entry + tp_dist if is_long else entry - tp_dist
+            sl = entry - sl_dist if is_long else entry + sl_dist
 
             su.update({
                 "position_open": True, "side": "long" if is_long else "short",
