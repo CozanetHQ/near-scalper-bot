@@ -28,8 +28,8 @@ PRODUCT = "USDT-FUTURES"
 ATR_PERIOD = 14
 SL_ATR_MULT = 1.5     # SL distance = 1.5 x 1m ATR (scales with real movement)
 TP_SL_RATIO = 1.33    # TP distance = 1.33 x SL distance (same R:R as before)
-ATR_MIN = 0.0015      # skip entries when 1m ATR is below this (dead market)
-MIN_SL_DIST = 0.006   # absolute floor so SL is never absurdly tight
+ATR_MIN = 0.0008      # scalper: trade in all but the deadest minutes
+MIN_SL_DIST = 0.004   # absolute floor so SL is never absurdly tight
 TRAIL_TRIGGER = 0.5   # trail activates once price is 50% of the way to TP
 TRAIL_DIST = 0.35     # trail stop follows 35% of TP-distance behind price
 TIME_STOP_MIN = 30    # recycle a stale position at market after N minutes
