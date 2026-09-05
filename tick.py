@@ -10,7 +10,7 @@ Flow (every 15s for ~4.4 min):
   2. Fetch forming 4H/15M/1M candles + ticker from Bitget
   3. Bias = 4H color == 15M color
   4. If position open -> check TP ($0.02) / SL ($0.015)
-  5. If flat + bias + 1M just turned to bias color -> open
+  5. If flat + bias + 1M RSI pullback trigger (dip-buy / spike-sell) -> open
   6. POST updates/trades to Base44 sync endpoint (secret protected)
 """
 
@@ -29,7 +29,9 @@ TP_DOLLAR = 0.02
 SL_DOLLAR = 0.015
 SL_STREAK_REVERSAL = 3  # after N consecutive SLs on one side, flip the next entry
 SL_COOLDOWN_SECONDS = 180  # after a stop-out, wait this long before re-entering (chop protection)
-MIN_BODY_RATIO = 0.35  # turning candle body must be >= 35% of its range (filters doji noise)
+RSI_PERIOD = 14
+RSI_LONG_ENTRY = 35   # in bull bias: buy when 1m RSI crosses back UP through this (dip ends)
+RSI_SHORT_ENTRY = 65  # in bear bias: sell when 1m RSI crosses back DOWN through this (spike ends)
 LEVERAGE = 10
 START_BALANCE = 3.0
 FEE_RATE = 0.0006
@@ -92,6 +94,19 @@ def candle_color(c):
     return "bull" if c["close"] >= c["open"] else "bear"
 
 
+def compute_rsi(closes, period=RSI_PERIOD):
+    """Cutler's RSI on a list of closes (oldest -> newest). Returns None if not enough data."""
+    if len(closes) < period + 1:
+        return None
+    deltas = [closes[i + 1] - closes[i] for i in range(len(closes) - 1)]
+    window = deltas[-period:]
+    gains = sum(d for d in window if d > 0) / period
+    losses = sum(-d for d in window if d < 0) / period
+    if losses == 0:
+        return 100.0
+    return 100.0 - (100.0 / (1.0 + gains / losses))
+
+
 def send_telegram(text):
     if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID or TELEGRAM_CHAT_ID == "dummy":
         return
@@ -128,7 +143,7 @@ def process_tick(state):
     """One poll cycle. Returns (action, details)."""
     c4h = fetch_candles("4H", 2)
     c15m = fetch_candles("15m", 2)
-    c1m = fetch_candles("1m", 4)
+    c1m = fetch_candles("1m", 20)
     ticker = fetch_ticker()
 
     forming_4h = c4h[-1]
@@ -140,10 +155,6 @@ def process_tick(state):
     color_15m = candle_color(forming_15m)
     color_1m = candle_color(forming_1m)
     prev_color_1m = candle_color(prev_1m)
-    # Closed-candle confirmation data: the forming candle can flicker color
-    # mid-minute, so entries must be confirmed on candles that already closed.
-    last_closed_1m = c1m[-2]
-    prior_closed_1m = c1m[-3] if len(c1m) > 3 else last_closed_1m
     price = ticker["last"]
     bias = color_4h if color_4h == color_15m else "none"
 
@@ -252,16 +263,20 @@ def process_tick(state):
 
     # Flat -> check entry
     if bias != "none" and state.get("status") == "running":
-        # Entry signal confirmed on CLOSED 1m candles only — no mid-candle flicker entries.
-        just_turned = (candle_color(prior_closed_1m) != candle_color(last_closed_1m)
-                       and candle_color(last_closed_1m) == bias)
+        # RSI pullback trigger: buy weakness in uptrends, sell strength in
+        # downtrends. The old 1m color-flip trigger chased breakouts and bought
+        # local tops (15.9% win rate over 208 trades) — this is the fix for that.
+        # Uses CLOSED candles only; the forming candle is excluded.
+        closed_closes = [c["close"] for c in c1m[:-1]]
+        cur_rsi = compute_rsi(closed_closes)
+        prev_rsi = compute_rsi(closed_closes[:-1]) if len(closed_closes) > RSI_PERIOD + 1 else None
 
-        # Body-strength filter: the turning candle must have a real directional body,
-        # not a doji — filters noise flips in chop.
-        body = abs(last_closed_1m["close"] - last_closed_1m["open"])
-        rng = last_closed_1m["high"] - last_closed_1m["low"]
-        if rng > 0 and body < MIN_BODY_RATIO * rng:
-            just_turned = False
+        just_turned = False
+        if cur_rsi is not None and prev_rsi is not None:
+            if bias == "bull" and prev_rsi < RSI_LONG_ENTRY <= cur_rsi:
+                just_turned = True  # dip just ended — buy the discount
+            elif bias == "bear" and prev_rsi > RSI_SHORT_ENTRY >= cur_rsi:
+                just_turned = True  # spike just ended — sell the premium
 
         # SL cooldown: after a stop-out, wait before re-entering. The 2026-09-05
         # postmortem showed rapid-fire re-entries losing 9x in a row in chop.
