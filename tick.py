@@ -34,6 +34,20 @@ MAX_POSITIONS = 8    # hedge scalper: multiple concurrent positions — wedged t
 MARGIN_BUDGET = 0.80  # total margin across all open positions <= 80% of balance
 ENTRY_COOLDOWN_SEC = 90  # min seconds between entries — one signal cluster can't fill all slots
 HEARTBEAT_SEC = 3600  # if no open/close events for an hour, ping Telegram so silence never looks like downtime
+
+# ── REGIME HARDENING (owner 09-06: "build against this kind of regime") ──
+# Failure mode observed live + in lab: one-way vertical moves wedge every
+# counter-trend slot (longs at the local top, shorts at the local bottom).
+# ENTRY THROTTLE — inventory cap (owner 09-06: "build against this kind of regime").
+# NOT a stop loss: nothing ever closes, no loss is realized. It only stops ADDING
+# new positions while floating damage exceeds this share of balance, so a one-way
+# regime can't stack unlimited wedges. The grind resumes as floating recovers.
+INVENTORY_CAP = float(os.environ.get("INVENTORY_CAP", "999"))  # OFF by default — lab 09-06: every throttle variant starved the grind that pays for wedges (raw equity -$0.26 vs -$3.2 to -$5.3 hardened)
+# Slot recycling: a position stuck for hours relaxes its TP toward entry.
+# It NEVER crosses entry — no loss is ever realized. It just stops demanding
+# full profit to free the slot. Fees are always covered (keep > fee buffer).
+TP_AGING = os.environ.get("TP_AGING", "1") == "1"
+TP_AGING_TIERS = [(6, 0.5), (24, 0.25), (72, 0.10)]  # (hours stuck, fraction of TP distance kept)
 MIN_TP_DIST = 0.003  # TP floor: ~0.13% — below this, fees eat the scalp alive
 EMA_FAST = 9         # scalper momentum: EMA9 vs EMA21 on 1m closes
 EMA_SLOW = 21
@@ -255,6 +269,31 @@ def sync(state_update=None, trade=None):
     return data.get("state") or {}
 
 
+def aged_tp(pos, now):
+    """TP after aging: a stuck position relaxes its target toward entry.
+    Never crosses entry (no realized loss), always covers fees."""
+    tp = pos["tp_price"]
+    if not TP_AGING or not pos.get("opened_at"):
+        return tp
+    try:
+        age_h = (datetime.fromisoformat(now) - datetime.fromisoformat(pos["opened_at"])).total_seconds() / 3600
+    except (ValueError, TypeError):
+        return tp
+    if age_h < TP_AGING_TIERS[0][0]:
+        return tp
+    dist = abs(tp - pos["entry_price"])
+    if dist <= 0:
+        return tp
+    fee_buffer = pos["entry_price"] * (FEE_RATE * 2 + 0.0006)  # round-trip fees + crumb
+    keep = dist
+    for hours, frac in TP_AGING_TIERS:
+        if age_h >= hours:
+            keep = max(dist * frac, fee_buffer * 1.05)
+    if pos["side"] == "long":
+        return pos["entry_price"] + keep
+    return pos["entry_price"] - keep
+
+
 def close_position(pos, exit_price, reason, now, balance):
     """Close ONE position. Returns (trade_record, new_balance)."""
     is_long = pos["side"] == "long"
@@ -361,7 +400,9 @@ def process_tick(state):
     closed_any = []
     still_open = []
     for pos in positions:
-        tp = pos.get("tp_price") or 0
+        tp = aged_tp(pos, now)
+        if tp != (pos.get("tp_price") or 0):
+            pos["tp_price"] = tp  # aged — persisted via serialize
         if tp <= 0:
             continue
         is_long = pos["side"] == "long"
@@ -404,6 +445,7 @@ def process_tick(state):
         last_closed = c1m[-2] if len(c1m) >= 2 else c1m[-1]
         last_color = candle_color(last_closed)
         want = None
+        regime_ok = True
         if atr is not None and ema_fast is not None and ema_slow is not None:
             if atr >= atr_gate:
                 momentum = "bull" if ema_fast > ema_slow else "bear"
@@ -411,6 +453,15 @@ def process_tick(state):
                     want = "long"   # uptrend pullback — buy the dip candle
                 elif momentum == "bear" and last_color == "bull" and price < ema_slow:
                     want = "short"  # downtrend rally — sell the rip candle
+        if want:
+            # inventory cap: how much are the open positions floating right now?
+            floating_now = 0.0
+            for p in still_open:
+                u = (price - p["entry_price"]) * (p["notional"] / p["entry_price"]) if p["side"] == "long" \
+                    else (p["entry_price"] - price) * (p["notional"] / p["entry_price"])
+                floating_now += u
+            if floating_now < -abs(INVENTORY_CAP) * balance:
+                want = None  # wedge inventory too deep — pause new entries, let TPs work
         entry_cooldown_ok = True
         if still_open:
             try:
