@@ -26,15 +26,16 @@ BITGET = "https://api.bitget.com/api/v2/mix/market"
 SYMBOL = "NEARUSDT"
 PRODUCT = "USDT-FUTURES"
 ATR_PERIOD = 14
-SL_ATR_MULT = 1.5     # SL distance = 1.5 x 1m ATR (scales with real movement)
-TP_SL_RATIO = 1.33    # TP distance = 1.33 x SL distance (same R:R as before)
-ATR_MIN = 0.0008      # scalper: trade in all but the deadest minutes
-MIN_SL_DIST = 0.004   # absolute floor so SL is never absurdly tight
-TRAIL_TRIGGER = 0.3   # trail activates once price is 30% of the way to TP
-TRAIL_DIST = 0.25     # trail stop follows 25% of TP-distance behind price
+SL_ATR_MULT = 2.0     # SL distance = 2.0 x 1m ATR (survives 1m noise, not spooked out in seconds)
+TP_SL_RATIO = 1.8     # TP distance = 1.8 x SL distance — must clear the ~0.12% RT fee tax with real edge
+ATR_MIN = 0.0015      # only trade when 1m ATR shows real movement (fee math dies on dead minutes)
+NIGHT_ATR_MIN = 0.0020  # 21:00-07:00 UTC thin-session chop needs a much bigger move to be worth fees
+MIN_SL_DIST = 0.005   # absolute floor so SL is never absurdly tight
+TRAIL_TRIGGER = 0.55  # trail activates past halfway to TP — let winners travel
+TRAIL_DIST = 0.35     # trail stop follows 35% of TP-distance behind price
 TIME_STOP_MIN = 20    # recycle a stale position at market after N minutes
 SL_STREAK_REVERSAL = 3  # after N consecutive SLs on one side, flip the next entry
-SL_COOLDOWN_SECONDS = 180  # after a stop-out, wait this long before re-entering (chop protection)
+SL_COOLDOWN_SECONDS = 240  # after a stop-out, wait before re-entering (chop protection)
 RSI_PERIOD = 14
 RSI_LONG_ENTRY = 40   # in bull bias: buy when 1m RSI crosses back UP through this (dip ends)
 RSI_SHORT_ENTRY = 60   # in bear bias: sell when 1m RSI crosses back DOWN through this (spike ends)
@@ -251,7 +252,20 @@ def process_tick(state):
         hit_sl = price <= state["sl_price"] if is_long else price >= state["sl_price"]
         if not hit_tp and not hit_sl:
             scan = fetch_candles("1m", 15)
+            # Only candles that formed AFTER entry count as our risk. Pre-entry
+            # candles routinely bracket the SL level on pullback entries —
+            # scanning them killed positions in <30s (2026-09-06 postmortem:
+            # avg hold 24s, 11 instant SLs). The live price check covers the
+            # entry candle; this scan covers between-poll gaps only.
+            opened_ms = None
+            if state.get("opened_at"):
+                try:
+                    opened_ms = int(datetime.fromisoformat(state["opened_at"]).timestamp() * 1000)
+                except (ValueError, TypeError):
+                    opened_ms = None
             for candle in scan:
+                if opened_ms is not None and candle["ts"] < opened_ms:
+                    continue  # candle closed before we even entered — history, not risk
                 if is_long:
                     c_sl = candle["low"] <= state["sl_price"]
                     c_tp = candle["high"] >= state["tp_price"]
@@ -382,9 +396,12 @@ def process_tick(state):
             # Volatility-scaled targets: wide when the market actually moves,
             # tight when it's dozing. Never trade a dead market.
             atr = compute_atr(c1m[:-1])
-            if atr is None or atr < ATR_MIN:
+            hour = datetime.now(timezone.utc).hour
+            night = hour >= 21 or hour < 7
+            atr_gate = NIGHT_ATR_MIN if night else ATR_MIN
+            if atr is None or atr < atr_gate:
                 sync(state_update=su)
-                return "none", f"entry skipped - dead market (atr={atr})"
+                return "none", f"entry skipped - thin market (atr={atr:.4f} < gate {atr_gate:.4f}{' night' if night else ''})"
             sl_dist = max(SL_ATR_MULT * atr, MIN_SL_DIST)
             tp_dist = TP_SL_RATIO * sl_dist
             entry = price

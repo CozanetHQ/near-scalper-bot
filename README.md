@@ -24,8 +24,9 @@ Paper trading bot for NEARUSDT on Bitget Futures. Runs 24/7 via GitHub Actions c
 | Symbol | NEARUSDT (Bitget USDT-M perpetual) |
 | Higher TF Bias | 4H + 15M must be same color |
 | Entry | 1M candle turns to bias color |
-| Take Profit | +$0.20 |
-| Stop Loss | -$0.15 |
+| Take Profit | 1.8 × SL distance (ATR-scaled) |
+| Stop Loss | 2.0 × 1m ATR, floor $0.005 |
+| ATR gate | 0.0015 day / 0.0020 night (21:00–07:00 UTC) |
 | Leverage | 10x Isolated |
 | Max Positions | 1 |
 | Start Balance | $3.00 virtual |
