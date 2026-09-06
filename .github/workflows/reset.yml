@@ -1,0 +1,38 @@
+name: Reset Account
+on:
+  workflow_dispatch:
+    inputs:
+      balance:
+        description: "Reset balance to this amount"
+        required: false
+        default: "3.0"
+
+jobs:
+  reset:
+    runs-on: ubuntu-latest
+    steps:
+      - name: POST state reset to sync endpoint
+        run: |
+          python3 - << 'PY'
+          import json, os, urllib.request
+          bal = float("${{ github.event.inputs.balance }}" or "3.0")
+          state = {
+              "balance": bal, "position_open": False, "side": "none",
+              "entry_price": 0, "tp_price": 0, "sl_price": 0, "notional": 0, "margin": 0,
+              "opened_at": None, "total_trades": 0, "wins": 0, "losses": 0,
+              "streak_count": 0, "streak_side": "none",
+              "unrealized_pnl": 0.0, "equity": bal, "open_positions": 0, "last_error": "",
+          }
+          for i in range(8):
+              state[f"pos_{i}_active"] = False
+              for f in ("side", "entry_price", "tp_price", "notional", "margin", "opened_at"):
+                  state[f"pos_{i}_{f}"] = ""
+          req = urllib.request.Request(
+              "https://superagent-ae0aaf02.base44.app/functions/nearScalperSync",
+              data=json.dumps({"state": state}).encode(),
+              headers={"Content-Type": "application/json", "X-Tick-Secret": os.environ["TICK_SECRET"]},
+              method="POST")
+          print(urllib.request.urlopen(req, timeout=15).read().decode())
+          PY
+        env:
+          TICK_SECRET: ${{ secrets.TICK_SECRET }}

@@ -28,12 +28,9 @@ PRODUCT = "USDT-FUTURES"
 ATR_PERIOD = 14
 SL_ATR_MULT = 4.0     # GRID SEARCH WINNER (1152 configs): wide stop, rarely hit
 TP_SL_RATIO = 1.5     # most exits are 20-min drift-capture time stops
-WIN_TARGET_DOLLARS = 0.15  # OWNER 09-06: each TP aims for $0.15 (margin caps scale it down)
+WIN_TARGET_DOLLARS = 0.15  # OWNER 09-06: every TP nets $0.15 flat
 SCALP_TP_ATR = 1.2   # TP distance = 1.2x 1m ATR (adaptive to live volatility)
-MAX_POSITIONS = 8    # hedge scalper: multiple concurrent positions — wedged trades don't stop the chopping
-MARGIN_BUDGET = 0.80  # total margin across all open positions <= 80% of balance
-ENTRY_COOLDOWN_SEC = 90  # min seconds between entries — one signal cluster can't fill all slots
-MIN_TP_DIST = 0.003  # TP floor: ~0.13% — below this, fees eat the scalp alive
+MIN_TP_DIST = 0.002  # TP floor: never closer than this (fee math)
 EMA_FAST = 9         # scalper momentum: EMA9 vs EMA21 on 1m closes
 EMA_SLOW = 21
 ATR_MIN = 0.0008      # GRID SEARCH WINNER: low gate — more shots on goal
@@ -254,68 +251,6 @@ def sync(state_update=None, trade=None):
     return data.get("state") or {}
 
 
-def close_position(pos, exit_price, reason, now, balance):
-    """Close ONE position. Returns (trade_record, new_balance)."""
-    is_long = pos["side"] == "long"
-    notional = pos["notional"]
-    entry = pos["entry_price"]
-    diff = (exit_price - entry) if is_long else (entry - exit_price)
-    gross = diff * (notional / entry)
-    fees = notional * FEE_RATE * 2
-    net = gross - fees
-    new_balance = balance + net
-    trade = {
-        "side": pos["side"],
-        "entry_price": entry,
-        "exit_price": exit_price,
-        "notional": notional,
-        "margin": pos["margin"],
-        "gross_pnl": round(gross, 6),
-        "fees": round(fees, 6),
-        "net_pnl": round(net, 6),
-        "reason": reason,
-        "balance_after": round(new_balance, 6),
-        "opened_at": pos["opened_at"],
-        "closed_at": now,
-    }
-    return trade, new_balance
-
-
-def serialize_positions(positions):
-    """Flatten the positions list into pos_{i}_{field} state keys — bulletproof
-    round-trip through the sync entity regardless of its array handling."""
-    out = {}
-    for i in range(MAX_POSITIONS):
-        for f in ("side", "entry_price", "tp_price", "notional", "margin", "opened_at"):
-            out[f"pos_{i}_{f}"] = ""
-        out[f"pos_{i}_active"] = False
-    for i, p in enumerate(positions[:MAX_POSITIONS]):
-        out[f"pos_{i}_active"] = True
-        for f in ("side", "entry_price", "tp_price", "notional", "margin", "opened_at"):
-            out[f"pos_{i}_{f}"] = p[f]
-    out["open_positions"] = len(positions[:MAX_POSITIONS])
-    return out
-
-
-def parse_positions(state):
-    """Rebuild the positions list from flat state keys."""
-    out = []
-    for i in range(MAX_POSITIONS):
-        if state.get(f"pos_{i}_active"):
-            try:
-                out.append({
-                    "side": state.get(f"pos_{i}_side"),
-                    "entry_price": float(state.get(f"pos_{i}_entry_price") or 0),
-                    "tp_price": float(state.get(f"pos_{i}_tp_price") or 0),
-                    "notional": float(state.get(f"pos_{i}_notional") or 0),
-                    "margin": float(state.get(f"pos_{i}_margin") or 0),
-                    "opened_at": state.get(f"pos_{i}_opened_at"),
-                })
-            except (TypeError, ValueError):
-                continue
-    return out
-
-
 def process_tick(state):
     """One poll cycle. Returns (action, details)."""
     c4h = fetch_candles("4H", 2)
@@ -345,139 +280,136 @@ def process_tick(state):
         "last_tick_at": now,
     }
 
-    # ── HEDGE SCALPER POSITION MANAGEMENT: TP only, no SL, no time-stop.
-    # Every open position runs until its own TP hits. Wedged positions simply
-    # sit and consume margin budget; the bot keeps chopping with the rest.
-    positions = parse_positions(state)
-    balance = state.get("balance") or START_BALANCE
-    scan = fetch_candles("1m", 15)  # gap-aware TP scan (shared)
-    closed_any = []
-    still_open = []
-    for pos in positions:
-        tp = pos.get("tp_price") or 0
-        if tp <= 0:
-            continue
-        is_long = pos["side"] == "long"
-        hit_tp = price >= tp if is_long else price <= tp
-        if not hit_tp:
-            opened_ms = None
-            if pos.get("opened_at"):
+    # Position open -> TP ONLY (owner 09-06: stop loss removed 100%).
+    # The position runs until TP hits — no SL, no trail, no time-stop.
+    if state.get("position_open"):
+        is_long = state.get("side") == "long"
+        tp = state.get("tp_price") or 0
+        if tp > 0:
+            hit_tp = price >= tp if is_long else price <= tp
+            if not hit_tp:
+                # gap-aware scan: any candle since entry touching TP counts
+                scan = fetch_candles("1m", 15)
+                opened_ms = None
+                if state.get("opened_at"):
+                    try:
+                        opened_ms = int(datetime.fromisoformat(state["opened_at"]).timestamp() * 1000)
+                    except (ValueError, TypeError):
+                        opened_ms = None
+                for candle in scan:
+                    if opened_ms is not None and candle["ts"] < opened_ms:
+                        continue
+                    if is_long and candle["high"] >= tp:
+                        hit_tp = True
+                        break
+                    if not is_long and candle["low"] <= tp:
+                        hit_tp = True
+                        break
+            if hit_tp:
+                trade, new_balance, _sc, _cs = finalize_close(state, tp, "TP", now, su)
+                sync(state_update=su, trade=trade)
+                pnl_str = f"+${trade['net_pnl']:.4f}" if trade['net_pnl'] >= 0 else f"-${abs(trade['net_pnl']):.4f}"
+                held = ""
                 try:
-                    opened_ms = int(datetime.fromisoformat(pos["opened_at"]).timestamp() * 1000)
-                except (ValueError, TypeError):
-                    opened_ms = None
-            for candle in scan:
-                if opened_ms is not None and candle["ts"] < opened_ms:
-                    continue
-                if is_long and candle["high"] >= tp:
-                    hit_tp = True
-                    break
-                if not is_long and candle["low"] <= tp:
-                    hit_tp = True
-                    break
-        if hit_tp:
-            trade, balance = close_position(pos, tp, "TP", now, balance)
-            closed_any.append(trade)
-            send_telegram(
-                f"\u2705 *Closed {pos['side'].upper()} (TP)*\n"
-                f"Entry ${pos['entry_price']:.4f} → TP ${tp:.4f}\n"
-                f"PnL +${trade['net_pnl']:.4f} | Balance ${balance:.4f}"
-            )
-        else:
-            still_open.append(pos)
+                    held = f" after {(datetime.now(timezone.utc)-datetime.fromisoformat(state['opened_at'])).total_seconds()/60:.0f}m"
+                except Exception:
+                    pass
+                send_telegram(
+                    f"✅ *Closed* {state['side'].upper()} (TP){held}\n"
+                    f"Entry ${state['entry_price']:.4f} → TP ${tp:.4f}\n"
+                    f"PnL {pnl_str} | Balance ${new_balance:.4f}"
+                )
+                return "closed", f"{state['side']} TP @ ${tp:.4f} PnL {pnl_str}"
+        # No hit — update market fields only; the position runs until TP
+        sync(state_update=su)
+        return "none", f"position open ({state['side']}) price=${price:.4f}"
 
-    # ── ENTRY: chop the CURRENT move. Pullback candle in live momentum = entry.
+    # Flat -> check entry. SCALPER MODE (owner 09-06): chop moves as they go.
+    # Up-move -> buy the pullback candles; down-move -> sell the rally candles.
     if state.get("status") == "running":
+        # circuit breakers stay (harmless in TP-only mode, but kept for safety)
+        bal = state.get("balance") or START_BALANCE
+        dsb = state.get("_day_start_balance") or bal
+        if dsb > 0 and bal < dsb * (1 - DAILY_LOSS_LIMIT):
+            sync(state_update=su)
+            return "none", f"RISK-OFF: daily loss limit ({(bal/dsb-1)*100:.1f}% today)"
+        if (state.get("streak_count") or 0) >= MAX_STREAK and state.get("streak_side") in ("long", "short"):
+            try:
+                elapsed = (datetime.now(timezone.utc) - datetime.fromisoformat(state["_last_close"])).total_seconds()
+            except (KeyError, ValueError, TypeError):
+                elapsed = STREAK_PAUSE_SEC
+            if elapsed < STREAK_PAUSE_SEC:
+                sync(state_update=su)
+                return "none", f"RISK-OFF: SL streak pause ({int(STREAK_PAUSE_SEC-elapsed)}s left)"
+
         atr = compute_atr(c1m[:-1])
+        if atr is None:
+            sync(state_update=su)
+            return "none", "not enough data"
+        # dead-market gate stays (fees kill dead-minute scalps)
         hour = datetime.now(timezone.utc).hour
         atr_gate = NIGHT_ATR_MIN if (hour < 7 or hour >= 21) else ATR_MIN
+        if atr < atr_gate:
+            sync(state_update=su)
+            return "none", f"thin market (atr {atr:.4f} < gate {atr_gate:.4f})"
+
+        # scalper momentum: EMA9 vs EMA21 on CLOSED 1m closes
         closes = [c["close"] for c in c1m[:-1]]
         ema_fast = compute_ema(closes, EMA_FAST)
         ema_slow = compute_ema(closes, EMA_SLOW)
+        if ema_fast is None or ema_slow is None:
+            sync(state_update=su)
+            return "none", "not enough data for EMA"
+        momentum = "bull" if ema_fast > ema_slow else "bear"
+        su["last_bias"] = momentum
+
+        # pullback chopper: in bull momentum, a RED closed candle above the slow
+        # EMA is a discount — buy it. In bear momentum, a GREEN candle below the
+        # slow EMA is a premium — sell it. One rule, both directions, every move.
         last_closed = c1m[-2] if len(c1m) >= 2 else c1m[-1]
         last_color = candle_color(last_closed)
         want = None
-        if atr is not None and ema_fast is not None and ema_slow is not None:
-            if atr >= atr_gate:
-                momentum = "bull" if ema_fast > ema_slow else "bear"
-                if momentum == "bull" and last_color == "bear" and price > ema_slow:
-                    want = "long"   # uptrend pullback — buy the dip candle
-                elif momentum == "bear" and last_color == "bull" and price < ema_slow:
-                    want = "short"  # downtrend rally — sell the rip candle
-        entry_cooldown_ok = True
-        if still_open:
-            try:
-                last_open = max(datetime.fromisoformat(p["opened_at"]) for p in still_open if p.get("opened_at"))
-                if (datetime.now(timezone.utc) - last_open).total_seconds() < ENTRY_COOLDOWN_SEC:
-                    entry_cooldown_ok = False
-            except (ValueError, TypeError):
-                pass
-        can_open = (
-            want is not None
-            and entry_cooldown_ok
-            and len(still_open) < MAX_POSITIONS
-        )
-        if can_open:
-            used_margin = sum(p["margin"] for p in still_open)
-            margin_left = balance * MARGIN_BUDGET - used_margin
-            tp_dist = max(SCALP_TP_ATR * (atr or 0.003), MIN_TP_DIST)
-            per_unit = tp_dist / price - FEE_RATE * 2
-            # per-slot cap: 8 slots x balance notional = exactly the 80% margin
-            # budget at 10x — a single trade can never hog the whole budget and
-            # freeze the bot (the 2026-09-06 wedge lesson).
-            slot_cap = balance * MARGIN_BUDGET * LEVERAGE / MAX_POSITIONS
-            if per_unit > 0 and margin_left > 0.05:
-                notional = min(WIN_TARGET_DOLLARS / per_unit, slot_cap, margin_left * LEVERAGE, 40.0)
-                if notional >= 1.0:  # don't open dust positions
-                    margin = notional / LEVERAGE
-                    entry = price
-                    tp = entry + tp_dist if want == "long" else entry - tp_dist
-                    still_open.append({
-                        "side": want, "entry_price": entry, "tp_price": tp,
-                        "notional": notional, "margin": margin, "opened_at": now,
-                    })
-                    send_telegram(
-                        f"\u26a1\ufe0f *Opened {want.upper()} (scalp)*\n"
-                        f"Entry ${entry:.4f} → TP ${tp:.4f} | NO SL\n"
-                        f"Notional ${notional:.2f} ({len(still_open)}/{MAX_POSITIONS} slots)"
-                    )
+        ema_fast_prev = compute_ema(closes[:-3], EMA_FAST)
+        if momentum == "bull" and last_color == "bear" and price > ema_slow and (ema_fast_prev is None or ema_fast > ema_fast_prev):
+            want = "long"   # uptrend pullback — buy the dip candle
+        elif momentum == "bear" and last_color == "bull" and price < ema_slow and (ema_fast_prev is None or ema_fast < ema_fast_prev):
+            want = "short"  # downtrend rally — sell the rip candle
+        if want is None:
+            sync(state_update=su)
+            return "none", f"flat (momentum {momentum}) — waiting for pullback candle"
 
-    # ── sync state: positions flattened + compatibility fields for the dashboard
-    unrealized = 0.0
-    for p in still_open:
-        u = (price - p["entry_price"]) * (p["notional"] / p["entry_price"]) if p["side"] == "long" \
-            else (p["entry_price"] - price) * (p["notional"] / p["entry_price"])
-        unrealized += u
-    su.update(serialize_positions(still_open))
-    su.update({
-        "position_open": len(still_open) > 0,
-        "balance": round(balance, 6),
-        "unrealized_pnl": round(unrealized, 6),
-        "equity": round(balance + unrealized, 6),
-        "open_positions": len(still_open),
-        "total_trades": (state.get("total_trades") or 0) + len(closed_any),
-        "wins": (state.get("wins") or 0) + len(closed_any),  # TP-only: every close is a win
-        "losses": state.get("losses") or 0,
-        "last_error": "",
-    })
-    if still_open:
-        latest = still_open[-1]
+        # TP distance adaptive to volatility; notional solved so a full TP nets
+        # $0.15 (owner's flat target). NO STOP LOSS.
+        tp_dist = max(SCALP_TP_ATR * atr, MIN_TP_DIST)
+        per_unit = tp_dist / price - FEE_RATE * 2
+        if per_unit <= 0:
+            sync(state_update=su)
+            return "none", "tp too small to clear fees"
+        notional = min(WIN_TARGET_DOLLARS / per_unit, bal * LEVERAGE * 0.95, 40.0)
+        margin = notional / LEVERAGE
+        if margin > bal:
+            sync(state_update=su)
+            return "none", "insufficient balance for margin"
+        entry = price
+        tp = entry + tp_dist if want == "long" else entry - tp_dist
         su.update({
-            "side": latest["side"], "entry_price": latest["entry_price"],
-            "tp_price": latest["tp_price"], "notional": latest["notional"],
-            "margin": latest["margin"], "opened_at": latest["opened_at"],
+            "position_open": True, "side": want,
+            "entry_price": entry, "tp_price": tp, "sl_price": 0,
+            "notional": notional, "margin": margin, "opened_at": now,
+            "last_error": "",
         })
-    else:
-        su.update({"side": "none", "entry_price": 0, "tp_price": 0, "notional": 0,
-                   "margin": 0, "opened_at": None, "position_open": False})
-    sync(state_update=su, trade=closed_any[0] if closed_any else None)
-    for t in closed_any[1:]:
-        sync(trade=t)
-    if closed_any:
-        return "closed", f"closed {len(closed_any)} TP(s), {len(still_open)} open"
-    if want is not None and not can_open:
-        return "none", f"signal {want} skipped — slots/margin full ({len(still_open)}/{MAX_POSITIONS})"
-    return "none", f"{len(still_open)} open | price ${price:.4f}"
+        sync(state_update=su)
+        send_telegram(
+            f"⚡️ *Opened {want.upper()} (scalp)*\n"
+            f"Momentum {momentum} | Entry ${entry:.4f}\n"
+            f"TP ${tp:.4f} | NO SL\n"
+            f"Notional ${notional:.2f} | Balance ${bal:.4f}"
+        )
+        return "opened", f"{want.upper()} SCALP @ ${entry:.4f} momentum={momentum}"
+
+    # No action
+    sync(state_update=su)
+    return "none", f"flat bias={bias} 1m={color_1m}"
 
 
 def main():
