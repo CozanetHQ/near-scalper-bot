@@ -30,7 +30,8 @@ SL_ATR_MULT = 4.0     # GRID SEARCH WINNER (1152 configs): wide stop, rarely hit
 TP_SL_RATIO = 1.5     # most exits are 20-min drift-capture time stops
 WIN_TARGET_DOLLARS = 0.15  # OWNER 09-06: each TP aims for $0.15 (margin caps scale it down)
 SCALP_TP_ATR = 1.2   # TP distance = 1.2x 1m ATR (adaptive to live volatility)
-MAX_POSITIONS = 8    # hedge scalper: multiple concurrent positions — wedged trades don't stop the chopping
+MAX_POSITIONS = int(os.environ.get("MAX_POSITIONS", "4"))  # owner 09-06: account too small to split 8 ways —
+# lab confirmed 4 slots strictly better: realized +3.84 vs +3.58, equity +0.51 vs -0.30, half the wedges    # hedge scalper: multiple concurrent positions — wedged trades don't stop the chopping
 MARGIN_BUDGET = 0.80  # total margin across all open positions <= 80% of balance
 ENTRY_COOLDOWN_SEC = 90  # min seconds between entries — one signal cluster can't fill all slots
 HEARTBEAT_SEC = 3600  # if no open/close events for an hour, ping Telegram so silence never looks like downtime
