@@ -11,28 +11,43 @@ jobs:
   reset:
     runs-on: ubuntu-latest
     steps:
-      - name: POST state reset to sync endpoint
+      - uses: actions/checkout@v4
+      - name: Reset account state via the engine's own sync path
         run: |
           python3 - << 'PY'
-          import json, os, urllib.request
-          bal = float("${{ github.event.inputs.balance }}" or "3.0")
+          import os, urllib.request, json
+          bal = float(os.environ.get("RESET_BAL", "3.0"))
           state = {
               "balance": bal, "position_open": False, "side": "none",
-              "entry_price": 0, "tp_price": 0, "sl_price": 0, "notional": 0, "margin": 0,
-              "opened_at": None, "total_trades": 0, "wins": 0, "losses": 0,
+              "entry_price": 0.0, "tp_price": 0.0, "sl_price": 0.0,
+              "notional": 0.0, "margin": 0.0,
+              "total_trades": 0, "wins": 0, "losses": 0,
               "streak_count": 0, "streak_side": "none",
-              "unrealized_pnl": 0.0, "equity": bal, "open_positions": 0, "last_error": "",
+              "open_positions": 0, "unrealized_pnl": 0.0, "equity": bal,
+              "last_error": "",
           }
           for i in range(8):
               state[f"pos_{i}_active"] = False
-              for f in ("side", "entry_price", "tp_price", "notional", "margin", "opened_at"):
-                  state[f"pos_{i}_{f}"] = ""
+              state[f"pos_{i}_side"] = "none"
+              state[f"pos_{i}_entry_price"] = 0.0
+              state[f"pos_{i}_tp_price"] = 0.0
+              state[f"pos_{i}_notional"] = 0.0
+              state[f"pos_{i}_margin"] = 0.0
+              state[f"pos_{i}_opened_at"] = ""
+          # exactly the payload shape tick.py sends: {"state": ..., "trade": None}
+          data = json.dumps({"state": state, "trade": None}).encode()
           req = urllib.request.Request(
               "https://superagent-ae0aaf02.base44.app/functions/nearScalperSync",
-              data=json.dumps({"state": state}).encode(),
-              headers={"Content-Type": "application/json", "X-Tick-Secret": os.environ["TICK_SECRET"]},
+              data=data,
+              headers={
+                  "Content-Type": "application/json",
+                  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+                  "Accept": "application/json, text/plain, */*",
+                  "X-Tick-Secret": os.environ["TICK_SECRET"],
+              },
               method="POST")
           print(urllib.request.urlopen(req, timeout=15).read().decode())
           PY
         env:
           TICK_SECRET: ${{ secrets.TICK_SECRET }}
+          RESET_BAL: ${{ github.event.inputs.balance }}
