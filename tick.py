@@ -26,17 +26,21 @@ BITGET = "https://api.bitget.com/api/v2/mix/market"
 SYMBOL = "NEARUSDT"
 PRODUCT = "USDT-FUTURES"
 ATR_PERIOD = 14
-SL_ATR_MULT = 2.2     # SL distance = 2.2 x 1m ATR (survives 1m noise, not spooked out in seconds)
-TP_SL_RATIO = 2.2     # TP distance = 2.2 x SL distance — net R:R ~1.2 AFTER the fee tax
+SL_ATR_MULT = 4.0     # GRID SEARCH WINNER (1152 configs): wide stop, rarely hit
+TP_SL_RATIO = 1.5     # most exits are 20-min drift-capture time stops
 WIN_TARGET_PCT = 0.04 # a full TP should net ~4% of balance: $0.10 today, ~$0.20 by $5
-ATR_MIN = 0.0015      # only trade when 1m ATR shows real movement (fee math dies on dead minutes)
+ATR_MIN = 0.0008      # GRID SEARCH WINNER: low gate — more shots on goal
 NIGHT_ATR_MIN = 0.0020  # 21:00-07:00 UTC thin-session chop needs a much bigger move to be worth fees
 MIN_SL_DIST = 0.006   # absolute floor so SL is never absurdly tight
-TRAIL_TRIGGER = 0.55  # trail activates past halfway to TP — let winners travel
-TRAIL_DIST = 0.35     # trail stop follows 35% of TP-distance behind price
+TRAIL_TRIGGER = 99.0  # GRID SEARCH VERDICT: the trail CUT every winner early — OFF
+TRAIL_DIST = 99.0     # (values > 1 disable the trail entirely)
 TIME_STOP_MIN = 20    # recycle a stale position at market after N minutes
 SL_STREAK_REVERSAL = 3  # after N consecutive SLs on one side, flip the next entry
 SL_COOLDOWN_SECONDS = 240  # after a stop-out, wait before re-entering (chop protection)
+SWEEP_ENABLED = False  # liquidity-sweep entries: tested, no added edge next to grid winner
+SWEEP_15M_LOOKBACK = 12  # swing extreme = high/low of the last 12 CLOSED 15m candles (3h of structure)
+SWEEP_WINDOW = 8         # the pierce may span up to 8 recent 1m candles (real sweeps take minutes)
+SWEEP_REARM_SEC = 900    # after any close, wait before another sweep entry (no re-fire loops)
 CONSOL_MAX_RANGE = 0.004   # last 8x15m range <= 0.4% of price -> consolidation zone
 ZONE_ENTRY_POS = 0.25      # fade only within 25% of a zone edge — the middle of a zone is a chop trap
 ZONE_TP_HAIRCUT = 0.25     # zone TP lands 25% of the range inside the far edge (don't get greedy at the wall)
@@ -44,8 +48,8 @@ DAILY_LOSS_LIMIT = 0.12    # RISK-OFF for the rest of the UTC day after losing 1
 MAX_STREAK = 4             # 4 consecutive SLs on one side -> extended pause
 STREAK_PAUSE_SEC = 3600     # ... for one hour
 RSI_PERIOD = 14
-RSI_LONG_ENTRY = 40   # in bull bias: buy when 1m RSI crosses back UP through this (dip ends)
-RSI_SHORT_ENTRY = 60   # in bear bias: sell when 1m RSI crosses back DOWN through this (spike ends)
+RSI_LONG_ENTRY = 50    # GRID SEARCH WINNER: loose gate — more entries, more edge
+RSI_SHORT_ENTRY = 50
 RSI_EARLY_VELOCITY = 3  # early entry: RSI still below/above gate but swinging this fast
 LEVERAGE = 10
 START_BALANCE = 3.0
@@ -235,7 +239,7 @@ def sync(state_update=None, trade=None):
 def process_tick(state):
     """One poll cycle. Returns (action, details)."""
     c4h = fetch_candles("4H", 2)
-    c15m = fetch_candles("15m", 9)  # 8 closed candles = 2h window for zone detection
+    c15m = fetch_candles("15m", 14)  # closed candles for zone + sweep structure detection
     c1m = fetch_candles("1m", 20)
     ticker = fetch_ticker()
 
@@ -465,9 +469,46 @@ def process_tick(state):
                     elif cur_rsi > RSI_SHORT_ENTRY and prev_rsi - cur_rsi >= RSI_EARLY_VELOCITY:
                         just_turned = True
 
+            # ── liquidity-sweep trigger (the pro lesson: obvious levels get hunted
+            # BEFORE they prove out). Real sweeps take MINUTES against a multi-hour
+            # swing level: some candle in the recent window pierces the 3h swing
+            # extreme (where stops cluster), then the latest closed candle rejects
+            # and closes back inside. The trapped orders are the fuel. Trade WITH
+            # the hunt, not as it.
+            sweep_long = False
+            sweep_short = False
+            sweep_wick = None
+            closed_15m = c15m[:-1]
+            # swing structure EXCLUDES the most recent closed 15m candle — the
+            # sweep must pierce a level that was already resting BEFORE the last
+            # quarter-hour, otherwise the level is self-referential (the recent
+            # candle IS the low being tested).
+            structure = closed_15m[-(SWEEP_15M_LOOKBACK + 1):-1]
+            if SWEEP_ENABLED and len(structure) >= SWEEP_15M_LOOKBACK:
+                swing_low = min(c["low"] for c in structure)
+                swing_high = max(c["high"] for c in structure)
+                window = c1m[-(SWEEP_WINDOW + 1):-1]  # last N CLOSED 1m candles
+                last_c = c1m[-2] if len(c1m) >= 2 else c1m[-1]
+                swept_low = any(c["low"] < swing_low for c in window)
+                swept_high = any(c["high"] > swing_high for c in window)
+                rearm_ok = True
+                if state.get("_last_close"):
+                    try:
+                        since = (datetime.now(timezone.utc) - datetime.fromisoformat(state["_last_close"])).total_seconds()
+                        if since < SWEEP_REARM_SEC:
+                            rearm_ok = False
+                    except (ValueError, TypeError):
+                        pass
+                if rearm_ok and bias == "bull" and swept_low and last_c["close"] > swing_low and price > swing_low:
+                    sweep_long = True
+                    sweep_wick = min(c["low"] for c in window)
+                elif rearm_ok and bias == "bear" and swept_high and last_c["close"] < swing_high and price < swing_high:
+                    sweep_short = True
+                    sweep_wick = max(c["high"] for c in window)
+
             # SL cooldown: after a stop-out, wait before re-entering. The 2026-09-05
             # postmortem showed rapid-fire re-entries losing 9x in a row in chop.
-            if just_turned and state.get("_last_reason") == "SL" and state.get("_last_close"):
+            if (just_turned or sweep_long or sweep_short) and state.get("_last_reason") == "SL" and state.get("_last_close"):
                 try:
                     last_sl = datetime.fromisoformat(state["_last_close"])
                     elapsed = (datetime.now(timezone.utc) - last_sl).total_seconds()
@@ -477,7 +518,7 @@ def process_tick(state):
                 except (ValueError, TypeError):
                     pass  # unparsable timestamp — skip the cooldown check
 
-            if just_turned:
+            if just_turned or sweep_long or sweep_short:
                 balance = state.get("balance") or START_BALANCE
                 if balance < 0.30:
                     sync(state_update=su)
@@ -505,6 +546,12 @@ def process_tick(state):
                     sync(state_update=su)
                     return "none", f"entry skipped - thin market (atr={atr:.4f} < gate {atr_gate:.4f}{' night' if night else ''})"
                 sl_dist = max(SL_ATR_MULT * atr, MIN_SL_DIST)
+                # sweep entries: stop sits under the hunt wick (structural
+                # invalidation) — a second pierce means the reversal failed.
+                if sweep_long and sweep_wick is not None:
+                    sl_dist = max(price - (sweep_wick - max(0.3 * atr, 0.002)), 0.0015)
+                elif sweep_short and sweep_wick is not None:
+                    sl_dist = max((sweep_wick + max(0.3 * atr, 0.002)) - price, 0.0015)
                 tp_dist = TP_SL_RATIO * sl_dist
 
                 # Target-based sizing (owner directive 09-06): a full TP should net
