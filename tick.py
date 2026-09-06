@@ -282,37 +282,43 @@ def close_position(pos, exit_price, reason, now, balance):
 
 
 def serialize_positions(positions):
-    """Flatten the positions list into pos_{i}_{field} state keys — bulletproof
-    round-trip through the sync entity regardless of its array handling."""
-    out = {}
-    for i in range(MAX_POSITIONS):
-        for f in ("side", "entry_price", "tp_price", "notional", "margin", "opened_at"):
-            out[f"pos_{i}_{f}"] = ""
-        out[f"pos_{i}_active"] = False
-    for i, p in enumerate(positions[:MAX_POSITIONS]):
-        out[f"pos_{i}_active"] = True
-        for f in ("side", "entry_price", "tp_price", "notional", "margin", "opened_at"):
-            out[f"pos_{i}_{f}"] = p[f]
-    out["open_positions"] = len(positions[:MAX_POSITIONS])
-    return out
+    """Store the positions list as compact JSON inside the legacy `last_error`
+    string field — the ONLY writable field proven to round-trip the sync
+    endpoint's schema whitelist at full length (689+ chars, exact match).
+    SAD BUT NECESSARY: the sync endpoint silently drops any state field not
+    in its original 2025 schema, so pos_*/equity/open_positions fields all
+    vanished. If you change this format, probe the round-trip first."""
+    compact = [
+        {"s": p["side"], "e": p["entry_price"], "t": p["tp_price"],
+         "n": p["notional"], "m": p["margin"], "o": p["opened_at"]}
+        for p in positions[:MAX_POSITIONS]
+    ]
+    return {"last_error": json.dumps(compact, separators=(",", ":"))}
 
 
 def parse_positions(state):
-    """Rebuild the positions list from flat state keys."""
+    """Rebuild the positions list from the JSON in `last_error`."""
+    raw = state.get("last_error") or ""
+    if not isinstance(raw, str) or not raw.startswith("["):
+        return []
+    try:
+        data = json.loads(raw)
+    except (ValueError, TypeError):
+        return []
     out = []
-    for i in range(MAX_POSITIONS):
-        if state.get(f"pos_{i}_active"):
-            try:
+    for p in data[:MAX_POSITIONS]:
+        try:
+            if p.get("s") in ("long", "short"):
                 out.append({
-                    "side": state.get(f"pos_{i}_side"),
-                    "entry_price": float(state.get(f"pos_{i}_entry_price") or 0),
-                    "tp_price": float(state.get(f"pos_{i}_tp_price") or 0),
-                    "notional": float(state.get(f"pos_{i}_notional") or 0),
-                    "margin": float(state.get(f"pos_{i}_margin") or 0),
-                    "opened_at": state.get(f"pos_{i}_opened_at"),
+                    "side": p["s"],
+                    "entry_price": float(p["e"]),
+                    "tp_price": float(p["t"]),
+                    "notional": float(p["n"]),
+                    "margin": float(p["m"]),
+                    "opened_at": p["o"],
                 })
-            except (TypeError, ValueError):
-                continue
+        except (KeyError, TypeError, ValueError):
+            continue
     return out
 
 
@@ -448,7 +454,6 @@ def process_tick(state):
         u = (price - p["entry_price"]) * (p["notional"] / p["entry_price"]) if p["side"] == "long" \
             else (p["entry_price"] - price) * (p["notional"] / p["entry_price"])
         unrealized += u
-    su.update(serialize_positions(still_open))
     su.update({
         "position_open": len(still_open) > 0,
         "balance": round(balance, 6),
@@ -458,7 +463,6 @@ def process_tick(state):
         "total_trades": (state.get("total_trades") or 0) + len(closed_any),
         "wins": (state.get("wins") or 0) + len(closed_any),  # TP-only: every close is a win
         "losses": state.get("losses") or 0,
-        "last_error": "",
     })
     if still_open:
         latest = still_open[-1]
@@ -470,6 +474,12 @@ def process_tick(state):
     else:
         su.update({"side": "none", "entry_price": 0, "tp_price": 0, "notional": 0,
                    "margin": 0, "opened_at": None, "position_open": False})
+    # positions JSON LAST — it lives in last_error and must not be clobbered
+    su.update(serialize_positions(still_open))
+    # equity snapshot in another legacy string field for observability
+    su["last_reversal_at"] = json.dumps(
+        {"eq": round(balance + unrealized, 4), "u": round(unrealized, 4), "n": len(still_open)},
+        separators=(",", ":"))
     sync(state_update=su, trade=closed_any[0] if closed_any else None)
     for t in closed_any[1:]:
         sync(trade=t)
@@ -501,7 +511,14 @@ def main():
         except Exception as e:
             log(f"ERROR: {e}")
             try:
-                sync(state_update={"last_error": str(e)[:200]})
+                # CRITICAL: last_error now stores the open-positions JSON.
+                # A transient error (Bitget timeout, network blip) must NEVER
+                # wipe it — that would orphan real open positions.
+                cur = get_state()
+                if not parse_positions(cur):
+                    sync(state_update={"last_error": str(e)[:200]})
+                else:
+                    log("positions intact — error logged to Actions log only")
             except Exception as e2:
                 log(f"ERROR updating state: {e2}")
 
