@@ -26,11 +26,12 @@ BITGET = "https://api.bitget.com/api/v2/mix/market"
 SYMBOL = "NEARUSDT"
 PRODUCT = "USDT-FUTURES"
 ATR_PERIOD = 14
-SL_ATR_MULT = 2.0     # SL distance = 2.0 x 1m ATR (survives 1m noise, not spooked out in seconds)
-TP_SL_RATIO = 1.8     # TP distance = 1.8 x SL distance — must clear the ~0.12% RT fee tax with real edge
+SL_ATR_MULT = 2.2     # SL distance = 2.2 x 1m ATR (survives 1m noise, not spooked out in seconds)
+TP_SL_RATIO = 2.2     # TP distance = 2.2 x SL distance — net R:R ~1.2 AFTER the fee tax
+WIN_TARGET_PCT = 0.04 # a full TP should net ~4% of balance: $0.10 today, ~$0.20 by $5
 ATR_MIN = 0.0015      # only trade when 1m ATR shows real movement (fee math dies on dead minutes)
 NIGHT_ATR_MIN = 0.0020  # 21:00-07:00 UTC thin-session chop needs a much bigger move to be worth fees
-MIN_SL_DIST = 0.005   # absolute floor so SL is never absurdly tight
+MIN_SL_DIST = 0.006   # absolute floor so SL is never absurdly tight
 TRAIL_TRIGGER = 0.55  # trail activates past halfway to TP — let winners travel
 TRAIL_DIST = 0.35     # trail stop follows 35% of TP-distance behind price
 TIME_STOP_MIN = 20    # recycle a stale position at market after N minutes
@@ -375,11 +376,9 @@ def process_tick(state):
 
         if just_turned:
             balance = state.get("balance") or START_BALANCE
-            notional = min(balance * LEVERAGE * 0.8, 25)
-            margin = notional / LEVERAGE
-            if margin > balance:
+            if balance < 0.30:
                 sync(state_update=su)
-                return "none", "insufficient balance for margin"
+                return "none", "balance too low to trade safely"
 
             natural_is_long = bias == "bull"
             natural_side = "long" if natural_is_long else "short"
@@ -404,6 +403,22 @@ def process_tick(state):
                 return "none", f"entry skipped - thin market (atr={atr:.4f} < gate {atr_gate:.4f}{' night' if night else ''})"
             sl_dist = max(SL_ATR_MULT * atr, MIN_SL_DIST)
             tp_dist = TP_SL_RATIO * sl_dist
+
+            # Target-based sizing (owner directive 09-06): a full TP should net
+            # WIN_TARGET_PCT of balance — $0.10 at $2.65, ~$0.20 at $5. Solve the
+            # notional backwards from the actual TP distance so the target holds
+            # at any volatility. Capped by margin (10x isolated) and an absolute
+            # ceiling.
+            win_target = balance * WIN_TARGET_PCT
+            per_unit = tp_dist / price - FEE_RATE * 2  # net fraction of notional per full TP
+            if per_unit <= 0:
+                sync(state_update=su)
+                return "none", f"TP too small to clear fees (tp_dist={tp_dist:.4f})"
+            notional = min(win_target / per_unit, balance * LEVERAGE * 0.95, 40.0)
+            margin = notional / LEVERAGE
+            if margin > balance:
+                sync(state_update=su)
+                return "none", "insufficient balance for margin"
             entry = price
             tp = entry + tp_dist if is_long else entry - tp_dist
             sl = entry - sl_dist if is_long else entry + sl_dist
