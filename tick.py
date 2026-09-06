@@ -33,6 +33,7 @@ SCALP_TP_ATR = 1.2   # TP distance = 1.2x 1m ATR (adaptive to live volatility)
 MAX_POSITIONS = 8    # hedge scalper: multiple concurrent positions — wedged trades don't stop the chopping
 MARGIN_BUDGET = 0.80  # total margin across all open positions <= 80% of balance
 ENTRY_COOLDOWN_SEC = 90  # min seconds between entries — one signal cluster can't fill all slots
+HEARTBEAT_SEC = 3600  # if no open/close events for an hour, ping Telegram so silence never looks like downtime
 MIN_TP_DIST = 0.003  # TP floor: ~0.13% — below this, fees eat the scalp alive
 EMA_FAST = 9         # scalper momentum: EMA9 vs EMA21 on 1m closes
 EMA_SLOW = 21
@@ -418,6 +419,7 @@ def process_tick(state):
                     entry_cooldown_ok = False
             except (ValueError, TypeError):
                 pass
+        opened_this_tick = False
         can_open = (
             want is not None
             and entry_cooldown_ok
@@ -442,6 +444,7 @@ def process_tick(state):
                         "side": want, "entry_price": entry, "tp_price": tp,
                         "notional": notional, "margin": margin, "opened_at": now,
                     })
+                    opened_this_tick = True
                     send_telegram(
                         f"\u26a1\ufe0f *Opened {want.upper()} (scalp)*\n"
                         f"Entry ${entry:.4f} → TP ${tp:.4f} | NO SL\n"
@@ -476,9 +479,33 @@ def process_tick(state):
                    "margin": 0, "opened_at": None, "position_open": False})
     # positions JSON LAST — it lives in last_error and must not be clobbered
     su.update(serialize_positions(still_open))
-    # equity snapshot in another legacy string field for observability
+    # ── HEARTBEAT: silence (all slots full, nothing closing) must not look
+    # like the bot died. Ping Telegram once an hour with no open/close events.
+    hb_prev = None
+    try:
+        snap = json.loads(state.get("last_reversal_at") or "{}")
+        hb_prev = snap.get("hb") if isinstance(snap, dict) else None
+    except (ValueError, TypeError):
+        hb_prev = None
+    event_happened = bool(closed_any) or opened_this_tick
+    hb_new = now
+    if not event_happened and hb_prev:
+        try:
+            silent_for = (datetime.fromisoformat(now) - datetime.fromisoformat(hb_prev)).total_seconds()
+            if silent_for < HEARTBEAT_SEC:
+                hb_new = hb_prev
+            else:
+                send_telegram(
+                    "\U0001F4A3 Scalper ALIVE — just quiet: every position waits on TP (no stop loss)\n"
+                    f"{len(still_open)}/{MAX_POSITIONS} slots full | Balance ${balance:.2f} | "
+                    f"Equity ${balance + unrealized:.2f} (floating {unrealized:+.2f})"
+                )
+        except (ValueError, TypeError):
+            hb_new = now
+    # equity + heartbeat snapshot in another legacy string field for observability
     su["last_reversal_at"] = json.dumps(
-        {"eq": round(balance + unrealized, 4), "u": round(unrealized, 4), "n": len(still_open)},
+        {"eq": round(balance + unrealized, 4), "u": round(unrealized, 4),
+         "n": len(still_open), "hb": hb_new},
         separators=(",", ":"))
     sync(state_update=su, trade=closed_any[0] if closed_any else None)
     for t in closed_any[1:]:
