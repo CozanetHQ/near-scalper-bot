@@ -6,35 +6,33 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - name: Write fake position, then read it back
+      - name: Test long-string round-trip through last_error
         run: |
           python3 - << 'PY'
           import os, urllib.request, json
           SEC = os.environ["TICK_SECRET"]
           SYNC = "https://superagent-ae0aaf02.base44.app/functions/nearScalperSync"
           DASH = "https://superagent-ae0aaf02.base44.app/functions/nearScalperDashboard"
-          now = "2026-09-06T13:55:00+00:00"
-          state = {
-              "balance": 3.0, "position_open": True, "side": "long",
-              "entry_price": 2.3900, "tp_price": 2.4000, "sl_price": 0.0,
-              "notional": 3.0, "margin": 0.3, "opened_at": now,
-              "open_positions": 1, "unrealized_pnl": 0.01, "equity": 3.01,
-              "pos_0_active": True, "pos_0_side": "long", "pos_0_entry_price": 2.39,
-              "pos_0_tp_price": 2.40, "pos_0_notional": 3.0, "pos_0_margin": 0.3,
-              "pos_0_opened_at": now,
-              "probe_field": "CAN_YOU_SEE_ME",
-          }
+          pos = [{"s":"long","e":2.3901,"t":2.3971,"n":3.85,"m":0.385,"o":"2026-09-06T13:55:00+00:00"} for _ in range(8)]
+          blob = json.dumps(pos, separators=(",", ":"))
+          state = {"balance": 3.0, "position_open": True, "last_error": blob}
           req = urllib.request.Request(SYNC, data=json.dumps({"state": state, "trade": None}).encode(),
               headers={"Content-Type": "application/json", "User-Agent": "Mozilla/5.0",
                        "X-Tick-Secret": SEC}, method="POST")
-          print("SYNC RESP:", urllib.request.urlopen(req, timeout=15).read().decode()[:500])
-          # read back
+          print("SYNC RESP:", urllib.request.urlopen(req, timeout=15).read().decode()[:300])
           req2 = urllib.request.Request(DASH, headers={"User-Agent": "Mozilla/5.0"})
-          got = json.loads(urllib.request.urlopen(req2, timeout=15).read().decode())
-          st = got.get("state") or {}
-          print("READBACK KEYS:", sorted(st.keys()))
-          for k in ("pos_0_active", "pos_0_side", "open_positions", "equity", "unrealized_pnl", "probe_field", "position_open"):
-              print(f"  {k} = {st.get(k)!r}")
+          st = (json.loads(urllib.request.urlopen(req2, timeout=15).read().decode()).get("state") or {})
+          got = st.get("last_error")
+          print(f"SENT len={len(blob)} GOT len={len(got) if got else None} MATCH={got == blob}")
+          if got != blob:
+              print("GOT:", repr(got)[:400])
+          # cleanup: clear last_error
+          state2 = {"last_error": "", "position_open": False, "side": "none"}
+          req3 = urllib.request.Request(SYNC, data=json.dumps({"state": state2, "trade": None}).encode(),
+              headers={"Content-Type": "application/json", "User-Agent": "Mozilla/5.0",
+                       "X-Tick-Secret": SEC}, method="POST")
+          urllib.request.urlopen(req3, timeout=15).read()
+          print("cleanup done")
           PY
         env:
           TICK_SECRET: ${{ secrets.TICK_SECRET }}
