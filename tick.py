@@ -37,6 +37,12 @@ TRAIL_DIST = 0.35     # trail stop follows 35% of TP-distance behind price
 TIME_STOP_MIN = 20    # recycle a stale position at market after N minutes
 SL_STREAK_REVERSAL = 3  # after N consecutive SLs on one side, flip the next entry
 SL_COOLDOWN_SECONDS = 240  # after a stop-out, wait before re-entering (chop protection)
+CONSOL_MAX_RANGE = 0.004   # last 8x15m range <= 0.4% of price -> consolidation zone
+ZONE_ENTRY_POS = 0.25      # fade only within 25% of a zone edge — the middle of a zone is a chop trap
+ZONE_TP_HAIRCUT = 0.25     # zone TP lands 25% of the range inside the far edge (don't get greedy at the wall)
+DAILY_LOSS_LIMIT = 0.12    # RISK-OFF for the rest of the UTC day after losing 12% from day-start balance
+MAX_STREAK = 4             # 4 consecutive SLs on one side -> extended pause
+STREAK_PAUSE_SEC = 3600     # ... for one hour
 RSI_PERIOD = 14
 RSI_LONG_ENTRY = 40   # in bull bias: buy when 1m RSI crosses back UP through this (dip ends)
 RSI_SHORT_ENTRY = 60   # in bear bias: sell when 1m RSI crosses back DOWN through this (spike ends)
@@ -203,6 +209,18 @@ def get_state():
     if trades:
         state["_last_close"] = trades[0].get("closed_at")
         state["_last_reason"] = trades[0].get("reason")
+    # Day-start balance (UTC) for the daily loss circuit breaker: balance after
+    # the last trade that closed before today's midnight.
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    day_start = None
+    for t in trades:
+        if (t.get("closed_at") or "").startswith(today):
+            continue
+        day_start = t.get("balance_after")
+        break
+    if day_start is None:
+        day_start = state.get("balance") or START_BALANCE
+    state["_day_start_balance"] = day_start
     return state
 
 
@@ -217,7 +235,7 @@ def sync(state_update=None, trade=None):
 def process_tick(state):
     """One poll cycle. Returns (action, details)."""
     c4h = fetch_candles("4H", 2)
-    c15m = fetch_candles("15m", 2)
+    c15m = fetch_candles("15m", 9)  # 8 closed candles = 2h window for zone detection
     c1m = fetch_candles("1m", 20)
     ticker = fetch_ticker()
 
@@ -337,120 +355,205 @@ def process_tick(state):
         return "none", f"position open ({state['side']}) price=${price:.4f}"
 
     # Flat -> check entry
-    if bias != "none" and state.get("status") == "running":
-        # RSI pullback trigger: buy weakness in uptrends, sell strength in
-        # downtrends. The old 1m color-flip trigger chased breakouts and bought
-        # local tops (15.9% win rate over 208 trades) — this is the fix for that.
-        # Uses CLOSED candles only; the forming candle is excluded.
-        closed_closes = [c["close"] for c in c1m[:-1]]
-        cur_rsi = compute_rsi(closed_closes)
-        prev_rsi = compute_rsi(closed_closes[:-1]) if len(closed_closes) > RSI_PERIOD + 1 else None
-
-        just_turned = False
-        if cur_rsi is not None and prev_rsi is not None:
-            if bias == "bull":
-                # cross: dip just ended — buy the discount
-                if prev_rsi < RSI_LONG_ENTRY <= cur_rsi:
-                    just_turned = True
-                # early: RSI still low but swinging up fast — catch the turn
-                # before the cross completes (more chances, same direction logic)
-                elif cur_rsi < RSI_LONG_ENTRY and cur_rsi - prev_rsi >= RSI_EARLY_VELOCITY:
-                    just_turned = True
-            elif bias == "bear":
-                if prev_rsi > RSI_SHORT_ENTRY >= cur_rsi:
-                    just_turned = True
-                elif cur_rsi > RSI_SHORT_ENTRY and prev_rsi - cur_rsi >= RSI_EARLY_VELOCITY:
-                    just_turned = True
-
-        # SL cooldown: after a stop-out, wait before re-entering. The 2026-09-05
-        # postmortem showed rapid-fire re-entries losing 9x in a row in chop.
-        if just_turned and state.get("_last_reason") == "SL" and state.get("_last_close"):
+    if state.get("status") == "running":
+        # ── circuit breakers: never let chop bleed the account to zero ──
+        bal = state.get("balance") or START_BALANCE
+        dsb = state.get("_day_start_balance") or bal
+        if dsb > 0 and bal < dsb * (1 - DAILY_LOSS_LIMIT):
+            sync(state_update=su)
+            return "none", f"RISK-OFF: daily loss limit ({(bal/dsb-1)*100:.1f}% today) — done until tomorrow"
+        if (state.get("streak_count") or 0) >= MAX_STREAK and state.get("streak_side") in ("long", "short"):
             try:
-                last_sl = datetime.fromisoformat(state["_last_close"])
-                elapsed = (datetime.now(timezone.utc) - last_sl).total_seconds()
-                if elapsed < SL_COOLDOWN_SECONDS:
-                    sync(state_update=su)
-                    return "none", f"SL cooldown {int(elapsed)}/{SL_COOLDOWN_SECONDS}s"
-            except (ValueError, TypeError):
-                pass  # unparsable timestamp — skip the cooldown check
-
-        if just_turned:
-            balance = state.get("balance") or START_BALANCE
-            if balance < 0.30:
+                elapsed = (datetime.now(timezone.utc) - datetime.fromisoformat(state["_last_close"])).total_seconds()
+            except (KeyError, ValueError, TypeError):
+                elapsed = 0  # unknown timing — pause anyway, the streak is the signal
+            if elapsed < STREAK_PAUSE_SEC:
                 sync(state_update=su)
-                return "none", "balance too low to trade safely"
+                return "none", f"RISK-OFF: {state.get('streak_count')}x {state.get('streak_side')} SL streak — {int(STREAK_PAUSE_SEC-elapsed)}s pause left"
 
-            natural_is_long = bias == "bull"
-            natural_side = "long" if natural_is_long else "short"
+        # ── regime detection: is the market consolidating? ──
+        zone_high = max(c["high"] for c in c15m[:-1])
+        zone_low = min(c["low"] for c in c15m[:-1])
+        zone_range = zone_high - zone_low
+        consolidating = zone_range <= CONSOL_MAX_RANGE * price
 
-            # Anti-whipsaw reversal: the technical signal (bias) has been wrong
-            # SL_STREAK_REVERSAL times in a row on this exact side. Instead of
-            # trusting it again and eating a 4th stop-out, take the opposite side.
-            reversed_entry = (
-                state.get("streak_side") == natural_side
-                and (state.get("streak_count") or 0) >= SL_STREAK_REVERSAL
-            )
-            is_long = (not natural_is_long) if reversed_entry else natural_is_long
-
-            # Volatility-scaled targets: wide when the market actually moves,
-            # tight when it's dozing. Never trade a dead market.
+        if consolidating:
+            # ── RANGE MODE: trade like a range trader. Buy the floor, sell the
+            # ceiling, size to the room left in the zone, and get out BEFORE the
+            # wall. The middle of the zone is a chop trap — no entries there.
+            pos_in_zone = (price - zone_low) / zone_range if zone_range > 0 else 0.5
             atr = compute_atr(c1m[:-1])
-            hour = datetime.now(timezone.utc).hour
-            night = hour >= 21 or hour < 7
-            atr_gate = NIGHT_ATR_MIN if night else ATR_MIN
-            if atr is None or atr < atr_gate:
+            zone_rsi = compute_rsi([c["close"] for c in c1m[:-1]])
+            want = None
+            if pos_in_zone <= ZONE_ENTRY_POS and (zone_rsi is None or zone_rsi < 52):
+                want = "long"   # at the floor — buy the discount
+            elif pos_in_zone >= 1 - ZONE_ENTRY_POS and (zone_rsi is None or zone_rsi > 48):
+                want = "short"  # at the ceiling — sell the premium
+            if want and state.get("_last_reason") == "SL" and state.get("_last_close"):
+                try:
+                    elapsed = (datetime.now(timezone.utc) - datetime.fromisoformat(state["_last_close"])).total_seconds()
+                    if elapsed < SL_COOLDOWN_SECONDS:
+                        want = None
+                except (ValueError, TypeError):
+                    pass
+            if want is None:
                 sync(state_update=su)
-                return "none", f"entry skipped - thin market (atr={atr:.4f} < gate {atr_gate:.4f}{' night' if night else ''})"
-            sl_dist = max(SL_ATR_MULT * atr, MIN_SL_DIST)
-            tp_dist = TP_SL_RATIO * sl_dist
-
-            # Target-based sizing (owner directive 09-06): a full TP should net
-            # WIN_TARGET_PCT of balance — $0.10 at $2.65, ~$0.20 at $5. Solve the
-            # notional backwards from the actual TP distance so the target holds
-            # at any volatility. Capped by margin (10x isolated) and an absolute
-            # ceiling.
+                return "none", f"consolidating zone {zone_low:.4f}-{zone_high:.4f} — waiting at edge (pos {pos_in_zone:.2f})"
+            is_long = want == "long"
+            buffer = max(0.6 * (atr or 0.003), 0.004)
+            if is_long:
+                tp = zone_high - ZONE_TP_HAIRCUT * zone_range
+                sl = zone_low - buffer
+            else:
+                tp = zone_low + ZONE_TP_HAIRCUT * zone_range
+                sl = zone_high + buffer
+            tp_dist = abs(tp - price)
+            sl_dist = abs(price - sl)
+            if tp_dist < 1.2 * sl_dist or tp_dist < MIN_SL_DIST:
+                sync(state_update=su)
+                return "none", f"zone entry skipped — poor R:R (tp {tp_dist:.4f} vs sl {sl_dist:.4f})"
+            balance = state.get("balance") or START_BALANCE
             win_target = balance * WIN_TARGET_PCT
-            per_unit = tp_dist / price - FEE_RATE * 2  # net fraction of notional per full TP
+            per_unit = tp_dist / price - FEE_RATE * 2
             if per_unit <= 0:
                 sync(state_update=su)
-                return "none", f"TP too small to clear fees (tp_dist={tp_dist:.4f})"
+                return "none", f"zone TP too small to clear fees (tp_dist={tp_dist:.4f})"
             notional = min(win_target / per_unit, balance * LEVERAGE * 0.95, 40.0)
             margin = notional / LEVERAGE
             if margin > balance:
                 sync(state_update=su)
                 return "none", "insufficient balance for margin"
             entry = price
-            tp = entry + tp_dist if is_long else entry - tp_dist
-            sl = entry - sl_dist if is_long else entry + sl_dist
-
             su.update({
-                "position_open": True, "side": "long" if is_long else "short",
+                "position_open": True, "side": want,
                 "entry_price": entry, "tp_price": tp, "sl_price": sl,
                 "notional": notional, "margin": margin, "opened_at": now,
                 "last_error": "",
             })
-            if reversed_entry:
-                # Fresh start post-flip — don't let the old streak carry over.
-                su.update({"streak_side": "none", "streak_count": 0, "last_reversal_at": now})
             sync(state_update=su)
+            send_telegram(
+                f"🟦 *Opened {want.upper()} (zone fade)*\n"
+                f"Zone ${zone_low:.4f} - ${zone_high:.4f}\n"
+                f"Entry ${entry:.4f}\n"
+                f"TP ${tp:.4f} | SL ${sl:.4f}\n"
+                f"Notional ${notional:.2f} | Balance ${balance:.4f}"
+            )
+            return "opened", f"{want.upper()} ZONE-FADE @ ${entry:.4f} (zone pos {pos_in_zone:.2f})"
 
-            if reversed_entry:
-                send_telegram(
-                    f"🔁 *Auto-Reversal* — {natural_side.upper()} signal ignored after "
-                    f"{SL_STREAK_REVERSAL}x consecutive SL\n"
-                    f"🟢 *Opened {'LONG' if is_long else 'SHORT'}* (reversed)\n"
-                    f"Entry ${entry:.4f}\n"
-                    f"TP ${tp:.4f} | SL ${sl:.4f}\n"
-                    f"Notional ${notional:.2f} | Balance ${balance:.4f}"
+        elif bias != "none":
+            # RSI pullback trigger: buy weakness in uptrends, sell strength in
+            # downtrends. The old 1m color-flip trigger chased breakouts and bought
+            # local tops (15.9% win rate over 208 trades) — this is the fix for that.
+            # Uses CLOSED candles only; the forming candle is excluded.
+            closed_closes = [c["close"] for c in c1m[:-1]]
+            cur_rsi = compute_rsi(closed_closes)
+            prev_rsi = compute_rsi(closed_closes[:-1]) if len(closed_closes) > RSI_PERIOD + 1 else None
+
+            just_turned = False
+            if cur_rsi is not None and prev_rsi is not None:
+                if bias == "bull":
+                    # cross: dip just ended — buy the discount
+                    if prev_rsi < RSI_LONG_ENTRY <= cur_rsi:
+                        just_turned = True
+                    # early: RSI still low but swinging up fast — catch the turn
+                    # before the cross completes (more chances, same direction logic)
+                    elif cur_rsi < RSI_LONG_ENTRY and cur_rsi - prev_rsi >= RSI_EARLY_VELOCITY:
+                        just_turned = True
+                elif bias == "bear":
+                    if prev_rsi > RSI_SHORT_ENTRY >= cur_rsi:
+                        just_turned = True
+                    elif cur_rsi > RSI_SHORT_ENTRY and prev_rsi - cur_rsi >= RSI_EARLY_VELOCITY:
+                        just_turned = True
+
+            # SL cooldown: after a stop-out, wait before re-entering. The 2026-09-05
+            # postmortem showed rapid-fire re-entries losing 9x in a row in chop.
+            if just_turned and state.get("_last_reason") == "SL" and state.get("_last_close"):
+                try:
+                    last_sl = datetime.fromisoformat(state["_last_close"])
+                    elapsed = (datetime.now(timezone.utc) - last_sl).total_seconds()
+                    if elapsed < SL_COOLDOWN_SECONDS:
+                        sync(state_update=su)
+                        return "none", f"SL cooldown {int(elapsed)}/{SL_COOLDOWN_SECONDS}s"
+                except (ValueError, TypeError):
+                    pass  # unparsable timestamp — skip the cooldown check
+
+            if just_turned:
+                balance = state.get("balance") or START_BALANCE
+                if balance < 0.30:
+                    sync(state_update=su)
+                    return "none", "balance too low to trade safely"
+
+                natural_is_long = bias == "bull"
+                natural_side = "long" if natural_is_long else "short"
+
+                # Anti-whipsaw reversal: the technical signal (bias) has been wrong
+                # SL_STREAK_REVERSAL times in a row on this exact side. Instead of
+                # trusting it again and eating a 4th stop-out, take the opposite side.
+                reversed_entry = (
+                    state.get("streak_side") == natural_side
+                    and (state.get("streak_count") or 0) >= SL_STREAK_REVERSAL
                 )
-            else:
-                send_telegram(
-                    f"🟢 *Opened {'LONG' if is_long else 'SHORT'}*\n"
-                    f"Entry ${entry:.4f}\n"
-                    f"TP ${tp:.4f} | SL ${sl:.4f}\n"
-                    f"Notional ${notional:.2f} | Balance ${balance:.4f}"
-                )
-            return "opened", f"{'LONG' if is_long else 'SHORT'} @ ${entry:.4f}" + (" (reversed)" if reversed_entry else "")
+                is_long = (not natural_is_long) if reversed_entry else natural_is_long
+
+                # Volatility-scaled targets: wide when the market actually moves,
+                # tight when it's dozing. Never trade a dead market.
+                atr = compute_atr(c1m[:-1])
+                hour = datetime.now(timezone.utc).hour
+                night = hour >= 21 or hour < 7
+                atr_gate = NIGHT_ATR_MIN if night else ATR_MIN
+                if atr is None or atr < atr_gate:
+                    sync(state_update=su)
+                    return "none", f"entry skipped - thin market (atr={atr:.4f} < gate {atr_gate:.4f}{' night' if night else ''})"
+                sl_dist = max(SL_ATR_MULT * atr, MIN_SL_DIST)
+                tp_dist = TP_SL_RATIO * sl_dist
+
+                # Target-based sizing (owner directive 09-06): a full TP should net
+                # WIN_TARGET_PCT of balance — $0.10 at $2.65, ~$0.20 at $5. Solve the
+                # notional backwards from the actual TP distance so the target holds
+                # at any volatility. Capped by margin (10x isolated) and an absolute
+                # ceiling.
+                win_target = balance * WIN_TARGET_PCT
+                per_unit = tp_dist / price - FEE_RATE * 2  # net fraction of notional per full TP
+                if per_unit <= 0:
+                    sync(state_update=su)
+                    return "none", f"TP too small to clear fees (tp_dist={tp_dist:.4f})"
+                notional = min(win_target / per_unit, balance * LEVERAGE * 0.95, 40.0)
+                margin = notional / LEVERAGE
+                if margin > balance:
+                    sync(state_update=su)
+                    return "none", "insufficient balance for margin"
+                entry = price
+                tp = entry + tp_dist if is_long else entry - tp_dist
+                sl = entry - sl_dist if is_long else entry + sl_dist
+
+                su.update({
+                    "position_open": True, "side": "long" if is_long else "short",
+                    "entry_price": entry, "tp_price": tp, "sl_price": sl,
+                    "notional": notional, "margin": margin, "opened_at": now,
+                    "last_error": "",
+                })
+                if reversed_entry:
+                    # Fresh start post-flip — don't let the old streak carry over.
+                    su.update({"streak_side": "none", "streak_count": 0, "last_reversal_at": now})
+                sync(state_update=su)
+
+                if reversed_entry:
+                    send_telegram(
+                        f"🔁 *Auto-Reversal* — {natural_side.upper()} signal ignored after "
+                        f"{SL_STREAK_REVERSAL}x consecutive SL\n"
+                        f"🟢 *Opened {'LONG' if is_long else 'SHORT'}* (reversed)\n"
+                        f"Entry ${entry:.4f}\n"
+                        f"TP ${tp:.4f} | SL ${sl:.4f}\n"
+                        f"Notional ${notional:.2f} | Balance ${balance:.4f}"
+                    )
+                else:
+                    send_telegram(
+                        f"🟢 *Opened {'LONG' if is_long else 'SHORT'}*\n"
+                        f"Entry ${entry:.4f}\n"
+                        f"TP ${tp:.4f} | SL ${sl:.4f}\n"
+                        f"Notional ${notional:.2f} | Balance ${balance:.4f}"
+                    )
+                return "opened", f"{'LONG' if is_long else 'SHORT'} @ ${entry:.4f}" + (" (reversed)" if reversed_entry else "")
 
     # No action
     sync(state_update=su)
