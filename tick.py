@@ -69,6 +69,34 @@ COORD_WOUND = 0.01  # side is "wounded" when its floating < -1% of balance
 SIG_VOL_CONFIRM = os.environ.get("SIG_VOL_CONFIRM", "0")   # 1 = pullback candle must be LOW volume
 SIG_EMA_SLOPE = os.environ.get("SIG_EMA_SLOPE", "0")       # 1 = EMA slope must agree with momentum
 SIG_NO_CHASE = os.environ.get("SIG_NO_CHASE", "0")         # 1 = don't enter when price is extended from EMA fast
+
+# ── STRUCTURE-AWARE TP (owner 09-07: "a human sees swing highs on the chart
+# and puts the TP where the market already reacts") ──
+SWING_TP = os.environ.get("SWING_TP", "0")                 # 1 = TP at nearest swing level, else ATR formula
+SWING_MAX = float(os.environ.get("SWING_MAX", "1.6"))      # swing TP allowed up to this x the ATR distance
+SWING_FRONT = 0.85                                         # front-run the level by 15% of the distance
+
+def nearest_swing_tp(closed15m, side, price):
+    """Nearest PROVEN swing high (for longs) / swing low (for shorts) in the
+    trade's favor, from the last 40 closed 15m candles. Fractal rule: a level
+    must dominate the 2 candles on each side — the same swing highs a human
+    marks on the chart."""
+    cs = closed15m[-40:]
+    if len(cs) < 6:
+        return None
+    highs = [c["high"] for c in cs]
+    lows = [c["low"] for c in cs]
+    levels = {"hi": [], "lo": []}
+    for j in range(2, len(cs) - 2):
+        if highs[j] > max(highs[j-2:j]) and highs[j] > max(highs[j+1:j+3]):
+            levels["hi"].append(highs[j])
+        if lows[j] < min(lows[j-2:j]) and lows[j] < min(lows[j+1:j+3]):
+            levels["lo"].append(lows[j])
+    if side == "long":
+        above = [h for h in levels["hi"] if h > price]
+        return min(above) if above else None
+    below = [l for l in levels["lo"] if l < price]
+    return max(below) if below else None
 MIN_TP_DIST = 0.003  # TP floor: ~0.13% — below this, fees eat the scalp alive
 EMA_FAST = 9         # scalper momentum: EMA9 vs EMA21 on 1m closes
 EMA_SLOW = 21
@@ -310,7 +338,10 @@ def sync(state_update=None, trade=None):
     return data.get("state") or {}
 
 
-def aged_tp(pos, now):
+SWING_AGE = os.environ.get("SWING_AGE", "0")  # 1 = aged TPs ALSO relax to the nearest
+# proven swing level price is recovering toward (owner: "exit where the chart reacts")
+
+def aged_tp(pos, now, closed15m=None):
     """TP after aging: a stuck position relaxes its target toward entry.
     Never crosses entry (no realized loss), always covers fees."""
     tp = pos["tp_price"]
@@ -330,6 +361,17 @@ def aged_tp(pos, now):
     for hours, frac in TP_AGING_TIERS:
         if age_h >= hours:
             keep = max(dist * frac, fee_buffer * 1.05)
+    # structure-aware aging: if a PROVEN swing level sits between the aged TP
+    # and entry, exit AT that level — price is far likelier to touch the level
+    # than travel all the way home to entry.
+    if SWING_AGE == "1" and closed15m:
+        lvl = nearest_swing_tp(closed15m, pos["side"], pos["entry_price"])
+        if lvl is not None:
+            # level must be in the recovery zone: past the aged TP, not past entry
+            if pos["side"] == "long" and pos["entry_price"] + keep < lvl < pos["entry_price"] + dist:
+                keep = lvl - pos["entry_price"]
+            elif pos["side"] == "short" and pos["entry_price"] - dist < lvl < pos["entry_price"] - keep:
+                keep = pos["entry_price"] - lvl
     if pos["side"] == "long":
         return pos["entry_price"] + keep
     return pos["entry_price"] - keep
@@ -442,7 +484,7 @@ def process_tick(state):
     closed_any = []
     still_open = []
     for pos in positions:
-        tp = aged_tp(pos, now)
+        tp = aged_tp(pos, now, c15m[:-1])
         if tp != (pos.get("tp_price") or 0):
             pos["tp_price"] = tp  # aged — persisted via serialize
         if tp <= 0:
@@ -563,7 +605,15 @@ def process_tick(state):
             used_margin = sum(p["margin"] for p in still_open)
             margin_left = balance * MARGIN_BUDGET - used_margin
             tp_dist = max(SCALP_TP_ATR * (atr or 0.003), MIN_TP_DIST)
-            per_unit = tp_dist / price - FEE_RATE * 2
+            entry_tp_dist = tp_dist
+            if SWING_TP == "1":
+                lvl = nearest_swing_tp(c15m[:-1], want, price)
+                if lvl is not None:
+                    d = (lvl - price) if want == "long" else (price - lvl)
+                    d *= SWING_FRONT  # front-run the level — fill before the crowd at it
+                    if MIN_TP_DIST <= d <= tp_dist * SWING_MAX:
+                        entry_tp_dist = d
+            per_unit = entry_tp_dist / price - FEE_RATE * 2
             # per-slot cap: 8 slots x balance notional = exactly the 80% margin
             # budget at 10x — a single trade can never hog the whole budget and
             # freeze the bot (the 2026-09-06 wedge lesson).
@@ -573,7 +623,7 @@ def process_tick(state):
                 if notional >= 1.0:  # don't open dust positions
                     margin = notional / LEVERAGE
                     entry = price
-                    tp = entry + tp_dist if want == "long" else entry - tp_dist
+                    tp = entry + entry_tp_dist if want == "long" else entry - entry_tp_dist
                     still_open.append({
                         "side": want, "entry_price": entry, "tp_price": tp,
                         "notional": notional, "margin": margin, "opened_at": now,
