@@ -52,6 +52,23 @@ INVENTORY_CAP = float(os.environ.get("INVENTORY_CAP", "999"))  # OFF by default 
 # full profit to free the slot. Fees are always covered (keep > fee buffer).
 TP_AGING = os.environ.get("TP_AGING", "1") == "1"
 TP_AGING_TIERS = [(6, 0.5), (24, 0.25), (72, 0.10)]  # (hours stuck, fraction of TP distance kept)
+
+# ── TEAM COORDINATION (owner 09-07: "if 3 traders are losing, work together") ──
+# COORD_MODE: 0 = off (each slot trades its own signal)
+#             1 = HELP: when one side's book is wounded (floating < -1% of
+#                 balance), only entries in THAT direction are allowed — the
+#                 team pushes toward the wounded side's recovery.
+#             2 = HEDGE: the opposite — when one side is wounded, entries in
+#                 that direction are skipped so the book's net exposure to
+#                 its own wound can't grow.
+COORD_MODE = int(os.environ.get("COORD_MODE", "0"))
+COORD_WOUND = 0.01  # side is "wounded" when its floating < -1% of balance
+
+# ── SIGNAL PURITY FILTERS (owner 09-07: "pick moves from signal, not noise") ──
+# Each independently togglable; all default OFF until lab-proven.
+SIG_VOL_CONFIRM = os.environ.get("SIG_VOL_CONFIRM", "0")   # 1 = pullback candle must be LOW volume
+SIG_EMA_SLOPE = os.environ.get("SIG_EMA_SLOPE", "0")       # 1 = EMA slope must agree with momentum
+SIG_NO_CHASE = os.environ.get("SIG_NO_CHASE", "0")         # 1 = don't enter when price is extended from EMA fast
 MIN_TP_DIST = 0.003  # TP floor: ~0.13% — below this, fees eat the scalp alive
 EMA_FAST = 9         # scalper momentum: EMA9 vs EMA21 on 1m closes
 EMA_SLOW = 21
@@ -479,14 +496,55 @@ def process_tick(state):
                 elif momentum == "bear" and last_color == "bull" and price < ema_slow:
                     want = "short"  # downtrend rally — sell the rip candle
         if want:
+            # ── signal purity filters (lab-gated; all default OFF) ──
+            if SIG_VOL_CONFIRM == "1":
+                vols = [c["vol"] for c in c1m[:-1][-11:-1]]
+                if vols and len(vols) >= 5:
+                    avg_v = sum(vols) / len(vols)
+                    if last_closed["vol"] > 1.2 * avg_v:   # heavy-volume "pullback" = possible reversal, skip
+                        want = None
+            if SIG_EMA_SLOPE == "1" and want and ema_fast is not None and ema_slow is not None:
+                closes_x = [c["close"] for c in c1m[:-1]]
+                if len(closes_x) >= EMA_SLOW + 3:
+                    e_now = ema_fast
+                    e_prev = compute_ema(closes_x[:-3], EMA_FAST)
+                    if e_prev is not None:
+                        if want == "long" and e_now <= e_prev:
+                            want = None
+                        elif want == "short" and e_now >= e_prev:
+                            want = None
+            if SIG_NO_CHASE == "1" and want and atr:
+                ext = abs(price - ema_fast) if ema_fast is not None else 0
+                if ext > 0.5 * atr:  # already extended — the move is old, don't chase
+                    want = None
+        if want:
             # inventory cap: how much are the open positions floating right now?
-            floating_now = 0.0
+            long_float = 0.0
+            short_float = 0.0
             for p in still_open:
                 u = (price - p["entry_price"]) * (p["notional"] / p["entry_price"]) if p["side"] == "long" \
                     else (p["entry_price"] - price) * (p["notional"] / p["entry_price"])
-                floating_now += u
+                if p["side"] == "long":
+                    long_float += u
+                else:
+                    short_float += u
+            floating_now = long_float + short_float
             if floating_now < -abs(INVENTORY_CAP) * balance:
                 want = None  # wedge inventory too deep — pause new entries, let TPs work
+            elif COORD_MODE == 1 and want:
+                # HELP the wounded side: skip entries that fight the team's book
+                wound = -COORD_WOUND * balance
+                if long_float < wound and want == "short":
+                    want = None
+                elif short_float < wound and want == "long":
+                    want = None
+            elif COORD_MODE == 2 and want:
+                # HEDGE: skip entries that add to the wounded side's exposure
+                wound = -COORD_WOUND * balance
+                if long_float < wound and want == "long":
+                    want = None
+                elif short_float < wound and want == "short":
+                    want = None
         entry_cooldown_ok = True
         if still_open:
             try:
