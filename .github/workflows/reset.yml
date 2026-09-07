@@ -25,6 +25,9 @@ jobs:
               "streak_count": 0, "streak_side": "none",
               "open_positions": 0, "unrealized_pnl": 0.0, "equity": bal,
               "last_error": "",
+              "last_reversal_at": "",
+              "last_price": 0.0,
+              "last_tick_at": "",
           }
           for i in range(8):
               state[f"pos_{i}_active"] = False

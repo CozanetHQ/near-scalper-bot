@@ -399,7 +399,8 @@ def process_tick(state):
     # Every open position runs until its own TP hits. Wedged positions simply
     # sit and consume margin budget; the bot keeps chopping with the rest.
     positions = parse_positions(state)
-    balance = state.get("balance") or START_BALANCE
+    bal_raw = state.get("balance")
+    balance = bal_raw if isinstance(bal_raw, (int, float)) and bal_raw > 0 else START_BALANCE
     scan = fetch_candles("1m", 15)  # gap-aware TP scan (shared)
     closed_any = []
     still_open = []
@@ -592,6 +593,12 @@ def main():
                 trades += 1
         except Exception as e:
             log(f"ERROR: {e}")
+            if not locals().get("_alerted"):
+                _alerted = True  # one alert per run — a crash-looping engine must not look like quiet grinding
+                try:
+                    send_telegram(f"\u26a0\ufe0f Scalper ENGINE ERROR (tick paused this cycle): {str(e)[:150]}")
+                except Exception:
+                    pass
             try:
                 # CRITICAL: last_error now stores the open-positions JSON.
                 # A transient error (Bitget timeout, network blip) must NEVER
