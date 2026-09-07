@@ -28,7 +28,7 @@ PRODUCT = "USDT-FUTURES"
 ATR_PERIOD = 14
 SL_ATR_MULT = 4.0     # GRID SEARCH WINNER (1152 configs): wide stop, rarely hit
 TP_SL_RATIO = 1.5     # most exits are 20-min drift-capture time stops
-WIN_TARGET_DOLLARS = 0.15  # OWNER 09-06: each TP aims for $0.15 (margin caps scale it down)
+WIN_TARGET_DOLLARS = 0.05  # OWNER 09-07: each TP aims for $0.05 (slot cap still binds in low vol)
 LIQ_MODEL = os.environ.get("LIQ_MODEL", "0")  # 1 = model EXCHANGE LIQUIDATION (lab only):
 # a position whose adverse move crosses 1/leverage is force-closed at the liq
 # price for a realized loss of its margin. Paper default OFF (sim floats wedges
@@ -36,7 +36,7 @@ LIQ_MODEL = os.environ.get("LIQ_MODEL", "0")  # 1 = model EXCHANGE LIQUIDATION (
 SCALP_TP_ATR = 1.2   # TP distance = 1.2x 1m ATR (adaptive to live volatility)
 MAX_POSITIONS = int(os.environ.get("MAX_POSITIONS", "2"))  # owner 09-07: watch period at 2 slots (was 4).
 # lab confirmed 4 slots strictly better: realized +3.84 vs +3.58, equity +0.51 vs -0.30, half the wedges    # hedge scalper: multiple concurrent positions — wedged trades don't stop the chopping
-MARGIN_BUDGET = float(os.environ.get("MARGIN_BUDGET", "0.40"))  # owner 09-07: halved.
+MARGIN_BUDGET = float(os.environ.get("MARGIN_BUDGET", "0.85"))  # owner 09-07 17:40: raised so $0.05 TPs actually materialize at $3 balance (watch-period experiment; live plan stays 40%).
 # Lab (same fresh week, 4 slots): 0.80 → realized +63% but equity -$2.94 (wedge
 # cluster ate the grind). 0.40 → realized +35% and equity +$0.19 — the WORST
 # observed week still ends green. Halves wins, halves wedge damage.  # total margin across all open positions <= 80% of balance
