@@ -100,10 +100,30 @@ def log(msg):
     print(f"[{datetime.now(timezone.utc).isoformat()}] {msg}", flush=True)
 
 
-def http_get(url, timeout=8):
-    req = urllib.request.Request(url, headers=HEADERS)
-    with urllib.request.urlopen(req, timeout=timeout) as res:
-        return json.loads(res.read().decode())
+def http_get(url, timeout=8, retries=3):
+    """GET with backoff on transient errors (429 rate-limit, 5xx). A single
+    hiccup — common on shared GitHub-runner IPs hitting public exchange
+    APIs — must not surface as an alert or cost a whole tick."""
+    last_err = None
+    for attempt in range(retries):
+        try:
+            req = urllib.request.Request(url, headers=HEADERS)
+            with urllib.request.urlopen(req, timeout=timeout) as res:
+                return json.loads(res.read().decode())
+        except urllib.error.HTTPError as e:
+            last_err = e
+            if e.code == 429 or e.code >= 500:
+                if attempt < retries - 1:
+                    time.sleep(0.5 * (2 ** attempt))  # 0.5s, 1s
+                    continue
+            raise
+        except (urllib.error.URLError, TimeoutError) as e:
+            last_err = e
+            if attempt < retries - 1:
+                time.sleep(0.5 * (2 ** attempt))
+                continue
+            raise
+    raise last_err
 
 
 def http_post(url, payload, headers=None, timeout=8):
