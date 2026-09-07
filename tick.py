@@ -29,6 +29,10 @@ ATR_PERIOD = 14
 SL_ATR_MULT = 4.0     # GRID SEARCH WINNER (1152 configs): wide stop, rarely hit
 TP_SL_RATIO = 1.5     # most exits are 20-min drift-capture time stops
 WIN_TARGET_DOLLARS = 0.15  # OWNER 09-06: each TP aims for $0.15 (margin caps scale it down)
+LIQ_MODEL = os.environ.get("LIQ_MODEL", "0")  # 1 = model EXCHANGE LIQUIDATION (lab only):
+# a position whose adverse move crosses 1/leverage is force-closed at the liq
+# price for a realized loss of its margin. Paper default OFF (sim floats wedges
+# forever); ON it exposes the true tail of high-leverage configs.
 SCALP_TP_ATR = 1.2   # TP distance = 1.2x 1m ATR (adaptive to live volatility)
 MAX_POSITIONS = int(os.environ.get("MAX_POSITIONS", "2"))  # owner 09-07: watch period at 2 slots (was 4).
 # lab confirmed 4 slots strictly better: realized +3.84 vs +3.58, equity +0.51 vs -0.30, half the wedges    # hedge scalper: multiple concurrent positions — wedged trades don't stop the chopping
@@ -507,6 +511,21 @@ def process_tick(state):
                 if not is_long and candle["low"] <= tp:
                     hit_tp = True
                     break
+        # liquidation check FIRST — in real isolated margin the exchange closes
+        # the slot before any TP could matter.
+        if LIQ_MODEL == "1" and pos.get("margin") and pos["margin"] > 0:
+            adverse = (pos["entry_price"] - price) / pos["entry_price"] if pos["side"] == "long" else (price - pos["entry_price"]) / pos["entry_price"]
+            liq_frac = (1.0 / LEVERAGE) - 0.005  # maintenance buffer
+            if adverse >= liq_frac:
+                liq_price = pos["entry_price"] * (1 - liq_frac) if pos["side"] == "long" else pos["entry_price"] * (1 + liq_frac)
+                trade, balance = close_position(pos, liq_price, "LIQ", now, balance)
+                closed_any.append(trade)
+                send_telegram(
+                    f"\u2620\ufe0f *LIQUIDATED {pos['side'].upper()}*\n"
+                    f"Entry ${pos['entry_price']:.4f} → LiQ ${liq_price:.4f}\n"
+                    f"PnL ${trade['net_pnl']:.4f} | Balance ${balance:.4f}"
+                )
+                continue
         if hit_tp:
             trade, balance = close_position(pos, tp, "TP", now, balance)
             closed_any.append(trade)
