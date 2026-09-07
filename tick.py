@@ -648,10 +648,13 @@ def process_tick(state):
                         "notional": notional, "margin": margin, "opened_at": now,
                     })
                     opened_this_tick = True
+                    # OWNER 09-07: plain-dollar math on every entry — no percentages to decode.
                     send_telegram(
                         f"\u26a1\ufe0f *Opened {want.upper()} (scalp)*\n"
                         f"Entry ${entry:.4f} → TP ${tp:.4f} | NO SL\n"
-                        f"Notional ${notional:.2f} ({len(still_open)}/{MAX_POSITIONS} slots)"
+                        f"Account ${balance:.2f} → this trader locks ${margin:.2f} and commands ${notional:.2f}\n"
+                        f"TP pays ≈ ${notional * (abs(tp - entry) / entry - FEE_RATE * 2):.2f}"
+                        f" | trader {len(still_open)}/{MAX_POSITIONS}"
                     )
 
     # ── sync state: positions flattened + compatibility fields for the dashboard
