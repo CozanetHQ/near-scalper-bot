@@ -55,7 +55,8 @@ HEARTBEAT_SEC = 3600  # if no open/close events for an hour, ping Telegram so si
 # NOT a stop loss: nothing ever closes, no loss is realized. It only stops ADDING
 # new positions while floating damage exceeds this share of balance, so a one-way
 # regime can't stack unlimited wedges. The grind resumes as floating recovers.
-INVENTORY_CAP = float(os.environ.get("INVENTORY_CAP", "999"))  # OFF by default — lab 09-06: every throttle variant starved the grind that pays for wedges (raw equity -$0.26 vs -$3.2 to -$5.3 hardened)
+INVENTORY_CAP = float(os.environ.get("INVENTORY_CAP", "999"))
+SAFE_DD = float(os.environ.get("SAFE_DD", "0.25"))  # owner 09-08 Engine 10: HARD realized-DD wall — pause ALL new entries at -25% from peak balance; the intelligence may NEVER override (0 disables for lab only)  # OFF by default — lab 09-06: every throttle variant starved the grind that pays for wedges (raw equity -$0.26 vs -$3.2 to -$5.3 hardened)
 # Slot recycling: a position stuck for hours relaxes its TP toward entry.
 # It NEVER crosses entry — no loss is ever realized. It just stops demanding
 # full profit to free the slot. Fees are always covered (keep > fee buffer).
@@ -493,6 +494,32 @@ def process_tick(state):
     positions = parse_positions(state)
     bal_raw = state.get("balance")
     balance = bal_raw if isinstance(bal_raw, (int, float)) and bal_raw > 0 else START_BALANCE
+    # ── OWNER 09-08 SELF-DIAGNOSTIC ENGINE: hard drawdown boundary.
+    # Safety wall, not a strategy opinion: realized balance below (1-SAFE_DD)
+    # of its running peak pauses ALL new entries until the account recovers.
+    safe_prev = 0
+    peak_bal = balance
+    try:
+        _snap = json.loads(state.get("last_reversal_at") or "{}")
+        if isinstance(_snap, dict):
+            safe_prev = int(_snap.get("sf") or 0)
+            peak_bal = max(balance, float(_snap.get("pk") or balance))
+    except (ValueError, TypeError):
+        peak_bal = balance
+    safe_on = SAFE_DD > 0 and balance < peak_bal * (1 - SAFE_DD)
+    if safe_on and not safe_prev:
+        try:
+            send_telegram(
+                "\U0001F6D1 SAFE MODE — hard risk boundary hit (non-negotiable):\n"
+                f"balance ${balance:.2f} is below {(1-SAFE_DD)*100:.0f}% of peak ${peak_bal:.2f}\n"
+                "New entries paused. Open positions ride to TP as normal.")
+        except Exception:
+            pass
+    elif not safe_on and safe_prev:
+        try:
+            send_telegram("\u2705 SAFE MODE lifted — balance recovered above the drawdown boundary.")
+        except Exception:
+            pass
     scan = fetch_candles("1m", 15)  # gap-aware TP scan (shared)
     closed_any = []
     still_open = []
@@ -638,6 +665,7 @@ def process_tick(state):
             want is not None
             and entry_cooldown_ok
             and len(still_open) < MAX_POSITIONS
+            and not safe_on
         )
         if can_open:
             used_margin = sum(p["margin"] for p in still_open)
@@ -734,7 +762,7 @@ def process_tick(state):
     # equity + heartbeat snapshot in another legacy string field for observability
     su["last_reversal_at"] = json.dumps(
         {"eq": round(balance + unrealized, 4), "u": round(unrealized, 4),
-         "n": len(still_open), "hb": hb_new},
+         "n": len(still_open), "hb": hb_new, "pk": round(peak_bal, 4), "sf": 1 if safe_on else 0},
         separators=(",", ":"))
     sync(state_update=su, trade=closed_any[0] if closed_any else None)
     for t in closed_any[1:]:
@@ -742,7 +770,8 @@ def process_tick(state):
     if closed_any:
         return "closed", f"closed {len(closed_any)} TP(s), {len(still_open)} open"
     if want is not None and not can_open:
-        return "none", f"signal {want} skipped — slots/margin full ({len(still_open)}/{MAX_POSITIONS})"
+        why = "SAFE MODE (drawdown gate)" if safe_on else f"slots/margin full ({len(still_open)}/{MAX_POSITIONS})"
+        return "none", f"signal {want} skipped — {why}"
     return "none", f"{len(still_open)} open | price ${price:.4f}"
 
 
