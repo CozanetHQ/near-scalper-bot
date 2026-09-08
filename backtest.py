@@ -110,12 +110,25 @@ class Backtest:
     def run(self, start_idx=30, end_idx=None):
         t = self.tick
         end = len(self.c1m) if end_idx is None else end_idx
+        self.min_eq = None
+        self.cap_hours = 0.0
         for i in range(start_idx, end):
             self.cur_i = i
             self.clock.now_ms = self.c1m[i]["ts"]
             try:
                 state = t.get_state()
                 t.process_tick(state)
+                # owner 09-08 lab metrics: max drawdown + capital-time locked
+                close = self.c1m[i]["close"]
+                pos = t.parse_positions(state)
+                unreal = 0.0
+                for p in pos:
+                    amt = p["notional"] / p["entry_price"]
+                    unreal += ((close - p["entry_price"]) * amt if p["side"] == "long"
+                               else (p["entry_price"] - close) * amt)
+                    self.cap_hours += p["margin"] / 60.0
+                eq = (state.get("balance") or 0) + unreal
+                if self.min_eq is None or eq < self.min_eq: self.min_eq = eq
             except Exception as e:
                 return f"ERROR at candle {i}: {type(e).__name__} {e}"
         return None

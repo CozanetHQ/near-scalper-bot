@@ -35,7 +35,7 @@ TREND_CHASE = os.environ.get("TREND_CHASE", "0")  # OWNER 09-08 hypothesis: duri
 # a position whose adverse move crosses 1/leverage is force-closed at the liq
 # price for a realized loss of its margin. Paper default OFF (sim floats wedges
 # forever); ON it exposes the true tail of high-leverage configs.
-SCALP_TP_ATR = 1.2   # TP distance = 1.2x 1m ATR (adaptive to live volatility)
+SCALP_TP_ATR = 1.6  # OWNER 09-08: two-week lab verdict — 1.6x ATR is the robust center (capital-time 0.0070 $/(cap.h) IDENTICAL on both regime weeks; hostile-week maxDD halved -$0.76 vs -$5.20 at 1.2x; 2.0x hits the recycle cliff)   # TP distance = 1.2x 1m ATR (adaptive to live volatility)
 MAX_POSITIONS = int(os.environ.get("MAX_POSITIONS", "2"))  # owner 09-07: watch period at 2 slots (was 4).
 # lab confirmed 4 slots strictly better: realized +3.84 vs +3.58, equity +0.51 vs -0.30, half the wedges    # hedge scalper: multiple concurrent positions — wedged trades don't stop the chopping
 MARGIN_BUDGET = float(os.environ.get("MARGIN_BUDGET", "0.85"))  # owner 09-07 17:40: raised so $0.05 TPs actually materialize at $3 balance (watch-period experiment; live plan stays 40%).
