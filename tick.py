@@ -29,6 +29,7 @@ ATR_PERIOD = 14
 SL_ATR_MULT = 4.0     # GRID SEARCH WINNER (1152 configs): wide stop, rarely hit
 TP_SL_RATIO = 1.5     # most exits are 20-min drift-capture time stops
 WIN_TARGET_DOLLARS = 0.05  # OWNER 09-07: each TP aims for $0.05 (slot cap still binds in low vol)
+WIN_TARGET_PCT = float(os.environ.get("WIN_TARGET_PCT", "0.0167"))  # OWNER 09-08: speak percentages — target = 1.67% of balance (=$0.05 at $3), auto-compounds with the account; 0 = fixed dollars
 LIQ_MODEL = os.environ.get("LIQ_MODEL", "0")
 TREND_MULT = float(os.environ.get("TREND_MULT", "1.0"))
 TREND_CHASE = os.environ.get("TREND_CHASE", "0")  # OWNER 09-08 hypothesis: during clear 4H+15m bias, ALSO enter WITH the trend (momentum candle, no pullback)  # OWNER 09-08: multiply win target when trade aligns with clear 4H+15m bias  # 1 = model EXCHANGE LIQUIDATION (lab only):
@@ -650,7 +651,8 @@ def process_tick(state):
             slot_cap = balance * MARGIN_BUDGET * LEVERAGE / MAX_POSITIONS
             if per_unit > 0 and margin_left > 0.05:
                 aligned = (bias != "none" and want == ("long" if bias == "bull" else "short"))
-                target = WIN_TARGET_DOLLARS * TREND_MULT if (aligned and TREND_MULT != 1.0) else WIN_TARGET_DOLLARS
+                base = WIN_TARGET_PCT * balance if WIN_TARGET_PCT > 0 else WIN_TARGET_DOLLARS
+                target = base * TREND_MULT if (aligned and TREND_MULT != 1.0) else base
                 notional = min(target / per_unit, slot_cap, margin_left * LEVERAGE, 40.0)
                 if notional >= 1.0:  # don't open dust positions
                     margin = notional / LEVERAGE
@@ -666,8 +668,8 @@ def process_tick(state):
                     send_telegram(
                         f"\u26a1\ufe0f *Opened {want.upper()} (scalp)*\n"
                         f"Entry ${entry:.4f} → TP ${tp:.4f} | NO SL\n"
-                        f"Account ${balance:.2f} → this trader locks ${margin:.2f} and commands ${notional:.2f}\n"
-                        f"TP pays ≈ ${notional * (abs(tp - entry) / entry - FEE_RATE * 2):.2f}"
+                        f"Account ${balance:.2f} → this trader locks ${margin:.2f} ({margin/balance*100:.0f}%) and commands ${notional:.2f} ({notional/balance*100:.0f}% of account)\n"
+                        f"TP pays ≈ ${notional * (abs(tp - entry) / entry - FEE_RATE * 2):.2f} (+{(notional/balance) * (abs(tp - entry) / entry - FEE_RATE * 2) * 100:.2f}% of account)"
                         f" | trader {len(still_open)}/{MAX_POSITIONS}"
                     )
 
