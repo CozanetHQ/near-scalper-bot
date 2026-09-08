@@ -29,7 +29,9 @@ ATR_PERIOD = 14
 SL_ATR_MULT = 4.0     # GRID SEARCH WINNER (1152 configs): wide stop, rarely hit
 TP_SL_RATIO = 1.5     # most exits are 20-min drift-capture time stops
 WIN_TARGET_DOLLARS = 0.05  # OWNER 09-07: each TP aims for $0.05 (slot cap still binds in low vol)
-WIN_TARGET_PCT = float(os.environ.get("WIN_TARGET_PCT", "0.0167"))  # OWNER 09-08: speak percentages — target = 1.67% of balance (=$0.05 at $3), auto-compounds with the account; 0 = fixed dollars
+WIN_TARGET_PCT = float(os.environ.get("WIN_TARGET_PCT", "0.0167"))
+SLIP_PCT = float(os.environ.get("SLIP_PCT", "0"))  # owner 09-08 stress lab: extra per-side execution cost (slippage/spread/failed fills)
+TRANSITION_GATE = os.environ.get("TRANSITION_GATE", "0")  # owner 09-08: yellow-state — closed 4H vs forming 4H+15m disagree = pause OLD-direction entries  # OWNER 09-08: speak percentages — target = 1.67% of balance (=$0.05 at $3), auto-compounds with the account; 0 = fixed dollars
 LIQ_MODEL = os.environ.get("LIQ_MODEL", "0")
 TREND_MULT = float(os.environ.get("TREND_MULT", "1.0"))
 TREND_CHASE = os.environ.get("TREND_CHASE", "0")  # OWNER 09-08 hypothesis: during clear 4H+15m bias, ALSO enter WITH the trend (momentum candle, no pullback)  # OWNER 09-08: multiply win target when trade aligns with clear 4H+15m bias  # 1 = model EXCHANGE LIQUIDATION (lab only):
@@ -256,7 +258,7 @@ def finalize_close(state, exit_price, reason, now, su):
     diff = (exit_price - entry) if is_long else (entry - exit_price)
     gross = diff * (notional / entry)
     fees = notional * FEE_RATE * 2
-    net = gross - fees
+    net = gross - fees - (notional * SLIP_PCT * 2)  # stress: slippage both sides
     new_balance = state["balance"] + net  # margin is virtual sizing only, never reserved from balance
 
     trade = {
@@ -393,7 +395,7 @@ def close_position(pos, exit_price, reason, now, balance):
     diff = (exit_price - entry) if is_long else (entry - exit_price)
     gross = diff * (notional / entry)
     fees = notional * FEE_RATE * 2
-    net = gross - fees
+    net = gross - fees - (notional * SLIP_PCT * 2)  # stress: slippage both sides
     new_balance = balance + net
     trade = {
         "side": pos["side"],
@@ -568,6 +570,11 @@ def process_tick(state):
                 if want is None and TREND_CHASE == "1" and bias != "none":
                     if momentum == bias and last_color == bias:
                         want = "long" if bias == "bull" else "short"
+                if TRANSITION_GATE == "1" and want is not None and len(c4h) >= 2:
+                    closed_c = candle_color(c4h[0]); forming_c = candle_color(forming_4h)
+                    if (forming_c != closed_c and forming_c == candle_color(forming_15m)
+                            and want == ("long" if closed_c == "bull" else "short")):
+                        want = None  # reversal in progress — pause old-direction harvesting
         if want:
             # ── signal purity filters (lab-gated; all default OFF) ──
             if SIG_VOL_CONFIRM == "1":
