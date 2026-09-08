@@ -29,7 +29,9 @@ ATR_PERIOD = 14
 SL_ATR_MULT = 4.0     # GRID SEARCH WINNER (1152 configs): wide stop, rarely hit
 TP_SL_RATIO = 1.5     # most exits are 20-min drift-capture time stops
 WIN_TARGET_DOLLARS = 0.05  # OWNER 09-07: each TP aims for $0.05 (slot cap still binds in low vol)
-LIQ_MODEL = os.environ.get("LIQ_MODEL", "0")  # 1 = model EXCHANGE LIQUIDATION (lab only):
+LIQ_MODEL = os.environ.get("LIQ_MODEL", "0")
+TREND_MULT = float(os.environ.get("TREND_MULT", "1.0"))
+TREND_CHASE = os.environ.get("TREND_CHASE", "0")  # OWNER 09-08 hypothesis: during clear 4H+15m bias, ALSO enter WITH the trend (momentum candle, no pullback)  # OWNER 09-08: multiply win target when trade aligns with clear 4H+15m bias  # 1 = model EXCHANGE LIQUIDATION (lab only):
 # a position whose adverse move crosses 1/leverage is force-closed at the liq
 # price for a realized loss of its margin. Paper default OFF (sim floats wedges
 # forever); ON it exposes the true tail of high-leverage configs.
@@ -267,6 +269,7 @@ def finalize_close(state, exit_price, reason, now, su):
         "net_pnl": round(net, 6),
         "reason": reason,
         "balance_after": round(new_balance, 6),
+        "aligned": pos.get("aligned", None),
         "opened_at": state.get("opened_at"),
         "closed_at": now,
     }
@@ -402,6 +405,7 @@ def close_position(pos, exit_price, reason, now, balance):
         "net_pnl": round(net, 6),
         "reason": reason,
         "balance_after": round(new_balance, 6),
+        "aligned": pos.get("aligned", None),
         "opened_at": pos["opened_at"],
         "closed_at": now,
     }
@@ -417,7 +421,8 @@ def serialize_positions(positions):
     vanished. If you change this format, probe the round-trip first."""
     compact = [
         {"s": p["side"], "e": p["entry_price"], "t": p["tp_price"],
-         "n": p["notional"], "m": p["margin"], "o": p["opened_at"]}
+         "n": p["notional"], "m": p["margin"], "o": p["opened_at"],
+         "a": bool(p.get("aligned"))}
         for p in positions[:MAX_POSITIONS]
     ]
     return {"last_error": json.dumps(compact, separators=(",", ":"))}
@@ -443,6 +448,7 @@ def parse_positions(state):
                     "notional": float(p["n"]),
                     "margin": float(p["m"]),
                     "opened_at": p["o"],
+                    "aligned": bool(p.get("a", False)),
                 })
         except (KeyError, TypeError, ValueError):
             continue
@@ -556,6 +562,11 @@ def process_tick(state):
                     want = "long"   # uptrend pullback — buy the dip candle
                 elif momentum == "bear" and last_color == "bull" and price < ema_slow:
                     want = "short"  # downtrend rally — sell the rip candle
+                # OWNER 09-08 hypothesis: "with a clear direction, scalping is easy"
+                # → also enter WITH a clear 4H+15m bias on a same-direction momentum candle
+                if want is None and TREND_CHASE == "1" and bias != "none":
+                    if momentum == bias and last_color == bias:
+                        want = "long" if bias == "bull" else "short"
         if want:
             # ── signal purity filters (lab-gated; all default OFF) ──
             if SIG_VOL_CONFIRM == "1":
@@ -638,7 +649,9 @@ def process_tick(state):
             # freeze the bot (the 2026-09-06 wedge lesson).
             slot_cap = balance * MARGIN_BUDGET * LEVERAGE / MAX_POSITIONS
             if per_unit > 0 and margin_left > 0.05:
-                notional = min(WIN_TARGET_DOLLARS / per_unit, slot_cap, margin_left * LEVERAGE, 40.0)
+                aligned = (bias != "none" and want == ("long" if bias == "bull" else "short"))
+                target = WIN_TARGET_DOLLARS * TREND_MULT if (aligned and TREND_MULT != 1.0) else WIN_TARGET_DOLLARS
+                notional = min(target / per_unit, slot_cap, margin_left * LEVERAGE, 40.0)
                 if notional >= 1.0:  # don't open dust positions
                     margin = notional / LEVERAGE
                     entry = price
@@ -646,6 +659,7 @@ def process_tick(state):
                     still_open.append({
                         "side": want, "entry_price": entry, "tp_price": tp,
                         "notional": notional, "margin": margin, "opened_at": now,
+                        "aligned": aligned,
                     })
                     opened_this_tick = True
                     # OWNER 09-07: plain-dollar math on every entry — no percentages to decode.
