@@ -3,147 +3,354 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>NEAR Scalper Bot — Live Dashboard</title>
+<title>NEAR Scalper — Market Intelligence Terminal</title>
 <style>
+  :root {
+    --bg: #0a0e14; --panel: #10151e; --panel2: #141a25; --line: #1d2532;
+    --txt: #c9d3df; --dim: #6b7688; --dim2: #465062;
+    --acc: #5b9dd9; --pos: #34d399; --neg: #f87171; --warn: #f5b942;
+  }
   * { margin:0; padding:0; box-sizing:border-box; }
-  body { background:#0b0e14; color:#d7dce4; font-family:'SF Mono','Cascadia Code',Consolas,monospace; padding:24px; max-width:1100px; margin:0 auto; }
-  h1 { font-size:1.15rem; letter-spacing:.08em; color:#fff; text-transform:uppercase; }
-  .sub { color:#6b7280; font-size:.75rem; margin-bottom:20px; }
-  .live { display:inline-block; width:8px; height:8px; border-radius:50%; background:#22c55e; margin-right:6px; animation:pulse 2s infinite; }
-  .live.stale { background:#f59e0b; }
-  .live.dead { background:#ef4444; animation:none; }
-  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
-  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin-bottom:20px; }
-  .card { background:#131824; border:1px solid #232b3d; border-radius:10px; padding:14px 16px; }
-  .card .label { font-size:.68rem; color:#6b7280; text-transform:uppercase; letter-spacing:.08em; }
-  .card .value { font-size:1.35rem; color:#fff; margin-top:4px; font-weight:600; }
-  .card .value.green { color:#22c55e; } .card .value.red { color:#ef4444; }
-  .pos { background:#131824; border:1px solid #232b3d; border-radius:10px; padding:16px; margin-bottom:20px; }
-  .pos h2 { font-size:.8rem; color:#9ca3af; text-transform:uppercase; letter-spacing:.08em; margin-bottom:10px; }
-  table { width:100%; border-collapse:collapse; font-size:.78rem; }
-  th { text-align:left; color:#6b7280; font-weight:400; font-size:.68rem; text-transform:uppercase; padding:6px 8px; border-bottom:1px solid #232b3d; }
-  td { padding:7px 8px; border-bottom:1px solid #1a2132; }
-  .tag { padding:1px 8px; border-radius:99px; font-size:.68rem; }
-  .tag.long { background:rgba(34,197,94,.12); color:#22c55e; }
-  .tag.short { background:rgba(239,68,68,.12); color:#ef4444; }
-  .tag.tp { background:rgba(34,197,94,.12); color:#22c55e; }
-  .tag.hardsl, .tag.maxage, .tag.liq { background:rgba(239,68,68,.15); color:#ef4444; }
-  .tag.wedge { background:rgba(245,158,11,.12); color:#f59e0b; }
-  .pnl-pos { color:#22c55e; } .pnl-neg { color:#ef4444; }
-  #trades-wrap h2, .pos h2 { margin-bottom:6px; }
-  .note { margin-top:18px; color:#4b5563; font-size:.7rem; line-height:1.5; }
-  a { color:#60a5fa; text-decoration:none; }
-  .err { color:#ef4444; padding:20px; text-align:center; }
+  html,body { background:var(--bg); color:var(--txt); }
+  body { font:12.5px/1.45 -apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+         font-variant-numeric: tabular-nums; padding:0 0 40px; }
+  a { color:var(--acc); text-decoration:none; }
+  .num { font-variant-numeric: tabular-nums; }
+
+  header { display:flex; align-items:baseline; gap:14px; padding:14px 20px 10px;
+           border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  header h1 { font-size:14px; font-weight:650; letter-spacing:.04em; color:#e8eef5; }
+  header h1 span { color:var(--dim); font-weight:400; }
+  .pill { display:inline-flex; align-items:center; gap:6px; padding:2px 10px;
+          border-radius:3px; font-size:11px; letter-spacing:.05em; border:1px solid var(--line); color:var(--dim); }
+  .pill b { color:var(--pos); font-weight:600; }
+  .pill .dot { width:6px; height:6px; border-radius:50%; background:var(--pos); animation:pulse 2.2s infinite; }
+  .pill.stall { border-color:#3a3020; } .pill.stall b { color:var(--warn); }
+  .pill.stall .dot { background:var(--warn); animation:none; }
+  .pill.dead { border-color:#3a2020; } .pill.dead b { color:var(--neg); }
+  .pill.dead .dot { background:var(--neg); animation:none; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+  .meta { margin-left:auto; color:var(--dim2); font-size:11px; display:flex; gap:16px; }
+  .meta b { color:var(--dim); font-weight:500; }
+
+  .kpis { display:grid; grid-template-columns:repeat(8,1fr); gap:1px; background:var(--line);
+          border-bottom:1px solid var(--line); }
+  .kpi { background:var(--panel); padding:10px 14px 9px; }
+  .kpi .l { font-size:10px; letter-spacing:.09em; color:var(--dim2); text-transform:uppercase; }
+  .kpi .v { font-size:16px; font-weight:600; color:#e8eef5; margin-top:3px; }
+  .kpi .s { font-size:10.5px; color:var(--dim); margin-top:1px; }
+  .pos-c { color:var(--pos); } .neg-c { color:var(--neg); } .warn-c { color:var(--warn); }
+  @media (max-width:1100px){ .kpis{grid-template-columns:repeat(4,1fr);} }
+
+  .main { display:grid; grid-template-columns:2fr 1fr; gap:1px; background:var(--line); }
+  @media (max-width:1100px){ .main{grid-template-columns:1fr;} }
+  section { background:var(--panel); padding:12px 16px 14px; }
+  section h2 { font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--dim);
+               font-weight:600; margin-bottom:10px; display:flex; justify-content:space-between; }
+  section h2 span { text-transform:none; letter-spacing:0; color:var(--dim2); font-weight:400; }
+
+  .chart-wrap { position:relative; }
+  svg text { font-family:inherit; }
+
+  .row { display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid #151b27;
+         font-size:12px; }
+  .row:last-child { border-bottom:none; }
+  .row .k { color:var(--dim); }
+  .row .v { color:#dfe6ef; font-weight:500; text-align:right; }
+  .regime { display:inline-block; padding:1px 8px; border-radius:2px; font-size:11px;
+            letter-spacing:.06em; background:#1b2331; color:var(--acc); border:1px solid #223146; }
+  .wait-box { margin-top:8px; padding:9px 11px; background:#171408; border:1px solid #3a3020;
+              border-radius:3px; color:var(--warn); font-size:11.5px; }
+  .wait-box b { letter-spacing:.06em; }
+  .clear-box { margin-top:8px; padding:9px 11px; background:#0d1512; border:1px solid #1c2f26;
+               border-radius:3px; color:var(--pos); font-size:11.5px; }
+  .params { margin-top:10px; }
+  .params .row { font-size:11px; }
+  .params .v { font-weight:400; color:var(--dim); }
+
+  .exits { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:1px;
+           background:var(--line); border-bottom:1px solid var(--line); }
+  .exit { background:var(--panel); padding:9px 14px; }
+  .exit .l { font-size:10px; letter-spacing:.09em; text-transform:uppercase; color:var(--dim2); }
+  .exit .v { font-size:13px; font-weight:600; margin-top:2px; }
+  .exit .s { font-size:10.5px; color:var(--dim); }
+
+  table { width:100%; border-collapse:collapse; font-size:12px; }
+  th { text-align:right; font-size:10px; letter-spacing:.07em; text-transform:uppercase;
+       color:var(--dim2); font-weight:500; padding:4px 8px; border-bottom:1px solid var(--line); }
+  th:first-child, td:first-child { text-align:left; }
+  td { text-align:right; padding:6px 8px; border-bottom:1px solid #131926; color:#d5dde7; }
+  tr:last-child td { border-bottom:none; }
+  .tag { display:inline-block; padding:0 7px; border-radius:2px; font-size:10.5px;
+         letter-spacing:.05em; line-height:17px; }
+  .tag.long  { background:#0d211a; color:var(--pos); border:1px solid #1d4033; }
+  .tag.short { background:#241214; color:var(--neg); border:1px solid #472020; }
+  .tag.tp     { background:#0d211a; color:var(--pos); border:1px solid #1d4033; }
+  .tag.hardsl, .tag.maxage, .tag.liq { background:#241214; color:var(--neg); border:1px solid #472020; }
+  .tag.flat  { background:#1b2331; color:var(--dim); border:1px solid #223146; }
+  .empty { color:var(--dim2); font-style:italic; padding:10px 4px; }
+
+  .riskbar { display:inline-block; width:90px; height:5px; background:#1a2230; border-radius:2px;
+             vertical-align:middle; margin-right:7px; overflow:hidden; }
+  .riskbar i { display:block; height:100%; background:var(--pos); }
+  .riskbar i.hot { background:var(--warn); }
+  .riskbar i.crit { background:var(--neg); }
+
+  footer { padding:14px 20px 0; color:var(--dim2); font-size:10.5px; line-height:1.6; }
+  .loading { padding:60px 20px; text-align:center; color:var(--dim2); }
 </style>
 </head>
 <body>
-<h1>NEAR Scalper Bot</h1>
-<div class="sub"><span id="live-dot" class="live"></span><span id="live-txt">live</span> · paper trading · Bitget NEAR/USDT · auto-refresh 30s</div>
-<div id="root"><div class="err">Loading bot state…</div></div>
-<div id="wait-slot"></div>
-<div class="note">Protected exits per v4 hardened spec: TP (take-profit) · HARD_SL (12% adverse kill) · MAX_AGE (48h force-close) · WEDGE (pre-v4 float, no longer possible). Data: <a href="https://superagent-ae0aaf02.base44.app/functions/nearScalperDashboard" target="_blank">raw JSON</a></div>
-<script>
-const API = "https://superagent-ae0aaf02.base44.app/functions/nearScalperDashboard";
-const fmt = (x,d=2) => (x===null||x===undefined||isNaN(x)) ? "—" : Number(x).toFixed(d);
-const pnlClass = v => v >= 0 ? "pnl-pos" : "pnl-neg";
-const startBal = 3.0;
+<header>
+  <h1>NEAR SCALPER <span>/ market intelligence terminal &middot; v5</span></h1>
+  <div class="pill" id="tick-pill"><span class="dot"></span><b>LIVE</b></div>
+  <div class="pill"><b>BITGET</b>&nbsp;NEAR/USDT &middot; 10&times; &middot; PAPER</div>
+  <div class="meta">
+    <span>EPOCH SINCE <b id="epoch">—</b></span>
+    <span>UTC <b id="clock">—</b></span>
+    <span>SYNC <b id="sync">—</b></span>
+  </div>
+</header>
 
-function parsePositions(state) {
-  const raw = state.last_error;
+<div id="root"><div class="loading">initializing — awaiting first state sync…</div></div>
+
+<footer>
+  Decision layer: EV-after-costs entry gate (p&#770;&middot;win &minus; (1&minus;p&#770;)&middot;kill &minus; fees &minus; assumed slip &ge; locked margin, else WAIT) &middot; regime classifier (runaway / spike / chop) &middot; HARD_SL 6% &middot; MAX_AGE 48h, all locked a priori in <a href="https://github.com/CozanetHQ/near-scalper-bot/blob/main/param_registry.json" target="_blank">param_registry.json</a>.
+  Data: live state via engine sync endpoint; epoch boundary from <a href="https://github.com/CozanetHQ/near-scalper-bot/blob/main/data/reset_log.jsonl" target="_blank">reset audit log</a>.
+  Paper trading — simulated fills, no live capital at risk.
+</footer>
+
+<script>
+"use strict";
+const STATE_API = "https://superagent-ae0aaf02.base44.app/functions/nearScalperDashboard";
+const RESET_LOG = "https://raw.githubusercontent.com/CozanetHQ/near-scalper-bot/main/data/reset_log.jsonl";
+const FEE_RATE = 0.0006, HARD_SL = 0.06, MAX_AGE_H = 48;
+const EV_PRIOR_P = 0.85, EV_PRIOR_W = 20, EV_MARGIN_REQ = 0.0005, SLIP = 0.0005;
+
+const $ = id => document.getElementById(id);
+const fmt = (x,d) => { d = (d===undefined?2:d); return (x===null||x===undefined||isNaN(+x)) ? "—" : (+x).toFixed(d); };
+const sgn = (x,d) => { d = (d===undefined?2:d); return (x>=0?"+":"") + fmt(x,d); };
+const cls = v => v>0 ? "pos-c" : v<0 ? "neg-c" : "";
+const ago = ts => {
+  if (!ts) return "—";
+  const m = (Date.now() - Date.parse(ts)) / 60000;
+  if (m < 60) return m < 1 ? "now" : Math.round(m) + "m";
+  if (m < 1440) return (m/60).toFixed(1) + "h";
+  return (m/1440).toFixed(1) + "d";
+};
+const parsePositions = s => {
+  const raw = s && s.last_error;
   if (typeof raw !== "string" || !raw.startsWith("[")) return [];
   try {
-    const data = JSON.parse(raw).filter(p => p.s === "long" || p.s === "short");
-    return data.map(p => ({
-      side: p.s, entry: +p.e, tp: +p.t, notional: +p.n, margin: +p.m, opened: p.o,
-      ageHours: p.o ? (Date.now() - Date.parse(p.o)) / 36e5 : null
-    }));
-  } catch { return []; }
+    return JSON.parse(raw)
+      .filter(p => p.s === "long" || p.s === "short")
+      .map(p => ({ side:p.s, entry:+p.e, tp:+p.t, notional:+p.n, margin:+p.m, opened:p.o }));
+  } catch (e) { return []; }
+};
+
+let lastEpoch = null;
+
+function equitySVG(points, startBal) {
+  const W = 720, H = 190, P = { t:12, r:10, b:20, l:52 };
+  if (!points.length) points = [];
+  const all = (lastEpoch ? [{ t: Date.parse(lastEpoch), b: startBal }] : []).concat(points);
+  if (all.length === 1) all.push({ t: all[0].t + 1, b: all[0].b });
+  const xs = all.map(p => p.t), bs = all.map(p => p.b);
+  const x0 = Math.min.apply(null, xs), x1 = Math.max.apply(null, xs) || x0 + 1;
+  let b0 = Math.min.apply(null, bs), b1 = Math.max.apply(null, bs);
+  const pad = Math.max((b1 - b0) * 0.15, 0.01); b0 -= pad; b1 += pad;
+  const X = t => P.l + (t - x0) / (x1 - x0) * (W - P.l - P.r);
+  const Y = b => H - P.b - (b - b0) / (b1 - b0) * (H - P.t - P.b);
+  const path = all.map((p,i) => (i ? "L" : "M") + X(p.t).toFixed(1) + " " + Y(p.b).toFixed(1)).join(" ");
+  const area = path + " L " + X(all[all.length-1].t).toFixed(1) + " " + (H-P.b) + " L " + X(all[0].t).toFixed(1) + " " + (H-P.b) + " Z";
+  const last = bs[bs.length-1], up = last >= startBal;
+  const col = up ? "var(--pos)" : "var(--neg)";
+  const grid = [0.25,0.5,0.75].map(f => {
+    const b = b0 + (b1-b0)*f;
+    return '<line x1="'+P.l+'" y1="'+Y(b)+'" x2="'+(W-P.r)+'" y2="'+Y(b)+'" stroke="#161d29"/>' +
+           '<text x="'+(P.l-6)+'" y="'+(Y(b)+3.5)+'" fill="#465062" font-size="9.5" text-anchor="end">'+fmt(b,3)+'</text>';
+  }).join("");
+  const t0 = new Date(x0), t1 = new Date(x1);
+  const p2 = n => String(n).padStart(2,"0");
+  const lab = (d,anchor,x) => '<text x="'+x+'" y="'+(H-5)+'" fill="#465062" font-size="9.5" text-anchor="'+anchor+'">'+(d.getUTCMonth()+1)+"/"+d.getUTCDate()+" "+p2(d.getUTCHours())+":"+p2(d.getUTCMinutes())+"</text>";
+  return '<svg viewBox="0 0 '+W+" "+H+'" width="100%" preserveAspectRatio="none" style="display:block">' +
+    grid +
+    '<line x1="'+P.l+'" y1="'+Y(startBal)+'" x2="'+(W-P.r)+'" y2="'+Y(startBal)+'" stroke="#2a3547" stroke-dasharray="3 3"/>' +
+    '<text x="'+(P.l-6)+'" y="'+(Y(startBal)+3.5)+'" fill="#6b7688" font-size="9.5" text-anchor="end">'+fmt(startBal,3)+'</text>' +
+    '<path d="'+area+'" fill="'+(up?"rgba(52,211,153,.07)":"rgba(248,113,113,.07)")+'"/>' +
+    '<path d="'+path+'" fill="none" stroke="'+col+'" stroke-width="1.5"/>' +
+    '<circle cx="'+X(all[all.length-1].t)+'" cy="'+Y(last)+'" r="2.5" fill="'+col+'"/>' +
+    lab(t0,"start",P.l) + lab(t1,"end",W-P.r) +
+  "</svg>";
 }
 
 function tagFor(reason) {
   const r = (reason||"").toUpperCase();
-  const cls = r.includes("HARD_SL") ? "hardsl" : r.includes("MAX_AGE") ? "maxage" : r.includes("LIQ") ? "liq" : r.includes("TP") ? "tp" : "";
-  const label = r.includes("HARD_SL") ? "HARD_SL" : r.includes("MAX_AGE") ? "MAX_AGE" : r || "—";
-  return `<span class="tag ${cls}">${label}</span>`;
+  const clsx = r.indexOf("HARD_SL")>=0 ? "hardsl" : r.indexOf("MAX_AGE")>=0 ? "maxage" : r.indexOf("LIQ")>=0 ? "liq" : r.indexOf("TP")>=0 ? "tp" : "flat";
+  const label = r.indexOf("HARD_SL")>=0 ? "HARD_SL" : r.indexOf("MAX_AGE")>=0 ? "MAX_AGE" : r.indexOf("LIQ")>=0 ? "LIQ" : (r || "—");
+  return '<span class="tag '+clsx+'">'+label+'</span>';
+}
+
+function render(d, resetAt) {
+  const s = d.state, allTrades = d.trades || [];
+  lastEpoch = resetAt || "2026-09-10T14:44:00+00:00";
+  const epochTrades = resetAt ? allTrades.filter(t => (t.closed_at||"") >= resetAt) : allTrades;
+  const pos = parsePositions(s);
+  let snap = {}; try { snap = JSON.parse(s.last_reversal_at || "{}"); } catch (e) {}
+  const bal = +s.balance || 0;
+  const startBal = 3.0;
+  const price = +s.last_price || null;
+
+  let floating = 0;
+  for (const p of pos) {
+    if (price && p.entry) {
+      p.float = (p.side === "long" ? price - p.entry : p.entry - price) * (p.notional / p.entry)
+                - p.notional * FEE_RATE * 2;
+    } else p.float = null;
+    if (p.float) floating += p.float;
+    p.ageH = p.opened ? (Date.now() - Date.parse(p.opened)) / 36e5 : null;
+    if (price && p.entry) {
+      p.adv = p.side === "long" ? (p.entry - price) / p.entry : (price - p.entry) / p.entry;
+      p.killPct = Math.max(0, Math.min(1, (p.adv < 0 ? 0 : p.adv) / HARD_SL));
+    }
+  }
+  const equity = bal + floating;
+  const wins = +s.wins || 0, losses = +s.losses || 0, n = wins + losses;
+  const grossW = epochTrades.filter(t=>+t.net_pnl>0).reduce((a,t)=>a + (+t.net_pnl||0), 0);
+  const grossL = Math.abs(epochTrades.filter(t=>+t.net_pnl<=0).reduce((a,t)=>a + (+t.net_pnl||0), 0));
+  const pf = grossL > 0 ? grossW/grossL : (grossW > 0 ? Infinity : null);
+  const expct = epochTrades.length ? (grossW - grossL) / epochTrades.length : null;
+  let peak = startBal, mdd = 0;
+  const ordered = epochTrades.slice().reverse();
+  for (const t of ordered) {
+    peak = Math.max(peak, +t.balance_after || peak);
+    mdd = Math.max(mdd, peak - (+t.balance_after || peak));
+  }
+  const usedMargin = pos.reduce((a,p)=>a+(p.margin||0),0);
+  const marginUtil = bal > 0 ? usedMargin / (bal*0.8) : 0;
+  const pWinNow = (EV_PRIOR_W*EV_PRIOR_P + wins) / (EV_PRIOR_W + wins + losses);
+
+  const tickAge = s.last_tick_at ? (Date.now()-Date.parse(s.last_tick_at))/60000 : Infinity;
+  const pill = $("tick-pill");
+  pill.className = "pill";
+  if (tickAge > 15) { pill.classList.add("dead");  pill.innerHTML = '<span class="dot"></span><b>ENGINE STALLED '+Math.round(tickAge)+'m</b>'; }
+  else if (tickAge > 8) { pill.classList.add("stall"); pill.innerHTML = '<span class="dot"></span><b>LATE '+Math.round(tickAge)+'m</b>'; }
+  else pill.innerHTML = '<span class="dot"></span><b>LIVE</b>';
+  $("epoch").textContent = (resetAt || "").slice(5,16).replace("T"," ");
+
+  const up = equity - startBal;
+
+  const byReason = {};
+  for (const t of epochTrades) {
+    const r = (t.reason||"—").toUpperCase();
+    const key = r.indexOf("HARD_SL")>=0?"HARD_SL":r.indexOf("MAX_AGE")>=0?"MAX_AGE":r.indexOf("LIQ")>=0?"LIQ":r.indexOf("TP")>=0?"TP":"OTHER";
+    byReason[key] = byReason[key] || {n:0, pnl:0};
+    byReason[key].n++; byReason[key].pnl += +t.net_pnl || 0;
+  }
+  const exitOrder = ["TP","HARD_SL","MAX_AGE","LIQ","OTHER"];
+  const exitHTML = exitOrder.filter(k=>byReason[k]).map(k=>{
+    const e = byReason[k];
+    return '<div class="exit"><div class="l">'+k+'</div>' +
+      '<div class="v '+cls(e.pnl)+'">'+sgn(e.pnl,3)+'</div>' +
+      '<div class="s">'+e.n+' close'+(e.n>1?"s":"")+' · avg '+sgn(e.pnl/e.n,3)+'</div></div>';
+  }).join("") || '<div class="exit"><div class="l">No closed trades this epoch</div><div class="s">awaiting first exit</div></div>';
+
+  const waitBox = snap.w
+    ? '<div class="wait-box"><b>WAIT</b> — '+snap.w+'</div>'
+    : '<div class="clear-box">'+(pos.length ? "entries permitted — gate armed" : "flat — monitoring for qualifying signal")+'</div>';
+
+  const posRows = pos.map(p=>{
+    const risk = (p.killPct===undefined)
+      ? '<span class="empty">—</span>'
+      : '<span class="riskbar"><i class="'+(p.killPct>0.75?"crit":p.killPct>0.4?"hot":"")+'" style="width:'+(p.killPct*100).toFixed(0)+'%"></i></span>'+(p.killPct*100).toFixed(1)+'% of kill';
+    return "<tr>" +
+      '<td><span class="tag '+p.side+'">'+p.side.toUpperCase()+'</span></td>' +
+      '<td class="num">'+fmt(p.entry,4)+'</td>' +
+      '<td class="num">'+(price?fmt(price,4):"—")+'</td>' +
+      '<td class="num">'+fmt(p.tp,4)+'</td>' +
+      '<td class="num '+cls(p.float)+'">'+(p.float===null||p.float===undefined?"—":sgn(p.float,3))+'</td>' +
+      '<td class="num">'+(p.ageH===null?"—":fmt(p.ageH,1))+'h / '+MAX_AGE_H+'h</td>' +
+      "<td>"+risk+"</td>" +
+    "</tr>";
+  }).join("") || '<tr><td colspan="7" class="empty">no open positions — flat</td></tr>';
+
+  const ledgerRows = epochTrades.slice(0,16).map(t=>{
+    const net = +t.net_pnl || 0;
+    return "<tr>" +
+      '<td style="color:var(--dim)">'+(t.closed_at||"").slice(5,16).replace("T"," ")+"</td>" +
+      '<td><span class="tag '+(t.side==="long"?"long":"short")+'">'+(t.side||"").toUpperCase()+'</span></td>' +
+      '<td class="num">'+fmt(t.entry_price,4)+'</td>' +
+      '<td class="num">'+fmt(t.exit_price,4)+'</td>' +
+      "<td>"+tagFor(t.reason)+"</td>" +
+      '<td class="num '+cls(net)+'">'+sgn(net,4)+'</td>' +
+      '<td class="num" style="color:var(--dim)">'+fmt(t.balance_after,3)+'</td>' +
+    "</tr>";
+  }).join("") || '<tr><td colspan="7" class="empty">no closed trades this epoch</td></tr>';
+
+  const curvePts = ordered.map(t=>({ t: Date.parse(t.closed_at), b:+t.balance_after }));
+
+  $("root").innerHTML =
+  '<div class="kpis">' +
+    '<div class="kpi"><div class="l">Equity</div><div class="v">$'+fmt(equity)+'</div><div class="s">bal $'+fmt(bal)+' + float '+sgn(floating,3)+'</div></div>' +
+    '<div class="kpi"><div class="l">Epoch P&amp;L</div><div class="v '+cls(up)+'">'+sgn(up)+'</div><div class="s">'+sgn(up/startBal*100,1)+'% since reset</div></div>' +
+    '<div class="kpi"><div class="l">Open / Max</div><div class="v">'+pos.length+' / 8</div><div class="s">margin util '+(marginUtil*100).toFixed(0)+'%</div></div>' +
+    '<div class="kpi"><div class="l">Win Rate</div><div class="v">'+(n?fmt(wins/n*100,1)+"%":"—")+'</div><div class="s">'+wins+'W / '+losses+'L</div></div>' +
+    '<div class="kpi"><div class="l">Profit Factor</div><div class="v">'+(pf===null?"—":pf===Infinity?"∞":fmt(pf,2))+'</div><div class="s">gross '+sgn(grossW,3)+' / −'+fmt(grossL,3)+'</div></div>' +
+    '<div class="kpi"><div class="l">Expectancy</div><div class="v '+cls(expct)+'">'+(expct===null?"—":sgn(expct,4))+'</div><div class="s">per closed trade</div></div>' +
+    '<div class="kpi"><div class="l">Max DD (epoch)</div><div class="v '+(mdd>0?"neg-c":"")+'">'+fmt(mdd,3)+'</div><div class="s">'+fmt(mdd/startBal*100,1)+'% of start</div></div>' +
+    '<div class="kpi"><div class="l">Last Tick</div><div class="v" style="font-size:13px">'+ago(s.last_tick_at)+'</div><div class="s">'+(s.last_tick_at||"").slice(11,19)+' UTC</div></div>' +
+  '</div>' +
+  '<div class="exits">'+exitHTML+'</div>' +
+  '<div class="main">' +
+    '<section><h2>Equity — Closed Trades (Epoch)<span>start $'+fmt(startBal)+' · dashed = epoch baseline</span></h2>' +
+    '<div class="chart-wrap">'+equitySVG(curvePts, startBal)+'</div></section>' +
+    '<section><h2>Engine Decision Layer</h2>' +
+      '<div class="row"><span class="k">Regime</span><span class="v"><span class="regime">'+(snap.rg||"—").toUpperCase()+'</span></span></div>' +
+      '<div class="row"><span class="k">Gate win-prob p\u0302</span><span class="v">'+fmt(pWinNow*100,1)+'%</span></div>' +
+      '<div class="row"><span class="k">Gate EV requirement</span><span class="v">≥ '+(EV_MARGIN_REQ*100).toFixed(2)+'% / unit notional</span></div>' +
+      '<div class="row"><span class="k">Kill distance (HARD_SL)</span><span class="v">'+(HARD_SL*100).toFixed(0)+'% adverse</span></div>' +
+      '<div class="row"><span class="k">Age kill (MAX_AGE)</span><span class="v">'+MAX_AGE_H+'h</span></div>' +
+      '<div class="row"><span class="k">Cost model</span><span class="v">fees '+(FEE_RATE*1e4).toFixed(0)+'bp/side + slip '+(SLIP*1e4).toFixed(0)+'bp/side</span></div>' +
+      '<div class="row"><span class="k">Drawdown guard</span><span class="v">'+(snap.sf?"ENGAGED":"off")+'</span></div>' +
+      waitBox +
+      '<div class="params">' +
+        '<div class="row"><span class="k">EV prior</span><span class="v">p '+(EV_PRIOR_P*100).toFixed(0)+'% × weight '+EV_PRIOR_W+'</span></div>' +
+        '<div class="row"><span class="k">Runaway / spike gates</span><span class="v">6× 15m candles · 3× 1m ATR</span></div>' +
+        '<div class="row"><span class="k">Tick cadence</span><span class="v">~4.5 min, hourly watchdog</span></div>' +
+      '</div>' +
+    '</section>' +
+  '</div>' +
+  '<div class="main" style="grid-template-columns:1fr">' +
+    '<section><h2>Open Positions &amp; Risk<span>kill = 6% adverse · age cap 48h</span></h2>' +
+    '<table><tr><th>Side</th><th>Entry</th><th>Mark</th><th>TP</th><th>Floating</th><th>Age</th><th>Distance to Kill</th></tr>' + posRows + '</table></section>' +
+  '</div>' +
+  '<div class="main" style="grid-template-columns:1fr">' +
+    '<section><h2>Trade Ledger (Epoch)<span>'+epochTrades.length+' closed · newest first</span></h2>' +
+    '<table><tr><th>Closed (UTC)</th><th>Side</th><th>Entry</th><th>Exit</th><th>Reason</th><th>Net P&amp;L</th><th>Balance</th></tr>' + ledgerRows + '</table></section>' +
+  '</div>';
 }
 
 async function refresh() {
   try {
-    const res = await fetch(API);
-    const d = await res.json();
-    const s = d.state, trades = d.trades || [];
-    const pos = parsePositions(s);
-    const bal = Number(s.balance) || startBal;
-    const wins = Number(s.wins)||0, losses = Number(s.losses)||0;
-    const n = wins + losses;
-    const price = Number(s.last_price) || null;
-    for (const p of pos) {
-      if (price && p.entry) {
-        const gross = (p.side === "long") ? (price - p.entry) * (p.notional / p.entry)
-                                          : (p.entry - price) * (p.notional / p.entry);
-        p.floatingPnl = gross - p.notional * 0.0006 * 2; // rough fee model
-      } else p.floatingPnl = null;
-    }
-    const floating = pos.reduce((acc,p) => acc + (p.floatingPnl || 0), 0);
-    const equity = bal + floating;
-
-    let snap = null;
-    try { snap = JSON.parse(s.last_reversal_at || "{}"); } catch {}
-    const waitMsg = snap && snap.w ? `<div class="pos"><h2>Engine Decision</h2><table><tr><td>\u23F3 <b>WAIT</b> — no new entry${snap.rg ? ` (regime: ${snap.rg})` : ""}</td></tr><tr><td style="color:#9ca3af">${snap.w}</td></tr></table></div>` : (snap && snap.rg ? `<div class="pos"><h2>Regime</h2><table><tr><td>${snap.rg}</td></tr></table></div>` : "");
-    const tickAge = s.last_tick_at ? (Date.now() - Date.parse(s.last_tick_at))/60000 : null;
-    let dot = document.getElementById("live-dot"), txt = document.getElementById("live-txt");
-    if (tickAge === null) { dot.className = "live dead"; txt.textContent = "no tick data"; }
-    else if (tickAge > 15) { dot.className = "live dead"; txt.textContent = `stalled — last tick ${Math.round(tickAge)} min ago`; }
-    else if (tickAge > 8) { dot.className = "live stale"; txt.textContent = `last tick ${Math.round(tickAge)} min ago`; }
-    else { dot.className = "live"; txt.textContent = "live"; }
-
-    let html = `<div class="grid">
-      <div class="card"><div class="label">Balance</div><div class="value ${bal>=startBal?"green":""}">$${fmt(bal)}</div></div>
-      <div class="card"><div class="label">Since Reset</div><div class="value ${bal>=startBal?"green":"red"}">${bal>=startBal?"+":""}${fmt((bal/startBal-1)*100,1)}%</div></div>
-      <div class="card"><div class="label">Equity (incl. floating)</div><div class="value ${equity>=startBal?"green":"red"}">$${fmt(equity)}</div></div>
-      <div class="card"><div class="label">Open Positions</div><div class="value">${pos.length}</div></div>
-      <div class="card"><div class="label">Trades (W/L)</div><div class="value">${n} <span style="color:#6b7280;font-size:.9rem">(${wins}W / ${losses}L)</span></div></div>
-    </div>`;
-
-    if (pos.length) {
-      const rows = pos.map(p => {
-        const age = p.ageHours !== null ? `${fmt(p.ageHours,1)}h` : "—";
-        const wedge = p.ageHours !== null && p.ageHours >= 24 ? ` <span class="tag wedge">wedge risk</span>` : "";
-        const fp = p.floatingPnl;
-        return `<tr><td><span class="tag ${p.side}">${p.side.toUpperCase()}</span></td>
-          <td>${fmt(p.entry,4)}</td><td>${fmt(p.tp,4)}</td>
-          <td>$${fmt(p.margin,2)}</td><td>${age}${wedge}</td>
-          <td class="${fp===null?"":pnlClass(fp)}">${fp===null?"—":(fp>=0?"+":"")+fmt(fp,3)}</td></tr>`;
-      }).join("");
-      html += `<div class="pos"><h2>Open Positions</h2><table>
-        <tr><th>Side</th><th>Entry</th><th>TP</th><th>Margin</th><th>Age</th><th>Floating</th></tr>${rows}</table></div>`;
-    } else {
-      html += `<div class="pos"><h2>Open Positions</h2><table><tr><td style="color:#6b7280">flat — no open positions</td></tr></table></div>`;
-    }
-
-    const recent = trades.slice(0, 12);
-    if (recent.length) {
-      const rows = recent.map(t => {
-        const net = Number(t.net_pnl)||0;
-        return `<tr><td><span class="tag ${t.side==="long"?"long":"short"}">${(t.side||"").toUpperCase()}</span></td>
-          <td>${fmt(t.entry_price,4)}</td><td>${fmt(t.exit_price,4)}</td>
-          <td>${tagFor(t.reason)}</td>
-          <td class="${pnlClass(net)}">${net>=0?"+":""}${fmt(net,4)}</td>
-          <td>${fmt(t.balance_after,3)}</td>
-          <td style="color:#6b7280">${(t.closed_at||"").slice(5,16).replace("T"," ")}</td></tr>`;
-      }).join("");
-      html += `<div class="pos" id="trades-wrap"><h2>Recent Trades</h2><table>
-        <tr><th>Side</th><th>Entry</th><th>Exit</th><th>Exit Reason</th><th>Net PnL</th><th>Balance</th><th>Closed</th></tr>${rows}</table></div>`;
-    }
-    document.getElementById("root").innerHTML = html;
-    const ws = document.getElementById("wait-slot");
-    if (ws) ws.innerHTML = waitMsg || "";
+    const r1 = fetch(STATE_API).then(r => { if(!r.ok) throw new Error("state "+r.status); return r.json(); });
+    const r2 = fetch(RESET_LOG).then(r => r.ok ? r.text() : "").catch(()=> "");
+    const d = await r1;
+    const logText = await r2;
+    let resetAt = null;
+    try {
+      const lines = logText.trim().split("\n").filter(Boolean);
+      if (lines.length) resetAt = (JSON.parse(lines[lines.length-1]) || {}).reset_at || null;
+    } catch (e) {}
+    render(d, resetAt);
+    $("sync").textContent = "OK " + new Date().toISOString().slice(11,19);
   } catch (e) {
-    document.getElementById("root").innerHTML = `<div class="err">Dashboard endpoint unreachable: ${e.message}</div>`;
+    $("sync").textContent = "ERR";
+    $("root").innerHTML = '<div class="loading">state endpoint unreachable — retrying in 30s ('+e.message+')</div>';
   }
 }
 refresh();
 setInterval(refresh, 30000);
+setInterval(function(){ $("clock").textContent = new Date().toISOString().slice(11,19); }, 1000);
 </script>
 </body>
 </html>
