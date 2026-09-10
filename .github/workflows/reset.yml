@@ -6,12 +6,39 @@ on:
         description: "Reset balance to this amount"
         required: false
         default: "3.0"
+      reason:
+        description: "Why this reset is happening (v4 Sec 10.1 audit requirement)"
+        required: true
 
 jobs:
   reset:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Log reset to durable audit record (v4 Section 10.1 — logged, count-limited discipline)
+        run: |
+          mkdir -p data
+          python3 - << 'PY'
+          import json, os
+          from datetime import datetime, timezone
+          entry = {
+              "reset_at": datetime.now(timezone.utc).isoformat(),
+              "reviewer": "${{ github.actor }}",
+              "reason": """${{ github.event.inputs.reason }}""",
+              "balance_target": "${{ github.event.inputs.balance }}",
+          }
+          path = "data/reset_log.jsonl"
+          with open(path, "a") as f:
+              f.write(json.dumps(entry) + "\n")
+          print("logged:", entry)
+          PY
+      - name: Commit audit record
+        run: |
+          git config user.email "fassdavid722@gmail.com"
+          git config user.name "CozyCrypto"
+          git add data/reset_log.jsonl
+          git commit -m "audit: reset log — ${{ github.event.inputs.reason }}" || echo "nothing to commit"
+          git push || echo "push failed, non-fatal"
       - name: Reset account state via the engine's own sync path
         run: |
           python3 - << 'PY'

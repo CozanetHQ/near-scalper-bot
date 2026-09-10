@@ -1,0 +1,29 @@
+{
+  "_meta": {
+    "spec": "Trading Bot — Falsification-Hardened Specification v4, Section 1.1",
+    "note": "Every field below is a LOCKED risk/execution parameter per v4 Section 1.1: it carries a version-locked definition and a timestamp predating any results that would justify it. Do not edit a value here after seeing how it performs — that is exactly the unfalsifiable practice this registry exists to prevent. To change a locked value: pick the new value BEFORE observing new results under it, update it here with a fresh locked_at timestamp and rationale, then deploy. tick.py hard-refuses new entries (WAIT) if its live constants don't match this file's hash."
+  },
+  "locked_at": "2026-09-10T02:10:00+00:00",
+  "locked_by": "owner (v4 spec upgrade)",
+  "params": {
+    "HARD_SL_FRAC": {"value": 0.12, "rationale": "Hard-close at market at 12% adverse move — inside the ~9.5% liquidation threshold at 10x leverage, so it fires before liquidation math would, and well outside normal 1m noise on NEARUSDT. Replaces the prior no-SL design."},
+    "MAX_POS_AGE_HOURS": {"value": 48, "rationale": "Hard age ceiling. TP_AGING (below) only relaxes the profit target with age; it never forces an exit. This is the actual forced exit the prior design lacked."},
+    "SL_ATR_MULT": {"value": 4.0, "rationale": "INHERITED FROM PRE-v4 GRID SEARCH (1152 configs) — flagged, not re-derived. Chosen by picking the value that performed best on the same backtest data (grid-search-on-results). This is the exact practice v4 Section 1.1 prohibits for locked parameters. Retained as-is for continuity; NOT re-certified under v4 discipline. Any future change to this value must be locked before seeing new results, per this registry."},
+    "TP_SL_RATIO": {"value": 1.5, "rationale": "Same inheritance caveat as SL_ATR_MULT — pre-v4 grid-search origin, not re-derived under v4 discipline."},
+    "SCALP_TP_ATR": {"value": 1.6, "rationale": "Pre-v4 two-week lab sweep result. Same inheritance caveat."},
+    "LEVERAGE": {"value": 10, "rationale": "Locked leverage per spec Section 8.3 (\"leverage is locked and versioned\")."},
+    "MAX_POSITIONS": {"value": 2, "rationale": "Owner-set slot count, 2026-09-07 watch period."},
+    "MARGIN_BUDGET": {"value": 0.85, "rationale": "Owner-set, 2026-09-07 watch-period value; live-plan target noted as 0.40 in comments but not yet switched."},
+    "SAFE_DD": {"value": 0.25, "rationale": "Realized-drawdown wall pausing new entries only — does not cap floating/unrealized exposure. Superseded in practice by HARD_SL_FRAC + MAX_POS_AGE_HOURS for existing positions."},
+    "TP_AGING_TIERS": {"value": [[6, 0.5], [24, 0.25], [72, 0.10]], "rationale": "Target relaxation only, never a forced exit — see MAX_POS_AGE_HOURS."},
+    "START_BALANCE": {"value": 3.0, "rationale": "Paper balance reset target."}
+  },
+  "known_gaps_not_claimed": [
+    "Tier 0 exchange-native resting/placeable stop order — this bot places no real orders on any venue; every kill is a software monitor polling every ~15s.",
+    "Tier 1 independent watchdog (separate host/network path/API credentials) — single GitHub Actions process, single Bitget public API path, no second host.",
+    "Tier 2 hedge/offsetting order with stress-tested basis risk — no hedge instrument is traded.",
+    "Tier 3 venue-level account kill / dead-man's switch — not available for a read-only public-API paper sim.",
+    "Regime probability engine (R(t), entropy, transition-risk), Probability Engine calibration+sharpness, Independent Uncertainty ensemble — not implemented; current entries use deterministic EMA/ATR/color rules only.",
+    "Hypothesis Registry with N>=200 independent events per regime, FDR/Deflated-Sharpe on total N, single-use Vault with retirement rule, block-bootstrap CPCV validation — not implemented; sweep.py/research.py perform grid search directly against backtest results, which v4 Section 1.1 explicitly treats as unfalsifiable, not as a passing validation protocol."
+  ]
+}

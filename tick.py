@@ -57,6 +57,25 @@ HEARTBEAT_SEC = 3600  # if no open/close events for an hour, ping Telegram so si
 # regime can't stack unlimited wedges. The grind resumes as floating recovers.
 INVENTORY_CAP = float(os.environ.get("INVENTORY_CAP", "999"))
 SAFE_DD = float(os.environ.get("SAFE_DD", "0.25"))  # owner 09-08 Engine 10: HARD realized-DD wall — pause ALL new entries at -25% from peak balance; the intelligence may NEVER override (0 disables for lab only)  # OFF by default — lab 09-06: every throttle variant starved the grind that pays for wedges (raw equity -$0.26 vs -$3.2 to -$5.3 hardened)
+
+# ── v4 FALSIFICATION-HARDENED SPEC — LOCKED PROTECTIVE KILL (owner 09-10) ──
+# HONEST SCOPE NOTE: this is a single Python process polling Bitget's public
+# REST API from GitHub Actions. It has no real order routing, no exchange-side
+# resting stop order, no independent second host/network/API-credential
+# watchdog, no hedge instrument, and no venue-level dead-man's switch. Per the
+# spec's own Section 16 (Absolute Prohibitions) and Section 9 ("monitor-only
+# protection remains explicitly insufficient"), this bot CANNOT claim Tier 0-3
+# kill-switch infrastructure and does not pretend to. What it CAN honestly do,
+# and now does: replace the prior "TP only, no SL, no time-stop, no loss ever
+# realized" design with an always-on SOFTWARE MONITOR that force-closes any
+# position at market past a hard adverse-move or hard age ceiling. This is a
+# deliberate behavior change — this bot WILL now realize real (paper) losses
+# it previously let float indefinitely. Values are locked HERE, dated, and
+# registered in param_registry.json BEFORE being run against new results —
+# they are not to be tuned by grid search against backtest performance
+# (that is precisely the unfalsifiable practice Section 1.1 prohibits).
+HARD_SL_FRAC = float(os.environ.get("HARD_SL_FRAC", "0.12"))   # locked 2026-09-10: hard-close at market if adverse move vs entry >= 12%. Rationale: well inside 10x-leverage liquidation (~9.5%) so it fires BEFORE liquidation math would, and far outside normal 1m noise for this pair.
+MAX_POS_AGE_HOURS = float(os.environ.get("MAX_POS_AGE_HOURS", "48"))  # locked 2026-09-10: hard-close at market if a position has been open >= 48h regardless of TP-aging tier. TP_AGING relaxes the TARGET; it never forces an exit — this does.
 # Slot recycling: a position stuck for hours relaxes its TP toward entry.
 # It NEVER crosses entry — no loss is ever realized. It just stops demanding
 # full profit to free the slot. Fees are always covered (keep > fee buffer).
@@ -459,6 +478,34 @@ def parse_positions(state):
     return out
 
 
+# ── v4 Section 1.1 — PARAMETER LINEAGE LOCK ──
+# Every locked risk/execution parameter must match param_registry.json,
+# which is timestamped BEFORE results are observed under it. A mismatch
+# (someone changed a constant in code without re-locking the registry)
+# hard-blocks new entries — existing open positions still ride to their
+# HARD_SL / MAX_AGE / TP kills normally. This does not evaluate the
+# GRID-SEARCHED legacy values (SL_ATR_MULT etc.) — see the registry's
+# known_gaps_not_claimed / inherited-value notes for that caveat.
+def registry_check():
+    try:
+        with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "param_registry.json")) as f:
+            reg = json.load(f)
+        live = {
+            "HARD_SL_FRAC": HARD_SL_FRAC,
+            "MAX_POS_AGE_HOURS": MAX_POS_AGE_HOURS,
+            "LEVERAGE": LEVERAGE,
+            "MAX_POSITIONS": MAX_POSITIONS,
+        }
+        mismatches = []
+        for k, v in live.items():
+            locked = reg.get("params", {}).get(k, {}).get("value")
+            if locked is not None and float(locked) != float(v):
+                mismatches.append(f"{k}: live={v} locked={locked}")
+        return (len(mismatches) == 0), mismatches
+    except Exception as e:
+        return False, [f"registry read failed: {e}"]
+
+
 def process_tick(state):
     """One poll cycle. Returns (action, details)."""
     c4h = fetch_candles("4H", 2)
@@ -562,6 +609,36 @@ def process_tick(state):
                     f"PnL ${trade['net_pnl']:.4f} | Balance ${balance:.4f}"
                 )
                 continue
+        # HARD_SL — locked protective kill (v4 spec, software-monitor, honestly scoped).
+        # Fires before liquidation math would, and independent of TP/TP-aging.
+        hs_side = pos["side"]
+        hs_adverse = (pos["entry_price"] - price) / pos["entry_price"] if hs_side == "long" else (price - pos["entry_price"]) / pos["entry_price"]
+        if HARD_SL_FRAC > 0 and hs_adverse >= HARD_SL_FRAC:
+            trade, balance = close_position(pos, price, "HARD_SL", now, balance)
+            closed_any.append(trade)
+            send_telegram(
+                f"\U0001F6D1 *HARD_SL — {pos['side'].upper()} force-closed*\n"
+                f"Entry ${pos['entry_price']:.4f} → ${price:.4f} (adverse {hs_adverse*100:.1f}% >= locked {HARD_SL_FRAC*100:.0f}%)\n"
+                f"PnL ${trade['net_pnl']:.4f} | Balance ${balance:.4f}"
+            )
+            continue
+        # MAX_POS_AGE — locked hard age kill. TP_AGING only relaxes the target;
+        # this is the actual forced exit the old design never had.
+        pos_age_h = None
+        if pos.get("opened_at"):
+            try:
+                pos_age_h = (datetime.fromisoformat(now) - datetime.fromisoformat(pos["opened_at"])).total_seconds() / 3600.0
+            except (ValueError, TypeError):
+                pos_age_h = None
+        if MAX_POS_AGE_HOURS > 0 and pos_age_h is not None and pos_age_h >= MAX_POS_AGE_HOURS:
+            trade, balance = close_position(pos, price, "MAX_AGE", now, balance)
+            closed_any.append(trade)
+            send_telegram(
+                f"\u23F0 *MAX_AGE — {pos['side'].upper()} force-closed*\n"
+                f"Open {pos_age_h:.1f}h >= locked {MAX_POS_AGE_HOURS:.0f}h ceiling\n"
+                f"Entry ${pos['entry_price']:.4f} → ${price:.4f} | PnL ${trade['net_pnl']:.4f} | Balance ${balance:.4f}"
+            )
+            continue
         if hit_tp:
             trade, balance = close_position(pos, tp, "TP", now, balance)
             closed_any.append(trade)
@@ -574,7 +651,14 @@ def process_tick(state):
             still_open.append(pos)
 
     # ── ENTRY: chop the CURRENT move. Pullback candle in live momentum = entry.
-    if state.get("status") == "running":
+    reg_ok, reg_mismatches = registry_check()
+    if not reg_ok:
+        send_telegram(
+            "\U0001F512 *PARAMETER LINEAGE MISMATCH — new entries WAIT\'d (v4 Sec 1.1)*\n"
+            + "\n".join(reg_mismatches[:5])
+            + "\nA locked constant changed without re-locking param_registry.json. Existing positions still ride their HARD_SL/MAX_AGE/TP kills normally."
+        )
+    if state.get("status") == "running" and reg_ok:
         atr = compute_atr(c1m[:-1])
         hour = datetime.now(timezone.utc).hour
         atr_gate = NIGHT_ATR_MIN if (hour < 7 or hour >= 21) else ATR_MIN

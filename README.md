@@ -35,3 +35,36 @@ Paper trading bot for NEARUSDT on Bitget Futures. Runs 24/7 via GitHub Actions c
 ## Manual trigger
 
 Go to Actions tab → "NEAR Scalper Tick" → "Run workflow"
+
+## v4 Falsification-Hardened Spec — What Was Actually Implemented (2026-09-10)
+
+The owner supplied a full institutional kill-switch/falsification spec (Tier 0-3
+kill infra, Hypothesis Registry, Independent Uncertainty Engine, Vault retirement,
+regime probability engine, etc.). Honest scope note: **this bot is a single Python
+process polling Bitget's public REST API from GitHub Actions with no real order
+routing** — it cannot legitimately claim exchange-side resting stops, an
+independent second-host watchdog, a hedge instrument, or a venue-level dead-man's
+switch. Implementing believable versions of those would require real infra this
+project doesn't have. See `param_registry.json` → `known_gaps_not_claimed` for the
+full list of spec sections not implemented, and why.
+
+What **is** implemented, load-bearing, and real:
+- **`param_registry.json`** (Section 1.1) — every locked risk/execution parameter
+  now carries a timestamped, version-locked definition. `tick.py` checks its live
+  constants against this file every tick; a mismatch hard-blocks new entries
+  (existing positions still ride their kills normally) and alerts Telegram.
+- **HARD_SL_FRAC (12%) + MAX_POS_AGE_HOURS (48h)** — a real, always-on protective
+  kill on every open position. This replaces the prior design ("TP only, no SL,
+  no time-stop... no loss is ever realized") with forced exits. **This is a
+  deliberate behavior change**: the bot will now realize real (paper) losses it
+  previously let float indefinitely as unrealized wedges.
+- **Reset discipline (Section 10.1)** — `reset.yml` now requires a `reason` input
+  and commits every reset to `data/reset_log.jsonl` as an immutable audit record
+  before resetting state.
+
+Not implemented (see registry for the full, honest list): Tiers 1-3 kill infra,
+regime/probability/independent-uncertainty engines, Hypothesis Registry with
+N≥200 independent events per regime, Vault retirement, block-bootstrap CPCV
+validation. `sweep.py`/`research.py` currently grid-search parameters directly
+against backtest results — the exact practice v4 Section 1.1 treats as
+unfalsifiable, not a passing validation protocol.
