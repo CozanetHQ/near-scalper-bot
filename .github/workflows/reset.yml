@@ -10,6 +10,9 @@ on:
         description: "Why this reset is happening (v4 Sec 10.1 audit requirement)"
         required: true
 
+permissions:
+  contents: write
+
 jobs:
   reset:
     runs-on: ubuntu-latest
