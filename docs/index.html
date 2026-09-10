@@ -40,6 +40,7 @@
 <h1>NEAR Scalper Bot</h1>
 <div class="sub"><span id="live-dot" class="live"></span><span id="live-txt">live</span> · paper trading · Bitget NEAR/USDT · auto-refresh 30s</div>
 <div id="root"><div class="err">Loading bot state…</div></div>
+<div id="wait-slot"></div>
 <div class="note">Protected exits per v4 hardened spec: TP (take-profit) · HARD_SL (12% adverse kill) · MAX_AGE (48h force-close) · WEDGE (pre-v4 float, no longer possible). Data: <a href="https://superagent-ae0aaf02.base44.app/functions/nearScalperDashboard" target="_blank">raw JSON</a></div>
 <script>
 const API = "https://superagent-ae0aaf02.base44.app/functions/nearScalperDashboard";
@@ -86,6 +87,9 @@ async function refresh() {
     const floating = pos.reduce((acc,p) => acc + (p.floatingPnl || 0), 0);
     const equity = bal + floating;
 
+    let snap = null;
+    try { snap = JSON.parse(s.last_reversal_at || "{}"); } catch {}
+    const waitMsg = snap && snap.w ? `<div class="pos"><h2>Engine Decision</h2><table><tr><td>\u23F3 <b>WAIT</b> — no new entry${snap.rg ? ` (regime: ${snap.rg})` : ""}</td></tr><tr><td style="color:#9ca3af">${snap.w}</td></tr></table></div>` : (snap && snap.rg ? `<div class="pos"><h2>Regime</h2><table><tr><td>${snap.rg}</td></tr></table></div>` : "");
     const tickAge = s.last_tick_at ? (Date.now() - Date.parse(s.last_tick_at))/60000 : null;
     let dot = document.getElementById("live-dot"), txt = document.getElementById("live-txt");
     if (tickAge === null) { dot.className = "live dead"; txt.textContent = "no tick data"; }
@@ -132,6 +136,8 @@ async function refresh() {
         <tr><th>Side</th><th>Entry</th><th>Exit</th><th>Exit Reason</th><th>Net PnL</th><th>Balance</th><th>Closed</th></tr>${rows}</table></div>`;
     }
     document.getElementById("root").innerHTML = html;
+    const ws = document.getElementById("wait-slot");
+    if (ws) ws.innerHTML = waitMsg || "";
   } catch (e) {
     document.getElementById("root").innerHTML = `<div class="err">Dashboard endpoint unreachable: ${e.message}</div>`;
   }

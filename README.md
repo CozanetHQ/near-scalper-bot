@@ -68,3 +68,35 @@ N≥200 independent events per regime, Vault retirement, block-bootstrap CPCV
 validation. `sweep.py`/`research.py` currently grid-search parameters directly
 against backtest results — the exact practice v4 Section 1.1 treats as
 unfalsifiable, not a passing validation protocol.
+
+## v5 Market-Intelligence Decision Layer (2026-09-10) — Market Intelligence Research Report
+
+The owner's Market Intelligence Research Report's core decision equation is
+`EV(trade|S) = E[PNL] - fees - spread - slippage - funding - adverse_selection -
+failure_risk`, executed "only when EV is above a dynamic threshold that itself
+depends on uncertainty, market regime and recent model degradation... If this
+number is not positive by a safety margin, the correct trade is WAIT."
+
+Scoped honestly to what a single-process Bitget paper bot can measure, v5 adds:
+
+- **EV-after-costs entry gate** — `EV = p*win − (1−p)*kill − fees − assumed slip`,
+  per unit of notional. `p` blends a locked prior (0.85) with observed W/L since
+  reset. Below the locked `EV_MARGIN_REQ`, the engine WAITs instead of trading.
+  This is a degradation brake: when realized win rate drops below the geometry's
+  breakeven (~0.81 at the 6% kill vs ~1.4% net TP), new entries stop.
+- **HARD_SL_FRAC re-locked 0.12 → 0.06 (a priori)** — the old value sat beyond
+  the ~9.5% liquidation point at 10x leverage, so live it could never be the
+  first exit. 0.06 caps tail loss at 60% of slot margin and makes the scalp
+  geometry viable (breakeven p ≈ 0.81 < 93.8% backtest win rate).
+- **Regime classifier** — deterministic, from data already fetched: `runaway`
+  (6+ same-color 15m candles → counter-trend entries blocked, the wedge lesson),
+  `spike` (live 1m range > 3x ATR → entries blocked that tick), else `chop`.
+- **WAIT as a real position** — the wait reason persists to state (snapshot
+  `w` key), shows on the dashboard, and alerts Telegram once per reason change.
+  A silent flat book is now an explained decision, not a mystery.
+
+**Honest backtest verdict (same window as v4's):** v4 = 48 trades, 93.8% win
+rate, net −$1.17, maxDD −$2.09. v5 = 2 trades, net +$0.09, maxDD −$0.04. The
+gate identifies that low-vol weeks make the TP-vs-kill geometry structurally
+EV-negative and declines to grind. Values were locked BEFORE this backtest ran
+(v4 Sec 1.1) and are not re-tuned on its results.

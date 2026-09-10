@@ -74,7 +74,18 @@ SAFE_DD = float(os.environ.get("SAFE_DD", "0.25"))  # owner 09-08 Engine 10: HAR
 # registered in param_registry.json BEFORE being run against new results —
 # they are not to be tuned by grid search against backtest performance
 # (that is precisely the unfalsifiable practice Section 1.1 prohibits).
-HARD_SL_FRAC = float(os.environ.get("HARD_SL_FRAC", "0.12"))   # locked 2026-09-10: hard-close at market if adverse move vs entry >= 12%. Rationale: well inside 10x-leverage liquidation (~9.5%) so it fires BEFORE liquidation math would, and far outside normal 1m noise for this pair.
+HARD_SL_FRAC = float(os.environ.get("HARD_SL_FRAC", "0.06"))   # RE-LOCKED 2026-09-10 (v5, BEFORE any results observed under it): 0.06. Rationale, a priori: at 10x isolated leverage the exchange force-liquidates at ~9.5% adverse — the prior locked 0.12 sat BEYOND that point, so in live trading it could never be the first exit (the exchange would liquidate first); 0.06 sits well inside it, caps tail loss at 60% of slot margin, and makes the scalp EV structure honest: breakeven win rate = 0.06/(0.06+~0.014 net TP frac) ~= 0.81, below the 93.8% backtest win rate. Not tuned on new results.
+
+# ── v5 MARKET-INTELLIGENCE DECISION LAYER (owner 09-10, Market Intelligence
+# Research Report): EV-after-costs entry gate, regime classifier, WAIT as a
+# real position. All values below are LOCKED a priori in param_registry.json
+# BEFORE the first run under them (v4 Sec 1.1 discipline).
+EV_PRIOR_WINRATE = float(os.environ.get("EV_PRIOR_WINRATE", "0.85"))   # pseudo-observed win rate blended into p_win. Conservative vs 93.8% backtest; above the ~0.81 EV breakeven.
+EV_PRIOR_WEIGHT = float(os.environ.get("EV_PRIOR_WEIGHT", "20"))      # pseudo-trade weight of the prior vs observed W/L since reset.
+EV_MARGIN_REQ = float(os.environ.get("EV_MARGIN_REQ", "0.0005"))       # per-unit-of-notional: EV must clear this AFTER fees+slip+expected kill loss, else WAIT.
+SLIP_ASSUMED_PCT = float(os.environ.get("SLIP_ASSUMED_PCT", "0.0005")) # EV-model slippage per side (live paper SLIP_PCT stays 0; the EV math must still pay for friction).
+TREND_RUNAWAY_CANDLES = int(os.environ.get("TREND_RUNAWAY_CANDLES", "6"))  # last N closed 15m candles ALL one color => runaway regime: counter-trend entries blocked (wedge lesson).
+SPIKE_RANGE_MULT = float(os.environ.get("SPIKE_RANGE_MULT", "3.0"))    # live 1m candle range > N x 1m ATR => spike regime: block entries this tick.
 MAX_POS_AGE_HOURS = float(os.environ.get("MAX_POS_AGE_HOURS", "48"))  # locked 2026-09-10: hard-close at market if a position has been open >= 48h regardless of TP-aging tier. TP_AGING relaxes the TARGET; it never forces an exit — this does.
 # Slot recycling: a position stuck for hours relaxes its TP toward entry.
 # It NEVER crosses entry — no loss is ever realized. It just stops demanding
@@ -495,6 +506,11 @@ def registry_check():
             "MAX_POS_AGE_HOURS": MAX_POS_AGE_HOURS,
             "LEVERAGE": LEVERAGE,
             "MAX_POSITIONS": MAX_POSITIONS,
+            "EV_PRIOR_WINRATE": EV_PRIOR_WINRATE,
+            "EV_MARGIN_REQ": EV_MARGIN_REQ,
+            "SLIP_ASSUMED_PCT": SLIP_ASSUMED_PCT,
+            "TREND_RUNAWAY_CANDLES": TREND_RUNAWAY_CANDLES,
+            "SPIKE_RANGE_MULT": SPIKE_RANGE_MULT,
         }
         mismatches = []
         for k, v in live.items():
@@ -651,6 +667,8 @@ def process_tick(state):
             still_open.append(pos)
 
     # ── ENTRY: chop the CURRENT move. Pullback candle in live momentum = entry.
+    regime = "chop"
+    wait_reason = None
     reg_ok, reg_mismatches = registry_check()
     if not reg_ok:
         send_telegram(
@@ -744,6 +762,21 @@ def process_tick(state):
                     entry_cooldown_ok = False
             except (ValueError, TypeError):
                 pass
+        # ── v5 REGIME CLASSIFIER (deterministic, from already-fetched data) ──
+        c15m_closed = c15m[:-1]
+        if len(c15m_closed) >= TREND_RUNAWAY_CANDLES:
+            runaway_colors = [candle_color(x) for x in c15m_closed[-TREND_RUNAWAY_CANDLES:]]
+            if all(col == runaway_colors[0] and col != "flat" for col in runaway_colors):
+                regime = "runaway"
+                run_dir = "long" if runaway_colors[0] == "bull" else "short"
+                if want is not None and want != run_dir:
+                    want = None
+                    wait_reason = f"regime:runaway — no counter-trend vs {TREND_RUNAWAY_CANDLES}x 15m {run_dir}s"
+        if want is not None and atr and atr > 0:
+            spike = abs(forming_1m["high"] - forming_1m["low"]) / atr
+            if spike > SPIKE_RANGE_MULT:
+                want = None
+                wait_reason = f"regime:spike — 1m range {spike:.1f}x ATR (manipulation/liquidation cascade risk)"
         opened_this_tick = False
         can_open = (
             want is not None
@@ -763,12 +796,26 @@ def process_tick(state):
                     d *= SWING_FRONT  # front-run the level — fill before the crowd at it
                     if MIN_TP_DIST <= d <= tp_dist * SWING_MAX:
                         entry_tp_dist = d
+            # ── v5 EV-AFTER-COSTS GATE (the report's decision equation, scoped
+            # to what this paper bot can measure): EV = p*win - (1-p)*kill - fees
+            # - assumed slip, per unit of notional. Below EV_MARGIN_REQ the
+            # correct trade is WAIT, not a smaller trade.
+            wins_obs = state.get("wins") or 0
+            losses_obs = state.get("losses") or 0
+            p_win = (EV_PRIOR_WEIGHT * EV_PRIOR_WINRATE + wins_obs) / (EV_PRIOR_WEIGHT + wins_obs + losses_obs)
+            tp_frac = entry_tp_dist / price
+            ev_frac = (p_win * (tp_frac - 2 * FEE_RATE)
+                       - (1 - p_win) * HARD_SL_FRAC
+                       - 2 * SLIP_ASSUMED_PCT)
+            if ev_frac < EV_MARGIN_REQ:
+                wait_reason = (f"EV gate: p={p_win:.2f} ev={ev_frac*100:+.2f}%/unit "
+                               f"< req {EV_MARGIN_REQ*100:.2f}% — edge gone, WAIT")
             per_unit = entry_tp_dist / price - FEE_RATE * 2
             # per-slot cap: 8 slots x balance notional = exactly the 80% margin
             # budget at 10x — a single trade can never hog the whole budget and
             # freeze the bot (the 2026-09-06 wedge lesson).
             slot_cap = balance * MARGIN_BUDGET * LEVERAGE / MAX_POSITIONS
-            if per_unit > 0 and margin_left > 0.05:
+            if per_unit > 0 and margin_left > 0.05 and ev_frac >= EV_MARGIN_REQ:
                 aligned = (bias != "none" and want == ("long" if bias == "bull" else "short"))
                 base = WIN_TARGET_PCT * balance if WIN_TARGET_PCT > 0 else WIN_TARGET_DOLLARS
                 target = base * TREND_MULT if (aligned and TREND_MULT != 1.0) else base
@@ -843,10 +890,25 @@ def process_tick(state):
                 )
         except (ValueError, TypeError):
             hb_new = now
+    # WAIT-as-a-strategy alert: fire only when the reason CHANGES (no spam).
+    prev_wait = None
+    try:
+        _psnap = json.loads(state.get("last_reversal_at") or "{}")
+        if isinstance(_psnap, dict):
+            prev_wait = _psnap.get("w")
+    except (ValueError, TypeError):
+        prev_wait = None
+    if wait_reason and wait_reason != prev_wait:
+        send_telegram(
+            "\u23F3 *WAIT — no new entry*\n"
+            f"{wait_reason}\n"
+            f"Slots {len(still_open)}/{MAX_POSITIONS} | Balance ${balance:.2f} — WAIT IS the trade here."
+        )
     # equity + heartbeat snapshot in another legacy string field for observability
     su["last_reversal_at"] = json.dumps(
         {"eq": round(balance + unrealized, 4), "u": round(unrealized, 4),
-         "n": len(still_open), "hb": hb_new, "pk": round(peak_bal, 4), "sf": 1 if safe_on else 0},
+         "n": len(still_open), "hb": hb_new, "pk": round(peak_bal, 4), "sf": 1 if safe_on else 0,
+         "rg": regime, "w": wait_reason},
         separators=(",", ":"))
     sync(state_update=su, trade=closed_any[0] if closed_any else None)
     for t in closed_any[1:]:
@@ -856,7 +918,9 @@ def process_tick(state):
     if want is not None and not can_open:
         why = "SAFE MODE (drawdown gate)" if safe_on else f"slots/margin full ({len(still_open)}/{MAX_POSITIONS})"
         return "none", f"signal {want} skipped — {why}"
-    return "none", f"{len(still_open)} open | price ${price:.4f}"
+    if wait_reason:
+        return "none", f"WAIT ({regime}) — {wait_reason} | {len(still_open)} open"
+    return "none", f"regime:{regime} | {len(still_open)} open | price ${price:.4f}"
 
 
 def main():
