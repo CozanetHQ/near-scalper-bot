@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEAR Scalper Bot — Live Dashboard</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#0b0e14; color:#d7dce4; font-family:'SF Mono','Cascadia Code',Consolas,monospace; padding:24px; max-width:1100px; margin:0 auto; }
+  h1 { font-size:1.15rem; letter-spacing:.08em; color:#fff; text-transform:uppercase; }
+  .sub { color:#6b7280; font-size:.75rem; margin-bottom:20px; }
+  .live { display:inline-block; width:8px; height:8px; border-radius:50%; background:#22c55e; margin-right:6px; animation:pulse 2s infinite; }
+  .live.stale { background:#f59e0b; }
+  .live.dead { background:#ef4444; animation:none; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin-bottom:20px; }
+  .card { background:#131824; border:1px solid #232b3d; border-radius:10px; padding:14px 16px; }
+  .card .label { font-size:.68rem; color:#6b7280; text-transform:uppercase; letter-spacing:.08em; }
+  .card .value { font-size:1.35rem; color:#fff; margin-top:4px; font-weight:600; }
+  .card .value.green { color:#22c55e; } .card .value.red { color:#ef4444; }
+  .pos { background:#131824; border:1px solid #232b3d; border-radius:10px; padding:16px; margin-bottom:20px; }
+  .pos h2 { font-size:.8rem; color:#9ca3af; text-transform:uppercase; letter-spacing:.08em; margin-bottom:10px; }
+  table { width:100%; border-collapse:collapse; font-size:.78rem; }
+  th { text-align:left; color:#6b7280; font-weight:400; font-size:.68rem; text-transform:uppercase; padding:6px 8px; border-bottom:1px solid #232b3d; }
+  td { padding:7px 8px; border-bottom:1px solid #1a2132; }
+  .tag { padding:1px 8px; border-radius:99px; font-size:.68rem; }
+  .tag.long { background:rgba(34,197,94,.12); color:#22c55e; }
+  .tag.short { background:rgba(239,68,68,.12); color:#ef4444; }
+  .tag.tp { background:rgba(34,197,94,.12); color:#22c55e; }
+  .tag.hardsl, .tag.maxage, .tag.liq { background:rgba(239,68,68,.15); color:#ef4444; }
+  .tag.wedge { background:rgba(245,158,11,.12); color:#f59e0b; }
+  .pnl-pos { color:#22c55e; } .pnl-neg { color:#ef4444; }
+  #trades-wrap h2, .pos h2 { margin-bottom:6px; }
+  .note { margin-top:18px; color:#4b5563; font-size:.7rem; line-height:1.5; }
+  a { color:#60a5fa; text-decoration:none; }
+  .err { color:#ef4444; padding:20px; text-align:center; }
+</style>
+</head>
+<body>
+<h1>NEAR Scalper Bot</h1>
+<div class="sub"><span id="live-dot" class="live"></span><span id="live-txt">live</span> · paper trading · Bitget NEAR/USDT · auto-refresh 30s</div>
+<div id="root"><div class="err">Loading bot state…</div></div>
+<div class="note">Protected exits per v4 hardened spec: TP (take-profit) · HARD_SL (12% adverse kill) · MAX_AGE (48h force-close) · WEDGE (pre-v4 float, no longer possible). Data: <a href="https://superagent-ae0aaf02.base44.app/functions/nearScalperDashboard" target="_blank">raw JSON</a></div>
+<script>
+const API = "https://superagent-ae0aaf02.base44.app/functions/nearScalperDashboard";
+const fmt = (x,d=2) => (x===null||x===undefined||isNaN(x)) ? "—" : Number(x).toFixed(d);
+const pnlClass = v => v >= 0 ? "pnl-pos" : "pnl-neg";
+const startBal = 3.0;
+
+function parsePositions(state) {
+  const raw = state.last_error;
+  if (typeof raw !== "string" || !raw.startsWith("[")) return [];
+  try {
+    const data = JSON.parse(raw).filter(p => p.s === "long" || p.s === "short");
+    return data.map(p => ({
+      side: p.s, entry: +p.e, tp: +p.t, notional: +p.n, margin: +p.m, opened: p.o,
+      ageHours: p.o ? (Date.now() - Date.parse(p.o)) / 36e5 : null
+    }));
+  } catch { return []; }
+}
+
+function tagFor(reason) {
+  const r = (reason||"").toUpperCase();
+  const cls = r.includes("HARD_SL") ? "hardsl" : r.includes("MAX_AGE") ? "maxage" : r.includes("LIQ") ? "liq" : r.includes("TP") ? "tp" : "";
+  const label = r.includes("HARD_SL") ? "HARD_SL" : r.includes("MAX_AGE") ? "MAX_AGE" : r || "—";
+  return `<span class="tag ${cls}">${label}</span>`;
+}
+
+async function refresh() {
+  try {
+    const res = await fetch(API);
+    const d = await res.json();
+    const s = d.state, trades = d.trades || [];
+    const pos = parsePositions(s);
+    const bal = Number(s.balance) || startBal;
+    const wins = Number(s.wins)||0, losses = Number(s.losses)||0;
+    const n = wins + losses;
+    const price = Number(s.last_price) || null;
+    for (const p of pos) {
+      if (price && p.entry) {
+        const gross = (p.side === "long") ? (price - p.entry) * (p.notional / p.entry)
+                                          : (p.entry - price) * (p.notional / p.entry);
+        p.floatingPnl = gross - p.notional * 0.0006 * 2; // rough fee model
+      } else p.floatingPnl = null;
+    }
+    const floating = pos.reduce((acc,p) => acc + (p.floatingPnl || 0), 0);
+    const equity = bal + floating;
+
+    const tickAge = s.last_tick_at ? (Date.now() - Date.parse(s.last_tick_at))/60000 : null;
+    let dot = document.getElementById("live-dot"), txt = document.getElementById("live-txt");
+    if (tickAge === null) { dot.className = "live dead"; txt.textContent = "no tick data"; }
+    else if (tickAge > 15) { dot.className = "live dead"; txt.textContent = `stalled — last tick ${Math.round(tickAge)} min ago`; }
+    else if (tickAge > 8) { dot.className = "live stale"; txt.textContent = `last tick ${Math.round(tickAge)} min ago`; }
+    else { dot.className = "live"; txt.textContent = "live"; }
+
+    let html = `<div class="grid">
+      <div class="card"><div class="label">Balance</div><div class="value ${bal>=startBal?"green":""}">$${fmt(bal)}</div></div>
+      <div class="card"><div class="label">Since Reset</div><div class="value ${bal>=startBal?"green":"red"}">${bal>=startBal?"+":""}${fmt((bal/startBal-1)*100,1)}%</div></div>
+      <div class="card"><div class="label">Equity (incl. floating)</div><div class="value ${equity>=startBal?"green":"red"}">$${fmt(equity)}</div></div>
+      <div class="card"><div class="label">Open Positions</div><div class="value">${pos.length}</div></div>
+      <div class="card"><div class="label">Trades (W/L)</div><div class="value">${n} <span style="color:#6b7280;font-size:.9rem">(${wins}W / ${losses}L)</span></div></div>
+    </div>`;
+
+    if (pos.length) {
+      const rows = pos.map(p => {
+        const age = p.ageHours !== null ? `${fmt(p.ageHours,1)}h` : "—";
+        const wedge = p.ageHours !== null && p.ageHours >= 24 ? ` <span class="tag wedge">wedge risk</span>` : "";
+        const fp = p.floatingPnl;
+        return `<tr><td><span class="tag ${p.side}">${p.side.toUpperCase()}</span></td>
+          <td>${fmt(p.entry,4)}</td><td>${fmt(p.tp,4)}</td>
+          <td>$${fmt(p.margin,2)}</td><td>${age}${wedge}</td>
+          <td class="${fp===null?"":pnlClass(fp)}">${fp===null?"—":(fp>=0?"+":"")+fmt(fp,3)}</td></tr>`;
+      }).join("");
+      html += `<div class="pos"><h2>Open Positions</h2><table>
+        <tr><th>Side</th><th>Entry</th><th>TP</th><th>Margin</th><th>Age</th><th>Floating</th></tr>${rows}</table></div>`;
+    } else {
+      html += `<div class="pos"><h2>Open Positions</h2><table><tr><td style="color:#6b7280">flat — no open positions</td></tr></table></div>`;
+    }
+
+    const recent = trades.slice(0, 12);
+    if (recent.length) {
+      const rows = recent.map(t => {
+        const net = Number(t.net_pnl)||0;
+        return `<tr><td><span class="tag ${t.side==="long"?"long":"short"}">${(t.side||"").toUpperCase()}</span></td>
+          <td>${fmt(t.entry_price,4)}</td><td>${fmt(t.exit_price,4)}</td>
+          <td>${tagFor(t.reason)}</td>
+          <td class="${pnlClass(net)}">${net>=0?"+":""}${fmt(net,4)}</td>
+          <td>${fmt(t.balance_after,3)}</td>
+          <td style="color:#6b7280">${(t.closed_at||"").slice(5,16).replace("T"," ")}</td></tr>`;
+      }).join("");
+      html += `<div class="pos" id="trades-wrap"><h2>Recent Trades</h2><table>
+        <tr><th>Side</th><th>Entry</th><th>Exit</th><th>Exit Reason</th><th>Net PnL</th><th>Balance</th><th>Closed</th></tr>${rows}</table></div>`;
+    }
+    document.getElementById("root").innerHTML = html;
+  } catch (e) {
+    document.getElementById("root").innerHTML = `<div class="err">Dashboard endpoint unreachable: ${e.message}</div>`;
+  }
+}
+refresh();
+setInterval(refresh, 30000);
+</script>
+</body>
+</html>
