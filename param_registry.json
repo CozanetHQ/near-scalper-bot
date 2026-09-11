@@ -158,5 +158,39 @@
   "Tier 3 venue-level account kill / dead-man's switch \u2014 not available for a read-only public-API paper sim.",
   "Regime probability engine (R(t), entropy, transition-risk), Probability Engine calibration+sharpness, Independent Uncertainty ensemble \u2014 not implemented; current entries use deterministic EMA/ATR/color rules only.",
   "Hypothesis Registry with N>=200 independent events per regime, FDR/Deflated-Sharpe on total N, single-use Vault with retirement rule, block-bootstrap CPCV validation \u2014 not implemented; sweep.py/research.py perform grid search directly against backtest results, which v4 Section 1.1 explicitly treats as unfalsifiable, not as a passing validation protocol."
- ]
+ ],
+ "per_pair": {
+  "MAX_POS_AGE_HOURS": {
+   "NEARUSDT": {
+    "value": 48,
+    "locked_at": "2026-09-11T17:05:00+00:00",
+    "locked_by": "structure rollout (defaults = global, behavior identical)",
+    "rationale": "Standing rule 2026-09-11: rules lock PER PAIR. Default = global locked value 48h until a pair-specific value is owner-authorized (proposals in research/phase4_validation_2026-09-11.md: BTC 8h, ETH 8h, SOL 6h, XRP 48h keep, NEAR 48h keep \u2014 validated on both windows)."
+   },
+   "BTCUSDT": {
+    "value": 48,
+    "locked_at": "2026-09-11T17:05:00+00:00",
+    "locked_by": "structure rollout (defaults = global, behavior identical)",
+    "rationale": "Standing rule 2026-09-11: rules lock PER PAIR. Default = global locked value 48h until a pair-specific value is owner-authorized (proposals in research/phase4_validation_2026-09-11.md: BTC 8h, ETH 8h, SOL 6h, XRP 48h keep, NEAR 48h keep \u2014 validated on both windows)."
+   },
+   "ETHUSDT": {
+    "value": 48,
+    "locked_at": "2026-09-11T17:05:00+00:00",
+    "locked_by": "structure rollout (defaults = global, behavior identical)",
+    "rationale": "Standing rule 2026-09-11: rules lock PER PAIR. Default = global locked value 48h until a pair-specific value is owner-authorized (proposals in research/phase4_validation_2026-09-11.md: BTC 8h, ETH 8h, SOL 6h, XRP 48h keep, NEAR 48h keep \u2014 validated on both windows)."
+   },
+   "SOLUSDT": {
+    "value": 48,
+    "locked_at": "2026-09-11T17:05:00+00:00",
+    "locked_by": "structure rollout (defaults = global, behavior identical)",
+    "rationale": "Standing rule 2026-09-11: rules lock PER PAIR. Default = global locked value 48h until a pair-specific value is owner-authorized (proposals in research/phase4_validation_2026-09-11.md: BTC 8h, ETH 8h, SOL 6h, XRP 48h keep, NEAR 48h keep \u2014 validated on both windows)."
+   },
+   "XRPUSDT": {
+    "value": 48,
+    "locked_at": "2026-09-11T17:05:00+00:00",
+    "locked_by": "structure rollout (defaults = global, behavior identical)",
+    "rationale": "Standing rule 2026-09-11: rules lock PER PAIR. Default = global locked value 48h until a pair-specific value is owner-authorized (proposals in research/phase4_validation_2026-09-11.md: BTC 8h, ETH 8h, SOL 6h, XRP 48h keep, NEAR 48h keep \u2014 validated on both windows)."
+   }
+  }
+ }
 }

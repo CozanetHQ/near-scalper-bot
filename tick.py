@@ -109,6 +109,40 @@ SLIP_ASSUMED_PCT = float(os.environ.get("SLIP_ASSUMED_PCT", "0.0001")) # EV-mode
 TREND_RUNAWAY_CANDLES = int(os.environ.get("TREND_RUNAWAY_CANDLES", "6"))  # last N closed 15m candles ALL one color => runaway regime: counter-trend entries blocked (wedge lesson).
 SPIKE_RANGE_MULT = float(os.environ.get("SPIKE_RANGE_MULT", "3.0"))    # live 1m candle range > N x 1m ATR => spike regime: block entries this tick.
 MAX_POS_AGE_HOURS = float(os.environ.get("MAX_POS_AGE_HOURS", "48"))  # locked 2026-09-10: hard-close at market if a position has been open >= 48h regardless of TP-aging tier. TP_AGING relaxes the TARGET; it never forces an exit — this does.
+
+# ── PER-PAIR PARAMETERS (owner standing rule 2026-09-11: every risk/execution
+# rule is tested and locked PER PAIR, never as one global setting — pairs have
+# different behavior; the 8h age-cap grid proved one number cannot fit five
+# pairs). The registry's "per_pair" section is the LOCKED source of truth:
+# {"<PARAM>": {"<PAIR>": {"value": x, "locked_at": ..., "rationale": ...}}}.
+# A pair absent from per_pair uses the global default above. Lab overrides:
+# env PER_PAIR_OVERRIDE='{"MAX_POS_AGE_HOURS": {"ETHUSDT": 4}}' (lab only —
+# the live workflow never sets it, so live always runs locked values).
+_PER_PAIR_OVERRIDES = {}
+try:
+    with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "param_registry.json")) as _f:
+        _PER_PAIR_OVERRIDES = json.load(_f).get("per_pair") or {}
+except Exception:
+    _PER_PAIR_OVERRIDES = {}
+try:
+    _PAIR_ENV_OVERRIDES = json.loads(os.environ.get("PER_PAIR_OVERRIDE") or "{}")
+except (ValueError, TypeError):
+    _PAIR_ENV_OVERRIDES = {}
+
+def pair_param(name, symbol, default):
+    """Effective per-pair parameter: lab env override > registry per_pair > global default."""
+    env_ov = _PAIR_ENV_OVERRIDES.get(name, {}).get(symbol)
+    if env_ov is not None:
+        try:
+            return type(default)(env_ov)
+        except (TypeError, ValueError):
+            pass
+    entry = _PER_PAIR_OVERRIDES.get(name, {}).get(symbol)
+    if isinstance(entry, dict):
+        v = entry.get("value")
+        if isinstance(v, (int, float)) and not isinstance(v, bool):
+            return type(default)(v) if isinstance(v, float) or isinstance(default, float) else v
+    return default
 # Slot recycling: a position stuck for hours relaxes its TP toward entry.
 # It NEVER crosses entry — no loss is ever realized. It just stops demanding
 # full profit to free the slot. Fees are always covered (keep > fee buffer).
@@ -556,6 +590,14 @@ def registry_check():
                     mismatches.append(f"{k}: live={v} locked={locked}")
             elif float(locked) != float(v):
                 mismatches.append(f"{k}: live={v} locked={locked}")
+        for pname, pmap in (reg.get("per_pair") or {}).items():
+            if not isinstance(pmap, dict):
+                mismatches.append(f"per_pair {pname}: not a dict")
+                continue
+            for pair, entry in pmap.items():
+                if not isinstance(entry, dict) or "value" not in entry or "locked_at" not in entry \
+                        or "rationale" not in entry:
+                    mismatches.append(f"per_pair {pname}.{pair}: missing value/locked_at/rationale")
         return (len(mismatches) == 0), mismatches
     except Exception as e:
         return False, [f"registry read failed: {e}"]
@@ -769,12 +811,13 @@ def process_tick(state):
                 pos_age_h = (datetime.fromisoformat(now) - datetime.fromisoformat(pos["opened_at"])).total_seconds() / 3600.0
             except (ValueError, TypeError):
                 pos_age_h = None
-        if MAX_POS_AGE_HOURS > 0 and pos_age_h is not None and pos_age_h >= MAX_POS_AGE_HOURS:
+        _age_cap = pair_param("MAX_POS_AGE_HOURS", symbol, MAX_POS_AGE_HOURS)
+        if _age_cap > 0 and pos_age_h is not None and pos_age_h >= _age_cap:
             trade, balance = close_position(pos, price, "MAX_AGE", now, balance)
             closed_any.append(trade)
             _pt(
                 f"\u23F0 *MAX_AGE — {pos['side'].upper()} force-closed*\n"
-                f"Open {pos_age_h:.1f}h >= locked {MAX_POS_AGE_HOURS:.0f}h ceiling\n"
+                f"Open {pos_age_h:.1f}h >= locked {_age_cap:.0f}h ceiling ({symbol})\n"
                 f"Entry ${pos['entry_price']:.4f} → ${price:.4f} | PnL ${trade['net_pnl']:.4f} | Balance ${balance:.4f}"
             )
             continue
