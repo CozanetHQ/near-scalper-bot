@@ -66,7 +66,7 @@ jobs:
         run: |
           git config user.email "fassdavid722@gmail.com"
           git config user.name "CozyCrypto"
-          git add data/reset_log.jsonl state/state.json data/trades.jsonl 2>/dev/null || true
+          git add data state 2>/dev/null || true
           git diff --cached --quiet && echo "nothing to commit" && exit 0
           git commit -m "audit: reset log — ${{ github.event.inputs.reason }}"
           git pull --rebase origin main || true

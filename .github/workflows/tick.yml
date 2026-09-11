@@ -43,7 +43,7 @@ jobs:
           # raw.githubusercontent is the public dashboard feed.
           git config user.email "fassdavid722@gmail.com"
           git config user.name "CozyCrypto"
-          git add state/state.json data/trades.jsonl 2>/dev/null || true
+          git add state data 2>/dev/null || true   # add dirs, not paths: git add is all-or-nothing if a listed file is absent (no trades yet)
           if git diff --cached --quiet; then echo "no state change"; exit 0; fi
           git commit -m "state: multi-pair tick $(date -u +%FT%TZ)"
           git pull --rebase origin main || true
