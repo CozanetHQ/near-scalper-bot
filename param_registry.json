@@ -143,6 +143,12 @@
    "locked_at": "2026-09-11T15:45:00+00:00",
    "locked_by": "owner",
    "rationale": "OWNER 2026-09-11 (Phase 4 finding 2): the 12% daily circuit breaker was documented since the single-pair era but never wired \u2014 DAILY_LOSS_LIMIT had zero readers and _day_start_balance was computed and discarded. Owner decision: wire it for real. Realized balance down 12% from the UTC day-start close \u2192 no new entries until the next UTC day (flag rides the last_reversal_at snapshot as drd, same channel as sf). Open positions ride to TP as normal. Documented behavior now equals actual behavior."
+  },
+  "COORD_MODE": {
+   "value": 0,
+   "locked_at": "2026-09-11T16:30:00+00:00",
+   "locked_by": "owner (documented on instruction, live dashboard review item 1)",
+   "rationale": "COORD_MODE 0 = each slot trades its own signal: counter-entries while the opposite side is open on the same pair are ALLOWED BY DESIGN. Live review 2026-09-11 saw 4 SHORT + 3 LONG NEARUSDT simultaneously (both sides underwater in chop) \u2014 that is this mode operating as designed, not a slot-check bug: G1 fires on alternating 1m/15m colors in whipsaw regimes and P2 BE stops scratch the retraces. Empirical (NEAR 30d sim, full-size era): 78% of entries were counter-entries while opposite side open, combined net +$0.2344 \u2014 the behavior HARVESTS chop rather than bleeding. Known gap deliberately left open for a separate owner decision: NO per-pair slot cap exists \u2014 one pair may consume all 8 global slots (live: 7/8 on NEARUSDT). Modes 1/2 (wound-based side blocking) remain in code, unused."
   }
  },
  "known_gaps_not_claimed": [

@@ -59,3 +59,68 @@ ETH h2 -0.23). Win rates 87-96% everywhere. The edge is real but the
 Aug 19-21 event is exactly the tail the SAFE_DD wall exists for — the
 policy decision above determines whether that protection is a brake or
 a kill switch.
+
+
+---
+
+# LIVE AUDIT — 2026-09-11 (owner dashboard review, 120 live trades)
+
+## CRITICAL: live-only cross-pair telemetry bug (found, root-caused, FIX PENDING OWNER AUTHORIZATION)
+
+`fetch_candles()` defaults `symbol=SYMBOL` (line 241) where `SYMBOL = "NEARUSDT"`
+hardcoded at module import (line 32). The signal path passes the real pair
+(lines 570-573) — but the MFE/MAE telemetry scan (line 651) calls
+`fetch_candles("1m", 15)` with NO symbol: **every pair's TP-scan and MFE/MAE
+telemetry runs on NEAR candles.**
+
+Consequences, all confirmed in data/trades.jsonl:
+- ETH ($2.5k) / BTC ($77k) / SOL ($100) positions: mae_frac = (entry - NEAR_low)/entry
+  ≈ 0.97-1.00 → MAE_KILL fires within minutes of opening, at ~$1 of real adverse
+  movement. 100% of ETH live trades (8/8), both BTC trades, 4/5 SOL trades are
+  bogus kills. Fingerprint: implied adverse extreme = $2.44-2.65 = NEAR's price,
+  on every poisoned trade, all four pairs.
+- XRP ($1.34) partially poisoned: NEAR highs read as bogus MFE (+0.87) → BE arms
+  instantly → 12 BE_STOP scratches are bug-artifacts of arming, not real 50%-of-TP
+  cohorts.
+- MFE for ETH/BTC/SOL never accumulates (NEAR highs far below their entries) →
+  BE protection could never arm on those pairs.
+- The 120-trade live sample: NEAR 87t is CLEAN (its own candles); BTC/SOL/ETH
+  live win rates (0%/20%/25%) are the BUG'S footprint, not strategy evidence.
+- Sim backtests UNAFFECTED: the harness fetcher serves the pair's own candles.
+- A BE-armed ETH exit (+$0.0054) was killed-and-labeled MAE_KILL because the
+  ceiling check runs before BE_STOP — the one "MAE 0.0%" oddity (its mae had not
+  yet round-tripped through a contaminated scan when the record was written).
+
+Proposed fix (one line, awaiting owner authorization per the constitution):
+`scan = fetch_candles("1m", 15, symbol)` — after which the contaminated live
+records for BTC/SOL/ETH/XRP should be treated as void; NEAR's record stands.
+
+## Item 1 — simultaneous LONG+SHORT on one pair
+
+Intentional: COORD_MODE 0 (each slot trades its own signal) — now documented in
+param_registry.json with the empirical evidence. Real structural gap flagged for
+owner decision: no per-pair slot cap (live: 7/8 slots on NEARUSDT).
+
+## Item 4/5 — designed asymmetry and target-failure ratio
+
+Live NEAR (87t): TP 40x avg +$0.0224 | BE_STOP 41x avg +$0.0023 | MAE_KILL 6x
+avg −$0.1407. PF 1.18 clean / 1.09 all-pairs. The win/loss asymmetry is the
+registry-locked scalper structure (TP ~1.7% of notional vs MAE ceiling 4%,
+HARD_SL 6% backstop). Target failure 41 vs success 40: BE_STOP catching
+half-completed trades at breakeven is the P2 design working; the 51% post-arm
+retrace rate vs the seed cohort's 9% is regime (post-Aug-19 chop). TP levels stay
+locked a priori per v4 Sec 1.1 — no tuning on live results.
+
+## Authorized changes shipped today (both validated in sim)
+
+- RECOVERY_SIZE_FRAC 0.25: wall trips → ¼ slots (dust floor $1) → engine keeps
+  trading instead of freezing. NEAR 30d: wall at trade #338, recovery era 3,836
+  dust trades net −$0.32 (old behavior: silence). Honest first datapoint, on
+  record in the registry rationale.
+- DAILY_LOSS_LIMIT 0.12 wired: trips at ≥12% day loss → no entries until next
+  UTC day → auto-releases at midnight (validated: Aug-15 00:09 trip → silence →
+  Aug-16 00:00 release). Flag rides the last_reversal_at snapshot (drd).
+- Registry-mismatch crash fixed: want/can_open/opened_this_tick hoisted so a
+  lineage mismatch degrades to graceful WAIT instead of UnboundLocalError.
+- Second Engine advisory scores now logged on every entry (advisory_score,
+  wall_ratio), round-tripped through the compact position format (probe passed).

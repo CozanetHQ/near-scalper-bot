@@ -84,6 +84,15 @@ class Backtest:
             s["_other_open"] = 0
             s["_other_margin"] = 0.0
             s["_hb_master"] = False
+            # mirror live get_state: UTC day-start balance for the daily loss limit
+            today = datetime.fromtimestamp(sim.clock.now_ms / 1000, timezone.utc).strftime("%Y-%m-%d")
+            day_start = None
+            for t in sim.trades:
+                if (t.get("closed_at") or "").startswith(today):
+                    continue
+                day_start = t.get("balance_after")
+                break
+            s["_day_start_balance"] = day_start if day_start is not None else s.get("balance")
             return s
         def sync(pair, state_update=None, trade=None):
             su = state_update or {}

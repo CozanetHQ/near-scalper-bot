@@ -92,6 +92,7 @@
 <header>
   <h1>SCALPER v5 <span class="sub">INSTITUTIONAL TERMINAL · MULTI-PAIR ENGINE · PAPER DESK</span></h1>
   <span class="pill live" id="status"><span class="dot"></span><span id="status-txt">LIVE</span></span>
+  <span class="pill stale" id="recovery" style="display:none;border-color:#6b4c14;background:rgba(245,166,35,.08)">RECOVERY · ¼ SLOTS</span>
   <span id="clock">—</span>
 </header>
 
@@ -153,7 +154,7 @@
 </div>
 
 <footer>
-  ALL PARAMS LOCKED A PRIORI IN param_registry.json · P1 TELEMETRY + P2 RISK ENGINE (BE STOP · MAE CEIL 4% · HARD SL 6% AIRBAG) LIVE<br>
+  ALL PARAMS LOCKED A PRIORI IN param_registry.json · P2 RISK ENGINE (BE STOP · MAE CEIL 4% · HARD SL 6% AIRBAG) · DD WALL 25% → RECOVERY ¼ SLOTS · DAILY LOSS LIMIT 12% WIRED<br>
   Paper trading engine · Bitget USDT perps · git history = immutable audit trail · registry-locked params · refresh 30s
 </footer>
 
@@ -220,6 +221,12 @@ function render() {
   const pill = document.getElementById("status");
   pill.className = "pill " + (ageMin < 12 ? "live" : "stale");
   pill.querySelector("#status-txt").textContent = ageMin < 12 ? "LIVE" : "STALE " + Math.round(ageMin) + "m";
+  try {
+    const snap = JSON.parse(acct.last_reversal_at || "{}");
+    const rbadge = document.getElementById("recovery");
+    if (snap.sf) { rbadge.style.display = "inline-flex"; }
+    else { rbadge.style.display = "none"; }
+  } catch (e) {}
 
   const bal = acct.balance ?? 3.0;
   const start = 3.0;

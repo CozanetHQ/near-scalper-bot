@@ -22,6 +22,7 @@ import json
 # lives in the engine package; tick.py orchestrates fetch/sync/execution.
 from engine.features import candle_color, compute_atr, compute_ema
 from engine.positions import serialize_positions, parse_positions, classify_trade_state
+from engine.second_engine import score_signal  # Phase 5: advisory-only (validated dist_to_wall; no gating)
 import time
 import urllib.request
 import urllib.error
@@ -70,7 +71,8 @@ HEARTBEAT_SEC = 3600  # if no open/close events for an hour, ping Telegram so si
 # new positions while floating damage exceeds this share of balance, so a one-way
 # regime can't stack unlimited wedges. The grind resumes as floating recovers.
 INVENTORY_CAP = float(os.environ.get("INVENTORY_CAP", "999"))
-SAFE_DD = float(os.environ.get("SAFE_DD", "0.25"))  # owner 09-08 Engine 10: HARD realized-DD wall — pause ALL new entries at -25% from peak balance; the intelligence may NEVER override (0 disables for lab only)  # OFF by default — lab 09-06: every throttle variant starved the grind that pays for wedges (raw equity -$0.26 vs -$3.2 to -$5.3 hardened)
+SAFE_DD = float(os.environ.get("SAFE_DD", "0.25"))
+RECOVERY_SIZE_FRAC = float(os.environ.get("RECOVERY_SIZE_FRAC", "0.25"))  # OWNER 2026-09-11: below the SAFE_DD wall, entries are no longer PAUSED (a paused account can never recover — Phase 4 finding). Slots run at 1/4 size until balance recovers above the boundary; full size returns automatically. Never below the $1 dust floor so the account keeps trading.  # owner 09-08 Engine 10: HARD realized-DD wall — pause ALL new entries at -25% from peak balance; the intelligence may NEVER override (0 disables for lab only)  # OFF by default — lab 09-06: every throttle variant starved the grind that pays for wedges (raw equity -$0.26 vs -$3.2 to -$5.3 hardened)
 
 # ── v4 FALSIFICATION-HARDENED SPEC — LOCKED PROTECTIVE KILL (owner 09-10) ──
 # HONEST SCOPE NOTE: this is a single Python process polling Bitget's public
@@ -175,7 +177,7 @@ SWEEP_REARM_SEC = 900    # after any close, wait before another sweep entry (no 
 CONSOL_MAX_RANGE = 0.004   # last 8x15m range <= 0.4% of price -> consolidation zone
 ZONE_ENTRY_POS = 0.25      # fade only within 25% of a zone edge — the middle of a zone is a chop trap
 ZONE_TP_HAIRCUT = 0.25     # zone TP lands 25% of the range inside the far edge (don't get greedy at the wall)
-DAILY_LOSS_LIMIT = 0.12    # RISK-OFF for the rest of the UTC day after losing 12% from day-start balance
+DAILY_LOSS_LIMIT = float(os.environ.get("DAILY_LOSS_LIMIT", "0.12"))  # registry-locked 0.12 — RISK-OFF for the rest of the UTC day after losing 12% from day-start balance. OWNER 2026-09-11: WIRED (was defined, never read — Phase 4 finding 2).
 MAX_STREAK = 4             # 4 consecutive SLs on one side -> extended pause
 STREAK_PAUSE_SEC = 3600     # ... for one hour
 RSI_PERIOD = 14
@@ -510,6 +512,8 @@ def close_position(pos, exit_price, reason, now, balance):
         "reason": reason,
         "balance_after": round(new_balance, 6),
         "aligned": pos.get("aligned", None),
+        "advisory_score": pos.get("advisory_score"),
+        "wall_ratio": pos.get("wall_ratio"),
         "opened_at": pos["opened_at"],
         "closed_at": now,
     }
@@ -539,6 +543,8 @@ def registry_check():
             "BE_BUFFER_FRAC": BE_BUFFER_FRAC,
             "CONCENTRATED": CONCENTRATED,
             "PAIRS": ",".join(PAIRS),
+            "RECOVERY_SIZE_FRAC": RECOVERY_SIZE_FRAC,
+            "DAILY_LOSS_LIMIT": DAILY_LOSS_LIMIT,
         }
         mismatches = []
         for k, v in live.items():
@@ -617,7 +623,29 @@ def process_tick(state):
             pass
     elif not safe_on and safe_prev:
         try:
-            _pt("\u2705 SAFE MODE lifted — balance recovered above the drawdown boundary.")
+            _pt("\u2705 RECOVERY COMPLETE — balance back above the drawdown boundary. Full slot size restored.")
+        except Exception:
+            pass
+    # ── OWNER 2026-09-11: DAILY LOSS LIMIT — now WIRED (was defined, never read).
+    # Realized balance down DAILY_LOSS_LIMIT from the UTC day-start close →
+    # no NEW entries until the next UTC day. Open positions ride as normal.
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    day_start = state.get("_day_start_balance") or balance
+    riskoff_prev_day = None
+    try:
+        _snap2 = json.loads(state.get("last_reversal_at") or "{}")
+        if isinstance(_snap2, dict):
+            riskoff_prev_day = _snap2.get("drd")
+    except (ValueError, TypeError):
+        riskoff_prev_day = None
+    daily_risk_off = DAILY_LOSS_LIMIT > 0 and riskoff_prev_day == today
+    if (not daily_risk_off and DAILY_LOSS_LIMIT > 0 and day_start > 0
+            and balance <= day_start * (1 - DAILY_LOSS_LIMIT)):
+        daily_risk_off = True
+        state["_riskoff_day"] = today
+        try:
+            _pt("\U0001F6D1 DAILY LOSS LIMIT — realized balance ${:.2f} is down {:.0f}% from the UTC day start ${:.2f}.\n"
+                "No new entries until the next UTC day. Open positions ride to TP as normal.".format(balance, 100 * DAILY_LOSS_LIMIT, day_start))
         except Exception:
             pass
     scan = fetch_candles("1m", 15)  # gap-aware TP scan (shared)
@@ -764,6 +792,13 @@ def process_tick(state):
     # ── ENTRY: chop the CURRENT move. Pullback candle in live momentum = entry.
     regime = "chop"
     wait_reason = None
+    # Hoisted so a registry mismatch (or non-running status) degrades gracefully:
+    # positions ride, entries WAIT, the heartbeat fires — instead of crashing
+    # with UnboundLocalError at the first post-block reference (found 2026-09-11
+    # when a lab env override tripped the mismatch path).
+    want = None
+    can_open = False
+    opened_this_tick = False
     reg_ok, reg_mismatches = registry_check()
     if not reg_ok:
         _pt(
@@ -877,7 +912,7 @@ def process_tick(state):
             want is not None
             and entry_cooldown_ok
             and len(still_open) + int(state.get("_other_open") or 0) < MAX_POSITIONS
-            and not safe_on
+            and not daily_risk_off
         )
         if can_open:
             used_margin = sum(p["margin"] for p in still_open) + float(state.get("_other_margin") or 0)
@@ -910,6 +945,10 @@ def process_tick(state):
             # budget at 10x — a single trade can never hog the whole budget and
             # freeze the bot (the 2026-09-06 wedge lesson).
             slot_cap = balance * MARGIN_BUDGET * LEVERAGE / MAX_POSITIONS
+            if safe_on:
+                # OWNER 2026-09-11 recovery sizing: 1/4 slots below the wall,
+                # floored at the dust minimum so the account keeps trading.
+                slot_cap = max(slot_cap * RECOVERY_SIZE_FRAC, 1.0)
             if per_unit > 0 and margin_left > 0.05 and ev_frac >= EV_MARGIN_REQ:
                 aligned = (bias != "none" and want == ("long" if bias == "bull" else "short"))
                 base = WIN_TARGET_PCT * balance if WIN_TARGET_PCT > 0 else WIN_TARGET_DOLLARS
@@ -923,6 +962,15 @@ def process_tick(state):
                 else:
                     notional = min(target / per_unit, slot_cap, margin_left * LEVERAGE, 40.0)
                 if notional >= 1.0:  # don't open dust positions
+                    # Phase 5 advisory: Second Engine scores on every entry.
+                    # Logged for live out-of-sample accumulation — NEVER gates.
+                    advisory = None
+                    try:
+                        advisory = score_signal(c15m[:-1], want, price,
+                                                atr or 0.003 * price, entry_tp_dist,
+                                                abs(forming_1m["high"] - forming_1m["low"]))
+                    except Exception:
+                        advisory = None
                     margin = notional / LEVERAGE
                     entry = price
                     tp = entry + entry_tp_dist if want == "long" else entry - entry_tp_dist
@@ -933,6 +981,8 @@ def process_tick(state):
                         # MFE/MAE/duration record every management decision reads).
                         "mfe_frac": 0.0, "mae_frac": 0.0,
                         "aligned": aligned, "pair": symbol,
+                        "advisory_score": (advisory or {}).get("overall_score"),
+                        "wall_ratio": (advisory or {}).get("wall_ratio"),
                     })
                     opened_this_tick = True
                     # OWNER 09-07: plain-dollar math on every entry — no percentages to decode.
@@ -1015,6 +1065,7 @@ def process_tick(state):
     su["last_reversal_at"] = json.dumps(
         {"eq": round(balance + unrealized, 4), "u": round(unrealized, 4),
          "n": len(still_open), "hb": hb_new, "pk": round(peak_bal, 4), "sf": 1 if safe_on else 0,
+         "drd": state.get("_riskoff_day") or "",
          "rg": regime, "w": wait_reason},
         separators=(",", ":"))
     sync(symbol, state_update=su, trade=closed_any[0] if closed_any else None)
@@ -1023,7 +1074,8 @@ def process_tick(state):
     if closed_any:
         return "closed", f"closed {len(closed_any)} TP(s), {len(still_open)} open"
     if want is not None and not can_open:
-        why = "SAFE MODE (drawdown gate)" if safe_on else f"slots/margin full ({len(still_open)}/{MAX_POSITIONS})"
+        why = ("daily risk-off (day loss limit)" if daily_risk_off
+               else f"slots/margin full ({len(still_open)}/{MAX_POSITIONS})")
         return "none", f"signal {want} skipped — {why}"
     if wait_reason:
         return "none", f"WAIT ({regime}) — {wait_reason} | {len(still_open)} open"

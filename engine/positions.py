@@ -18,7 +18,8 @@ def serialize_positions(positions, max_positions, default_symbol):
          "n": p["notional"], "m": p["margin"], "o": p["opened_at"],
          "a": bool(p.get("aligned")), "pr": p.get("pair") or default_symbol,
          "mf": round(p.get("mfe_frac") or 0.0, 6),
-         "me": round(p.get("mae_frac") or 0.0, 6)}
+         "me": round(p.get("mae_frac") or 0.0, 6),
+         "sc": p.get("advisory_score"), "wr": p.get("wall_ratio")}
         for p in positions[:max_positions]
     ]
     return {"last_error": json.dumps(compact, separators=(",", ":"))}
@@ -48,6 +49,7 @@ def parse_positions(state, default_symbol=None):
                     "aligned": bool(p.get("a", False)),
                     "mfe_frac": float(p.get("mf") or 0.0),
                     "mae_frac": float(p.get("me") or 0.0),
+                    "advisory_score": p.get("sc"), "wall_ratio": p.get("wr"),
                 })
         except (KeyError, TypeError, ValueError):
             continue
