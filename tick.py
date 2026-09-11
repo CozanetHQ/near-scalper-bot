@@ -25,6 +25,14 @@ from datetime import datetime, timezone
 BITGET = "https://api.bitget.com/api/v2/mix/market"
 SYMBOL = "NEARUSDT"
 PRODUCT = "USDT-FUTURES"
+# ── MULTI-PAIR: one shared account, per-pair intelligence, global slot budget.
+# Locked a priori (registry: PAIRS) — deepest-liquidity Bitget USDT perps,
+# NEAR retained for continuity with the single-pair era.
+PAIRS = [p.strip().upper() for p in os.environ.get(
+    "PAIRS", "NEARUSDT,BTCUSDT,ETHUSDT,SOLUSDT,XRPUSDT").split(",") if p.strip()]
+_REPO = os.path.dirname(os.path.abspath(__file__))
+STATE_FILE = os.environ.get("STATE_FILE", os.path.join(_REPO, "state", "state.json"))
+TRADES_FILE = os.environ.get("TRADES_FILE", os.path.join(_REPO, "data", "trades.jsonl"))
 ATR_PERIOD = 14
 SL_ATR_MULT = 4.0     # GRID SEARCH WINNER (1152 configs): wide stop, rarely hit
 TP_SL_RATIO = 1.5     # most exits are 20-min drift-capture time stops
@@ -137,7 +145,7 @@ def nearest_swing_tp(closed15m, side, price):
         return min(above) if above else None
     below = [l for l in levels["lo"] if l < price]
     return max(below) if below else None
-MIN_TP_DIST = 0.003  # TP floor: ~0.13% — below this, fees eat the scalp alive
+MIN_TP_DIST_FRAC = float(os.environ.get("MIN_TP_DIST_FRAC", "0.00125"))  # TP floor as a FRACTION of price (~0.13%): below this, fees eat the scalp alive. Was an absolute $0.003 in the single-pair NEAR era ($2.4 price); multi-pair demands price-proportionate ($0.003/$2.42 ≈ 0.125%). Registry-locked.
 EMA_FAST = 9         # scalper momentum: EMA9 vs EMA21 on 1m closes
 EMA_SLOW = 21
 ATR_MIN = 0.0008      # GRID SEARCH WINNER: low gate — more shots on goal
@@ -167,10 +175,6 @@ START_BALANCE = 3.0
 FEE_RATE = 0.0006
 POLL_INTERVAL = 15
 MAX_RUNTIME = int(os.environ.get('MAX_RUNTIME', 240))  # ~4 min loop; next run chains immediately
-
-BASE44_DASHBOARD = "https://superagent-ae0aaf02.base44.app/functions/nearScalperDashboard"
-BASE44_SYNC = "https://superagent-ae0aaf02.base44.app/functions/nearScalperSync"
-TICK_SECRET = os.environ.get("TICK_SECRET", "")
 
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
@@ -219,8 +223,8 @@ def http_post(url, payload, headers=None, timeout=8):
         return json.loads(res.read().decode())
 
 
-def fetch_candles(granularity, limit=5):
-    url = f"{BITGET}/candles?symbol={SYMBOL}&productType={PRODUCT}&granularity={granularity}&limit={limit}"
+def fetch_candles(granularity, limit=5, symbol=SYMBOL):
+    url = f"{BITGET}/candles?symbol={symbol}&productType={PRODUCT}&granularity={granularity}&limit={limit}"
     data = http_get(url)
     if data.get("code") != "00000":
         raise RuntimeError(f"Bitget candles error: {data.get('msg')}")
@@ -231,8 +235,8 @@ def fetch_candles(granularity, limit=5):
     ]
 
 
-def fetch_ticker():
-    url = f"{BITGET}/ticker?symbol={SYMBOL}&productType={PRODUCT}"
+def fetch_ticker(symbol=SYMBOL):
+    url = f"{BITGET}/ticker?symbol={symbol}&productType={PRODUCT}"
     data = http_get(url)
     if data.get("code") != "00000":
         raise RuntimeError(f"Bitget ticker error: {data.get('msg')}")
@@ -293,6 +297,7 @@ def finalize_close(state, exit_price, reason, now, su):
     new_balance = state["balance"] + net  # margin is virtual sizing only, never reserved from balance
 
     trade = {
+        "pair": state.get("_pair") or SYMBOL,
         "side": state["side"],
         "entry_price": entry,
         "exit_price": exit_price,
@@ -348,35 +353,104 @@ def send_telegram(text):
         log(f"Telegram send failed: {e}")
 
 
-def get_state():
-    data = http_get(BASE44_DASHBOARD) or {}
-    state = data.get("state") or {}
-    # Attach the latest CLOSED trade (used for the post-SL cooldown).
-    trades = data.get("trades") or []
-    if trades:
-        state["_last_close"] = trades[0].get("closed_at")
-        state["_last_reason"] = trades[0].get("reason")
-    # Day-start balance (UTC) for the daily loss circuit breaker: balance after
-    # the last trade that closed before today's midnight.
+def load_master():
+    """The engine's single source of truth: state/state.json, committed to git
+    every tick by the workflow. git history IS the audit trail."""
+    try:
+        with open(STATE_FILE) as f:
+            return json.load(f)
+    except (FileNotFoundError, ValueError):
+        return {"account": {}, "pairs": {}, "trades": []}
+
+
+def fresh_pair_state(pair):
+    return {
+        "pair": pair, "status": "running", "side": "none", "entry_price": 0,
+        "tp_price": 0, "sl_price": 0, "notional": 0, "margin": 0,
+        "position_open": False, "opened_at": None, "last_error": "[]",
+        "last_reversal_at": "", "last_price": 0, "wins": 0, "losses": 0,
+        "total_trades": 0, "streak_side": "none", "streak_count": 0,
+        "last_bias": "none", "last_1m_color": "flat", "last_15m_color": "flat",
+        "last_4h_color": "flat", "last_tick_at": "",
+    }
+
+
+def get_state(pair):
+    """Merged view for ONE pair: account fields (shared balance/peak) + the
+    pair's own scalping state + cross-pair budget context + trade context."""
+    master = load_master()
+    acct = master.get("account") or {}
+    ps = (master.get("pairs") or {}).get(pair) or fresh_pair_state(pair)
+    state = dict(ps)
+    state["_pair"] = pair
+    bal = acct.get("balance")
+    state["balance"] = bal if isinstance(bal, (int, float)) and bal > 0 else START_BALANCE
+    peak = acct.get("peak_balance")
+    state["peak_bal"] = peak if isinstance(peak, (int, float)) and peak > 0 else state["balance"]
+    state["status"] = ps.get("status") or "running"
+    trades = [t for t in (master.get("trades") or [])]
+    pair_trades = [t for t in trades if (t.get("pair") or SYMBOL) == pair]
+    if pair_trades:
+        state["_last_close"] = pair_trades[0].get("closed_at")
+        state["_last_reason"] = pair_trades[0].get("reason")
+    # Day-start balance (UTC) for the daily loss circuit breaker — account-level.
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     day_start = None
-    for t in trades:
+    for t in pair_trades:
         if (t.get("closed_at") or "").startswith(today):
             continue
         day_start = t.get("balance_after")
         break
     if day_start is None:
-        day_start = state.get("balance") or START_BALANCE
+        day_start = state["balance"]
     state["_day_start_balance"] = day_start
+    # Cross-pair budget context: slots + margin are GLOBAL, not per-pair.
+    other_open, other_margin = 0, 0.0
+    for op, ops in (master.get("pairs") or {}).items():
+        if op == pair:
+            continue
+        for p in parse_positions(ops):
+            other_open += 1
+            other_margin += float(p.get("margin") or 0)
+    state["_other_open"] = other_open
+    state["_other_margin"] = round(other_margin, 6)
     return state
 
 
-def sync(state_update=None, trade=None):
-    payload = {"state": state_update or {}, "trade": trade}
-    data = http_post(BASE44_SYNC, payload, headers={"X-Tick-Secret": TICK_SECRET})
-    if not data.get("ok"):
-        raise RuntimeError(f"Sync failed: {data.get('error')}")
-    return data.get("state") or {}
+def sync(pair, state_update=None, trade=None):
+    """Persist ONE pair's tick: shared account fields + pair fields to
+    state/state.json, and append any closed trade to the immutable ledger."""
+    master = load_master()
+    acct = master.setdefault("account", {})
+    su = state_update or {}
+    if "balance" in su:
+        acct["balance"] = su["balance"]
+        try:
+            acct["peak_balance"] = max(float(acct.get("peak_balance") or 0), float(su["balance"]))
+        except (ValueError, TypeError):
+            acct["peak_balance"] = float(su["balance"])
+        acct["status"] = su.get("status") or acct.get("status") or "running"
+        acct["last_tick_at"] = su.get("last_tick_at") or acct.get("last_tick_at")
+    ps = master.setdefault("pairs", {}).setdefault(pair, fresh_pair_state(pair))
+    for k, v in su.items():
+        if k == "balance":
+            continue
+        ps[k] = v
+    if trade:
+        tr = dict(trade)
+        tr.setdefault("pair", pair)
+        master.setdefault("trades", []).insert(0, tr)
+        master["trades"] = master["trades"][:60]  # working window; full ledger → trades.jsonl
+        os.makedirs(os.path.dirname(TRADES_FILE), exist_ok=True)
+        with open(TRADES_FILE, "a") as f:
+            f.write(json.dumps(tr, separators=(",", ":")) + "\n")
+    master["updated_at"] = datetime.now(timezone.utc).isoformat()
+    os.makedirs(os.path.dirname(STATE_FILE), exist_ok=True)
+    tmp = STATE_FILE + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(master, f, separators=(",", ":"))
+    os.replace(tmp, STATE_FILE)
+    return {"ok": True}
 
 
 SWING_AGE = os.environ.get("SWING_AGE", "0")  # 1 = aged TPs ALSO relax to the nearest
@@ -429,6 +503,7 @@ def close_position(pos, exit_price, reason, now, balance):
     net = gross - fees - (notional * SLIP_PCT * 2)  # stress: slippage both sides
     new_balance = balance + net
     trade = {
+        "pair": pos.get("pair") or state.get("_pair") or SYMBOL,
         "side": pos["side"],
         "entry_price": entry,
         "exit_price": exit_price,
@@ -456,7 +531,7 @@ def serialize_positions(positions):
     compact = [
         {"s": p["side"], "e": p["entry_price"], "t": p["tp_price"],
          "n": p["notional"], "m": p["margin"], "o": p["opened_at"],
-         "a": bool(p.get("aligned"))}
+         "a": bool(p.get("aligned")), "pr": p.get("pair") or SYMBOL}
         for p in positions[:MAX_POSITIONS]
     ]
     return {"last_error": json.dumps(compact, separators=(",", ":"))}
@@ -476,6 +551,7 @@ def parse_positions(state):
         try:
             if p.get("s") in ("long", "short"):
                 out.append({
+                    "pair": p.get("pr") or SYMBOL,
                     "side": p["s"],
                     "entry_price": float(p["e"]),
                     "tp_price": float(p["t"]),
@@ -511,11 +587,18 @@ def registry_check():
             "SLIP_ASSUMED_PCT": SLIP_ASSUMED_PCT,
             "TREND_RUNAWAY_CANDLES": TREND_RUNAWAY_CANDLES,
             "SPIKE_RANGE_MULT": SPIKE_RANGE_MULT,
+            "MIN_TP_DIST_FRAC": MIN_TP_DIST_FRAC,
+            "PAIRS": ",".join(PAIRS),
         }
         mismatches = []
         for k, v in live.items():
             locked = reg.get("params", {}).get(k, {}).get("value")
-            if locked is not None and float(locked) != float(v):
+            if locked is None:
+                continue
+            if isinstance(v, str):
+                if locked != v:
+                    mismatches.append(f"{k}: live={v} locked={locked}")
+            elif float(locked) != float(v):
                 mismatches.append(f"{k}: live={v} locked={locked}")
         return (len(mismatches) == 0), mismatches
     except Exception as e:
@@ -523,11 +606,15 @@ def registry_check():
 
 
 def process_tick(state):
-    """One poll cycle. Returns (action, details)."""
-    c4h = fetch_candles("4H", 2)
-    c15m = fetch_candles("15m", 14)  # closed candles for zone + sweep structure detection
-    c1m = fetch_candles("1m", 24)  # 23 closed candles: EMA21 needs 21
-    ticker = fetch_ticker()
+    """One poll cycle for ONE pair. Returns (action, details)."""
+    symbol = state.get("_pair") or SYMBOL
+    PTAG = symbol.replace("USDT", "")
+    def _pt(text):  # every alert from this pair carries its tag
+        send_telegram(f"[{PTAG}] {text}")
+    c4h = fetch_candles("4H", 2, symbol)
+    c15m = fetch_candles("15m", 14, symbol)  # closed candles for zone + sweep structure detection
+    c1m = fetch_candles("1m", 24, symbol)  # 23 closed candles: EMA21 needs 21
+    ticker = fetch_ticker(symbol)
 
     forming_4h = c4h[-1]
     forming_15m = c15m[-1]
@@ -561,18 +648,18 @@ def process_tick(state):
     # Safety wall, not a strategy opinion: realized balance below (1-SAFE_DD)
     # of its running peak pauses ALL new entries until the account recovers.
     safe_prev = 0
-    peak_bal = balance
     try:
         _snap = json.loads(state.get("last_reversal_at") or "{}")
         if isinstance(_snap, dict):
             safe_prev = int(_snap.get("sf") or 0)
-            peak_bal = max(balance, float(_snap.get("pk") or balance))
     except (ValueError, TypeError):
-        peak_bal = balance
+        safe_prev = 0
+    # Peak is ACCOUNT-level now (shared balance across pairs).
+    peak_bal = max(balance, float(state.get("peak_bal") or 0))
     safe_on = SAFE_DD > 0 and balance < peak_bal * (1 - SAFE_DD)
     if safe_on and not safe_prev:
         try:
-            send_telegram(
+            _pt(
                 "\U0001F6D1 SAFE MODE — hard risk boundary hit (non-negotiable):\n"
                 f"balance ${balance:.2f} is below {(1-SAFE_DD)*100:.0f}% of peak ${peak_bal:.2f}\n"
                 "New entries paused. Open positions ride to TP as normal.")
@@ -580,7 +667,7 @@ def process_tick(state):
             pass
     elif not safe_on and safe_prev:
         try:
-            send_telegram("\u2705 SAFE MODE lifted — balance recovered above the drawdown boundary.")
+            _pt("\u2705 SAFE MODE lifted — balance recovered above the drawdown boundary.")
         except Exception:
             pass
     scan = fetch_candles("1m", 15)  # gap-aware TP scan (shared)
@@ -619,7 +706,7 @@ def process_tick(state):
                 liq_price = pos["entry_price"] * (1 - liq_frac) if pos["side"] == "long" else pos["entry_price"] * (1 + liq_frac)
                 trade, balance = close_position(pos, liq_price, "LIQ", now, balance)
                 closed_any.append(trade)
-                send_telegram(
+                _pt(
                     f"\u2620\ufe0f *LIQUIDATED {pos['side'].upper()}*\n"
                     f"Entry ${pos['entry_price']:.4f} → LiQ ${liq_price:.4f}\n"
                     f"PnL ${trade['net_pnl']:.4f} | Balance ${balance:.4f}"
@@ -632,7 +719,7 @@ def process_tick(state):
         if HARD_SL_FRAC > 0 and hs_adverse >= HARD_SL_FRAC:
             trade, balance = close_position(pos, price, "HARD_SL", now, balance)
             closed_any.append(trade)
-            send_telegram(
+            _pt(
                 f"\U0001F6D1 *HARD_SL — {pos['side'].upper()} force-closed*\n"
                 f"Entry ${pos['entry_price']:.4f} → ${price:.4f} (adverse {hs_adverse*100:.1f}% >= locked {HARD_SL_FRAC*100:.0f}%)\n"
                 f"PnL ${trade['net_pnl']:.4f} | Balance ${balance:.4f}"
@@ -649,7 +736,7 @@ def process_tick(state):
         if MAX_POS_AGE_HOURS > 0 and pos_age_h is not None and pos_age_h >= MAX_POS_AGE_HOURS:
             trade, balance = close_position(pos, price, "MAX_AGE", now, balance)
             closed_any.append(trade)
-            send_telegram(
+            _pt(
                 f"\u23F0 *MAX_AGE — {pos['side'].upper()} force-closed*\n"
                 f"Open {pos_age_h:.1f}h >= locked {MAX_POS_AGE_HOURS:.0f}h ceiling\n"
                 f"Entry ${pos['entry_price']:.4f} → ${price:.4f} | PnL ${trade['net_pnl']:.4f} | Balance ${balance:.4f}"
@@ -658,7 +745,7 @@ def process_tick(state):
         if hit_tp:
             trade, balance = close_position(pos, tp, "TP", now, balance)
             closed_any.append(trade)
-            send_telegram(
+            _pt(
                 f"\u2705 *Closed {pos['side'].upper()} (TP)*\n"
                 f"Entry ${pos['entry_price']:.4f} → TP ${tp:.4f}\n"
                 f"PnL +${trade['net_pnl']:.4f} | Balance ${balance:.4f}"
@@ -671,7 +758,7 @@ def process_tick(state):
     wait_reason = None
     reg_ok, reg_mismatches = registry_check()
     if not reg_ok:
-        send_telegram(
+        _pt(
             "\U0001F512 *PARAMETER LINEAGE MISMATCH — new entries WAIT\'d (v4 Sec 1.1)*\n"
             + "\n".join(reg_mismatches[:5])
             + "\nA locked constant changed without re-locking param_registry.json. Existing positions still ride their HARD_SL/MAX_AGE/TP kills normally."
@@ -781,20 +868,20 @@ def process_tick(state):
         can_open = (
             want is not None
             and entry_cooldown_ok
-            and len(still_open) < MAX_POSITIONS
+            and len(still_open) + int(state.get("_other_open") or 0) < MAX_POSITIONS
             and not safe_on
         )
         if can_open:
-            used_margin = sum(p["margin"] for p in still_open)
+            used_margin = sum(p["margin"] for p in still_open) + float(state.get("_other_margin") or 0)
             margin_left = balance * MARGIN_BUDGET - used_margin
-            tp_dist = max(SCALP_TP_ATR * (atr or 0.003), MIN_TP_DIST)
+            tp_dist = max(SCALP_TP_ATR * (atr or 0.003 * price), MIN_TP_DIST_FRAC * price)
             entry_tp_dist = tp_dist
             if SWING_TP == "1":
                 lvl = nearest_swing_tp(c15m[:-1], want, price)
                 if lvl is not None:
                     d = (lvl - price) if want == "long" else (price - lvl)
                     d *= SWING_FRONT  # front-run the level — fill before the crowd at it
-                    if MIN_TP_DIST <= d <= tp_dist * SWING_MAX:
+                    if MIN_TP_DIST_FRAC * price <= d <= tp_dist * SWING_MAX:
                         entry_tp_dist = d
             # ── v5 EV-AFTER-COSTS GATE (the report's decision equation, scoped
             # to what this paper bot can measure): EV = p*win - (1-p)*kill - fees
@@ -827,11 +914,11 @@ def process_tick(state):
                     still_open.append({
                         "side": want, "entry_price": entry, "tp_price": tp,
                         "notional": notional, "margin": margin, "opened_at": now,
-                        "aligned": aligned,
+                        "aligned": aligned, "pair": symbol,
                     })
                     opened_this_tick = True
                     # OWNER 09-07: plain-dollar math on every entry — no percentages to decode.
-                    send_telegram(
+                    _pt(
                         f"\u26a1\ufe0f *Opened {want.upper()} (scalp)*\n"
                         f"Entry ${entry:.4f} → TP ${tp:.4f} | NO SL\n"
                         f"Account ${balance:.2f} → this trader locks ${margin:.2f} ({margin/balance*100:.0f}%) and commands ${notional:.2f} ({notional/balance*100:.0f}% of account)\n"
@@ -852,8 +939,8 @@ def process_tick(state):
         "equity": round(balance + unrealized, 6),
         "open_positions": len(still_open),
         "total_trades": (state.get("total_trades") or 0) + len(closed_any),
-        "wins": (state.get("wins") or 0) + len(closed_any),  # TP-only: every close is a win
-        "losses": state.get("losses") or 0,
+        "wins": (state.get("wins") or 0) + sum(1 for t in closed_any if +t["net_pnl"] > 0),
+        "losses": (state.get("losses") or 0) + sum(1 for t in closed_any if +t["net_pnl"] <= 0),
     })
     if still_open:
         latest = still_open[-1]
@@ -882,8 +969,10 @@ def process_tick(state):
             silent_for = (datetime.fromisoformat(now) - datetime.fromisoformat(hb_prev)).total_seconds()
             if silent_for < HEARTBEAT_SEC:
                 hb_new = hb_prev
-            else:
-                send_telegram(
+            elif state.get("_hb_master"):
+                # Portfolio heartbeat: only the first pair pings (one message,
+                # not five) — the snapshot is still written for every pair.
+                _pt(
                     "\U0001F4A3 Scalper ALIVE — just quiet: every position waits on TP (no stop loss)\n"
                     f"{len(still_open)}/{MAX_POSITIONS} slots full | Balance ${balance:.2f} | "
                     f"Equity ${balance + unrealized:.2f} (floating {unrealized:+.2f})"
@@ -899,7 +988,7 @@ def process_tick(state):
     except (ValueError, TypeError):
         prev_wait = None
     if wait_reason and wait_reason != prev_wait:
-        send_telegram(
+        _pt(
             "\u23F3 *WAIT — no new entry*\n"
             f"{wait_reason}\n"
             f"Slots {len(still_open)}/{MAX_POSITIONS} | Balance ${balance:.2f} — WAIT IS the trade here."
@@ -910,9 +999,9 @@ def process_tick(state):
          "n": len(still_open), "hb": hb_new, "pk": round(peak_bal, 4), "sf": 1 if safe_on else 0,
          "rg": regime, "w": wait_reason},
         separators=(",", ":"))
-    sync(state_update=su, trade=closed_any[0] if closed_any else None)
+    sync(symbol, state_update=su, trade=closed_any[0] if closed_any else None)
     for t in closed_any[1:]:
-        sync(trade=t)
+        sync(symbol, trade=t)
     if closed_any:
         return "closed", f"closed {len(closed_any)} TP(s), {len(still_open)} open"
     if want is not None and not can_open:
@@ -927,43 +1016,45 @@ def main():
     start = time.time()
     ticks = 0
     trades = 0
-    log("NEAR Scalper tick run starting")
-
-    # Reset any stale error at run start
-    state = get_state()
-    log(f"Initial state: balance=${state.get('balance', 0):.4f} position_open={state.get('position_open')}")
+    log(f"Scalper tick run starting — {len(PAIRS)} pairs: {', '.join(PAIRS)}")
+    alerted = set()
 
     while time.time() - start < MAX_RUNTIME:
-        try:
-            state = get_state()
-            action, details = process_tick(state)
-            ticks += 1
-            log(f"tick#{ticks}: {action} — {details}")
-            if action in ("opened", "closed"):
-                trades += 1
-        except Exception as e:
-            log(f"ERROR: {e}")
-            if not locals().get("_alerted"):
-                _alerted = True  # one alert per run — a crash-looping engine must not look like quiet grinding
-                try:
-                    send_telegram(f"\u26a0\ufe0f Scalper ENGINE ERROR (tick paused this cycle): {str(e)[:150]}")
-                except Exception:
-                    pass
+        for pair in PAIRS:
+            if time.time() - start >= MAX_RUNTIME:
+                break
             try:
-                # CRITICAL: last_error now stores the open-positions JSON.
-                # A transient error (Bitget timeout, network blip) must NEVER
-                # wipe it — that would orphan real open positions.
-                cur = get_state()
-                if not parse_positions(cur):
-                    sync(state_update={"last_error": str(e)[:200]})
-                else:
-                    log("positions intact — error logged to Actions log only")
-            except Exception as e2:
-                log(f"ERROR updating state: {e2}")
+                state = get_state(pair)
+                state["_hb_master"] = (pair == PAIRS[0])  # one portfolio heartbeat, not five
+                action, details = process_tick(state)
+                ticks += 1
+                if action in ("opened", "closed"):
+                    trades += 1
+                log(f"[{pair}] tick: {action} — {details}")
+            except Exception as e:
+                log(f"[{pair}] ERROR: {e}")
+                if pair not in alerted:
+                    alerted.add(pair)  # one alert per pair per run — no crash-loop spam
+                    try:
+                        send_telegram(f"\u26a0\ufe0f Scalper ENGINE ERROR [{pair}] (cycle skipped): {str(e)[:150]}")
+                    except Exception:
+                        pass
+                try:
+                    # CRITICAL: last_error stores the open-positions JSON.
+                    # A transient error must NEVER wipe it — that would orphan
+                    # real open positions. Only write the error if the blob
+                    # is already empty.
+                    cur = get_state(pair)
+                    if not parse_positions(cur):
+                        sync(pair, state_update={"last_error": str(e)[:200]})
+                    else:
+                        log(f"[{pair}] positions intact — error logged to Actions log only")
+                except Exception as e2:
+                    log(f"[{pair}] ERROR updating state: {e2}")
 
         elapsed = time.time() - start
         if elapsed < MAX_RUNTIME:
-            time.sleep(max(1, POLL_INTERVAL - (time.time() - start - elapsed) % POLL_INTERVAL))
+            time.sleep(max(1, POLL_INTERVAL - elapsed % POLL_INTERVAL))
 
     log(f"Run complete: {ticks} ticks, {trades} trades, {time.time()-start:.0f}s")
 

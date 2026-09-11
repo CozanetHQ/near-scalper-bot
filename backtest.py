@@ -10,6 +10,7 @@ Usage:
   python3 sweep.py        # parameter grid search
 """
 import json
+import os
 import importlib.util
 from datetime import datetime, timezone
 
@@ -63,6 +64,7 @@ class Backtest:
         self.c1m = candles_1m
         self.c15m = aggregate(candles_1m, 15)
         self.c4h = aggregate(candles_1m, 240)
+        self.pair = os.environ.get("SIM_PAIR", "NEARUSDT")
         self.sim_state = {"status": "running", "balance": start_balance, "position_open": False,
                           "side": "none", "streak_count": 0, "streak_side": "none",
                           "entry_price": 0, "tp_price": 0, "sl_price": 0, "notional": 0, "margin": 0,
@@ -72,19 +74,31 @@ class Backtest:
         t = self.tick
         t.datetime = self.clock.datetime_cls()
         t.send_telegram = lambda text: None
-        t.http_get = lambda url, timeout=8: {"state": dict(self.sim_state), "trades": list(self.trades)}
-        def http_post(url, payload, headers=None, timeout=8):
-            su = payload.get("state") or {}
-            self.sim_state.update(su)
-            tr = payload.get("trade")
-            if tr:
-                self.trades.insert(0, tr)
-            return {"ok": True, "state": dict(self.sim_state)}
-        t.http_post = http_post
+        # Multi-pair era: tick.get_state/sync are (pair, ...) file-backed.
+        # The sim drives ONE pair in isolation — patch them directly.
+        sim = self
+        def get_state(pair=None):
+            s = dict(sim.sim_state)
+            s["_pair"] = sim.pair
+            s["peak_bal"] = sim.sim_state.get("peak_bal", sim.sim_state.get("balance"))
+            s["_other_open"] = 0
+            s["_other_margin"] = 0.0
+            s["_hb_master"] = False
+            return s
+        def sync(pair, state_update=None, trade=None):
+            su = state_update or {}
+            sim.sim_state.update(su)
+            if "balance" in su:
+                sim.sim_state["peak_bal"] = max(sim.sim_state.get("peak_bal", su["balance"]), su["balance"])
+            if trade:
+                sim.trades.insert(0, trade)
+            return {"ok": True}
+        t.get_state = get_state
+        t.sync = sync
         t.fetch_candles = self._fetch_candles
         t.fetch_ticker = self._fetch_ticker
 
-    def _fetch_candles(self, gran, limit=5):
+    def _fetch_candles(self, gran, limit=5, symbol=None):
         i = self.cur_i
         if gran == "1m":
             lo = max(0, i + 1 - limit)
@@ -103,7 +117,7 @@ class Backtest:
             return (prev[-1:] + forming)
         raise ValueError(gran)
 
-    def _fetch_ticker(self):
+    def _fetch_ticker(self, symbol=None):
         c = self.c1m[self.cur_i]
         return {"last": c["close"], "mark": c["close"]}
 

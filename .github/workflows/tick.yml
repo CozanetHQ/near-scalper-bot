@@ -13,6 +13,7 @@ concurrency:
 
 permissions:
   actions: write
+  contents: write   # the engine's state (state/state.json) is committed every run
 
 jobs:
   tick:
@@ -27,15 +28,26 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Run tick engine
+      - name: Run tick engine (multi-pair)
         env:
-          TICK_SECRET: ${{ secrets.TICK_SECRET }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           MAX_RUNTIME: '240'
         run: |
-          echo "Starting NEAR scalper tick engine..."
+          echo "Starting multi-pair scalper tick engine..."
           python tick.py
+
+      - name: Commit engine state
+        run: |
+          # The repo IS the state store: git history is the audit trail and
+          # raw.githubusercontent is the public dashboard feed.
+          git config user.email "fassdavid722@gmail.com"
+          git config user.name "CozyCrypto"
+          git add state/state.json data/trades.jsonl 2>/dev/null || true
+          if git diff --cached --quiet; then echo "no state change"; exit 0; fi
+          git commit -m "state: multi-pair tick $(date -u +%FT%TZ)"
+          git pull --rebase origin main || true
+          git push || echo "push failed — next tick will retry with rebase"
 
       - name: Chain next run
         if: always()

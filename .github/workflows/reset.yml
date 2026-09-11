@@ -10,6 +10,12 @@ on:
         description: "Why this reset is happening (v4 Sec 10.1 audit requirement)"
         required: true
 
+# Reset touches the same state files the tick engine writes — queue behind
+# any running tick, never race it.
+concurrency:
+  group: tick
+  cancel-in-progress: false
+
 permissions:
   contents: write
 
@@ -35,52 +41,33 @@ jobs:
               f.write(json.dumps(entry) + "\n")
           print("logged:", entry)
           PY
-      - name: Commit audit record
+      - name: Reset all pair states via the engine's own sync path
+        run: |
+          pip install requests >/dev/null 2>&1 || true
+          python3 - << 'PY'
+          import os, importlib.util
+          bal = float(os.environ.get("RESET_BAL", "3.0"))
+          spec = importlib.util.spec_from_file_location("t", "tick.py")
+          t = importlib.util.module_from_spec(spec); spec.loader.exec_module(t)
+          # Every pair goes back to its fresh defaults; the shared account
+          # restarts at the target balance. The trade ledger is immutable
+          # (audit trail) — epoch filtering is by reset timestamp.
+          for pair in t.PAIRS:
+              su = {**t.fresh_pair_state(pair), "balance": bal, "status": "running"}
+              t.sync(pair, state_update=su)
+          m = t.load_master()
+          print("reset complete — account:", m["account"])
+          for p, v in m["pairs"].items():
+              print(f"  {p}: positions={v.get('last_error', '[]')[:30]}")
+          PY
+        env:
+          RESET_BAL: ${{ github.event.inputs.balance }}
+      - name: Commit reset (audit + state)
         run: |
           git config user.email "fassdavid722@gmail.com"
           git config user.name "CozyCrypto"
-          git add data/reset_log.jsonl
-          git commit -m "audit: reset log — ${{ github.event.inputs.reason }}" || echo "nothing to commit"
+          git add data/reset_log.jsonl state/state.json data/trades.jsonl 2>/dev/null || true
+          git diff --cached --quiet && echo "nothing to commit" && exit 0
+          git commit -m "audit: reset log — ${{ github.event.inputs.reason }}"
+          git pull --rebase origin main || true
           git push || echo "push failed, non-fatal"
-      - name: Reset account state via the engine's own sync path
-        run: |
-          python3 - << 'PY'
-          import os, urllib.request, json
-          bal = float(os.environ.get("RESET_BAL", "3.0"))
-          state = {
-              "balance": bal, "position_open": False, "side": "none",
-              "entry_price": 0.0, "tp_price": 0.0, "sl_price": 0.0,
-              "notional": 0.0, "margin": 0.0,
-              "total_trades": 0, "wins": 0, "losses": 0,
-              "streak_count": 0, "streak_side": "none",
-              "open_positions": 0, "unrealized_pnl": 0.0, "equity": bal,
-              "last_error": "",
-              "last_reversal_at": "",
-              "last_price": 0.0,
-              "last_tick_at": "",
-          }
-          for i in range(8):
-              state[f"pos_{i}_active"] = False
-              state[f"pos_{i}_side"] = "none"
-              state[f"pos_{i}_entry_price"] = 0.0
-              state[f"pos_{i}_tp_price"] = 0.0
-              state[f"pos_{i}_notional"] = 0.0
-              state[f"pos_{i}_margin"] = 0.0
-              state[f"pos_{i}_opened_at"] = ""
-          # exactly the payload shape tick.py sends: {"state": ..., "trade": None}
-          data = json.dumps({"state": state, "trade": None}).encode()
-          req = urllib.request.Request(
-              "https://superagent-ae0aaf02.base44.app/functions/nearScalperSync",
-              data=data,
-              headers={
-                  "Content-Type": "application/json",
-                  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
-                  "Accept": "application/json, text/plain, */*",
-                  "X-Tick-Secret": os.environ["TICK_SECRET"],
-              },
-              method="POST")
-          print(urllib.request.urlopen(req, timeout=15).read().decode())
-          PY
-        env:
-          TICK_SECRET: ${{ secrets.TICK_SECRET }}
-          RESET_BAL: ${{ github.event.inputs.balance }}

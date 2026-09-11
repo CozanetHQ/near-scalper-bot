@@ -1,0 +1,4 @@
+state/state.json.tmp
+__pycache__/
+*.pyc
+data_1m*.json

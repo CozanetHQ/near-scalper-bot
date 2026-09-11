@@ -86,6 +86,16 @@
     "SPIKE_RANGE_MULT": {
       "value": 3.0,
       "rationale": "Locked a priori: live 1m candle range > 3x 1m ATR = spike/manipulation regime; entries blocked that tick."
+    },
+    "PAIRS": {
+      "value": "NEARUSDT,BTCUSDT,ETHUSDT,SOLUSDT,XRPUSDT",
+      "locked": "2026-09-10",
+      "rationale": "Multi-pair expansion (owner-approved): five deepest-liquidity Bitget USDT perps. Locked a priori at expansion \u2014 pairs are added/removed only by explicit owner decision + registry edit, never mid-epoch."
+    },
+    "MIN_TP_DIST_FRAC": {
+      "value": 0.00125,
+      "locked": "2026-09-10",
+      "rationale": "TP distance floor as fraction of price. Era 1 used absolute $0.003 (\u22480.125% of NEAR's $2.4). Multi-pair prices span $1.3-$77k, so the floor must be proportionate. Equivalent behavior on NEAR."
     }
   },
   "known_gaps_not_claimed": [

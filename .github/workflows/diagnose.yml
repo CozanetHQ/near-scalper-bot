@@ -7,20 +7,20 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
-      - name: Test endpoints
-        env:
-          TICK_SECRET: ${{ secrets.TICK_SECRET }}
+      - uses: actions/checkout@v4
+      - name: Health checks (multi-pair era)
         run: |
-          echo "--- 1. Bitget candles GET ---"
-          curl -s -o /dev/null -w "HTTP %{http_code}\n" "https://api.bitget.com/api/v2/mix/market/candles?symbol=NEARUSDT&productType=USDT-FUTURES&granularity=1m&limit=3"
-          echo "--- 2. Bitget ticker GET ---"
-          curl -s -o /dev/null -w "HTTP %{http_code}\n" "https://api.bitget.com/api/v2/mix/market/ticker?symbol=NEARUSDT&productType=USDT-FUTURES"
-          echo "--- 3. Base44 dashboard GET ---"
-          curl -s -o /dev/null -w "HTTP %{http_code}\n" "https://superagent-ae0aaf02.base44.app/functions/nearScalperDashboard"
-          echo "--- 4. Base44 sync POST (with secret) ---"
-          curl -s -w "\nHTTP %{http_code}\n" -X POST "https://superagent-ae0aaf02.base44.app/functions/nearScalperSync" \
-            -H "Content-Type: application/json" \
-            -H "X-Tick-Secret: $TICK_SECRET" \
-            -d '{"state": {}, "trade": null}'
-          echo "--- 5. Telegram API GET (getMe) ---"
+          for S in NEARUSDT BTCUSDT ETHUSDT SOLUSDT XRPUSDT; do
+            echo "--- Bitget candles $S ---"
+            curl -s -o /dev/null -w "HTTP %{http_code}\n" "https://api.bitget.com/api/v2/mix/market/candles?symbol=$S&productType=USDT-FUTURES&granularity=1m&limit=3"
+          done
+          echo "--- Bitget tickers (all pairs) ---"
+          curl -s -o /dev/null -w "HTTP %{http_code}\n" "https://api.bitget.com/api/v2/mix/market/tickers?productType=USDT-FUTURES"
+          echo "--- Engine state file ---"
+          if [ -f state/state.json ]; then
+            python3 -c "import json; m=json.load(open('state/state.json')); print('updated_at:', m.get('updated_at')); print('account:', m.get('account')); print('pairs:', list((m.get('pairs') or {}).keys()))"
+          else
+            echo "state/state.json MISSING (first tick has not run yet)"
+          fi
+          echo "--- Telegram API ---"
           curl -s -o /dev/null -w "HTTP %{http_code}\n" "https://api.telegram.org"
