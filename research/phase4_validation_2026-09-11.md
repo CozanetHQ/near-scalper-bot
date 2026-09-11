@@ -213,3 +213,41 @@ rule is dead.
 - SOL 48h → 6h (+4.23 full / +0.83 OOS)
 - XRP: unchanged 48h
 - NEAR: unchanged 48h
+
+
+---
+
+# SESSION RESET — 2026-09-11T18:05:34.336583+00:00 (owner-authorized)
+
+Owner directive: the $3 session never proved the engine out; reset to $10 as a
+fresh, honestly tracked trial. If this session doesn't grow the account, that's
+the signal to stop iterating on this engine shape and start refinement from
+first principles.
+
+**What changed:**
+- Balance/peak balance hard-set: 2.9076 -> 10.0000
+- All 5 pairs flattened to `fresh_pair_state()` (the engine's own clean-slate
+  shape) — no open positions, no per-pair history carried forward.
+- Per-pair wins/losses/total_trades reset to 0. These feed the EV gate's
+  Bayesian blend (`p_win = (20 * 0.85 + wins_obs) / (20 + wins_obs + losses_obs)`)
+  — so every pair starts this session purely on the 0.85 fixed prior and
+  re-learns its own win rate from this session's trades only. This is a real
+  behavior reset, not cosmetic — flagged explicitly so it's not mistaken for
+  just a balance change.
+- `account.session_start_at` / `session_start_balance` added — the dashboard's
+  SESSION view filters to trades closed after this timestamp. The lifetime
+  ledger (trades.jsonl) is untouched; nothing is deleted, only the live state
+  is reset and the dashboard defaults to showing the new trial.
+
+**Closed at reset (audit record, not injected into the automated trades.jsonl
+ledger):** NEARUSDT held all 8 global slots at reset time (the known
+no-per-pair-slot-cap gap flagged in the 2026-09-11 dashboard review), last
+mark $2.5822. Sub-positions at reset:
+- LONG entry 2.6497 -> tp 2.6791, mfe 0.21% mae 3.51%, opened 2026-09-11T16:08:10.926211+00:00
+- LONG entry 2.6486 -> tp 2.6756, mfe 0.06% mae 3.47%, opened 2026-09-11T16:09:54.695228+00:00
+- SHORT entry 2.5701 -> tp 2.5501, mfe 0.18% mae 1.85%, opened 2026-09-11T16:33:05.440994+00:00
+- SHORT entry 2.5682 -> tp 2.5525, mfe 0.05% mae 1.92%, opened 2026-09-11T16:40:14.729839+00:00
+- SHORT entry 2.5718 -> tp 2.5560, mfe 0.19% mae 1.78%, opened 2026-09-11T16:41:44.746957+00:00
+- LONG entry 2.6096 -> tp 2.6253, mfe 0.13% mae 1.64%, opened 2026-09-11T17:28:00.356896+00:00
+- LONG entry 2.6057 -> tp 2.6213, mfe 0.28% mae 1.49%, opened 2026-09-11T17:31:13.974004+00:00
+- LONG entry 2.6075 -> tp 2.6231, mfe 0.19% mae 1.56%, opened 2026-09-11T17:37:09.997909+00:00
