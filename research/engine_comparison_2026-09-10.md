@@ -51,3 +51,51 @@ it compound beyond real margin constraints.*
 Reproduce: `data_1m_30d.json` (not committed — 43,200 candles; re-fetch via
 Bitget API), harness = per-era git worktree of `tick.py`/`backtest.py` at
 d7f89e3 (wedge), e173fd1 (v4), main (v5).
+
+---
+
+## ERRATUM — 2026-09-11: wins/losses miscount in the v5 state path
+
+**Bug found during the multi-pair refactor.** The v5 state sync incremented
+`wins` on *every* close (a stale "TP-only: every close is a win" comment from
+the pre-v4 hedge era), while losses stayed flat. The EV gate blends state
+wins/losses into p̂ — so after a HARD_SL kill the gate saw a fake win and
+**loosened itself**, allowing the marginal grind the honest gate refuses.
+
+**Corrected 30-day v5 numbers (same data, fixed accounting):**
+
+| Metric | Reported (buggy) | Corrected |
+|---|---|---|
+| Trades | 4 (3 TP, 1 HARD_SL) | 2 (1 TP, 1 HARD_SL) |
+| Net | +$0.0458 | **−$0.0414** |
+| PF | 1.73 | 0.34 |
+
+Sequence: the first HARD_SL (−$0.063) drops p̂ to ~0.66; the honest gate then
+WAITs through windows the inflated gate (p̂ ≈ 1.0) traded. The two extra TPs the
+buggy version caught were selected by a gate lying to itself about its own
+edge. The comparison's *qualitative* conclusion stands (v5 is the only design
+whose losses are bounded and whose gate is honest) — but the quantitative
+edge of the single-pair v5 on this window is **negative after the fix**.
+
+This is exactly the failure mode the v4 discipline warns about: a gate that
+tunes on results, implemented by accident at the accounting layer. All other
+engine generations in this comparison remain unaffected (they pre-date the
+multi-position close path that carried the bug).
+
+## ARCHITECTURE — 2026-09-11: multi-pair expansion (owner-approved)
+
+- **5 pairs**: NEAR, BTC, ETH, SOL, XRP (Bitget USDT perps; PAIRS locked in
+  param_registry.json a priori).
+- **Shared account** ($3 paper), **global budgets**: 8 slots and the 80%
+  margin cap are enforced across all pairs combined (per-pair context
+  injected via `_other_open` / `_other_margin`).
+- **Per-pair intelligence**: each pair keeps its own regime classifier, EV
+  gate p̂ (per-pair W/L blended with the 0.85 prior), positions, heartbeat.
+- **State lives in the repo**: `state/state.json` committed by the tick
+  workflow every run — git history is the audit trail, raw.githubusercontent
+  is the public dashboard feed, no secrets and no external middleware.
+  The legacy Base44 backend (superagent-ae0aaf02, single-pair, schema
+  whitelist) is retired with this change.
+- **MIN_TP_DIST → MIN_TP_DIST_FRAC (0.00125)**: the old absolute $0.003 TP
+  floor was tuned for NEAR's $2.4 price; multi-pair spans $1.3–$77k, so the
+  floor is now price-proportionate (registry-locked; NEAR-equivalent).
