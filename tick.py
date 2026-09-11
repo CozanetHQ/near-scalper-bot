@@ -17,6 +17,11 @@ Flow (every 15s for ~4.4 min):
 import os
 import sys
 import json
+
+# Phase 3 module pipeline (owner production path 2026-09-11): pure computation
+# lives in the engine package; tick.py orchestrates fetch/sync/execution.
+from engine.features import candle_color, compute_atr, compute_ema
+from engine.positions import serialize_positions, parse_positions, classify_trade_state
 import time
 import urllib.request
 import urllib.error
@@ -251,43 +256,8 @@ def fetch_ticker(symbol=SYMBOL):
     return {"last": float(d["lastPr"]), "mark": float(d["markPrice"])}
 
 
-def candle_color(c):
-    return "bull" if c["close"] >= c["open"] else "bear"
 
 
-def compute_rsi(closes, period=RSI_PERIOD):
-    """Cutler's RSI on a list of closes (oldest -> newest). Returns None if not enough data."""
-    if len(closes) < period + 1:
-        return None
-    deltas = [closes[i + 1] - closes[i] for i in range(len(closes) - 1)]
-    window = deltas[-period:]
-    gains = sum(d for d in window if d > 0) / period
-    losses = sum(-d for d in window if d < 0) / period
-    if losses == 0:
-        return 100.0
-    return 100.0 - (100.0 / (1.0 + gains / losses))
-
-
-def compute_ema(closes, period):
-    """Standard EMA over a list of closes (oldest -> newest)."""
-    if len(closes) < period:
-        return None
-    k = 2.0 / (period + 1)
-    e = sum(closes[:period]) / period
-    for c in closes[period:]:
-        e = c * k + e * (1 - k)
-    return e
-
-
-def compute_atr(candles, period=ATR_PERIOD):
-    """Simple ATR on CLOSED candles (oldest -> newest). Needs period+1 candles."""
-    if len(candles) < period + 1:
-        return None
-    trs = []
-    for i in range(1, len(candles)):
-        c, p = candles[i], candles[i - 1]
-        trs.append(max(c["high"] - c["low"], abs(c["high"] - p["close"]), abs(c["low"] - p["close"])))
-    return sum(trs[-period:]) / period
 
 
 def finalize_close(state, exit_price, reason, now, su):
@@ -416,7 +386,7 @@ def get_state(pair):
     for op, ops in (master.get("pairs") or {}).items():
         if op == pair:
             continue
-        for p in parse_positions(ops):
+        for p in parse_positions(ops, ops.get("pair") or SYMBOL):
             other_open += 1
             other_margin += float(p.get("margin") or 0)
     state["_other_open"] = other_open
@@ -519,14 +489,7 @@ def close_position(pos, exit_price, reason, now, balance):
     tp_price = pos.get("tp_price") or 0
     tp_frac = abs(tp_price - entry) / entry if (tp_price and entry) else 0.0
     mfe = pos.get("mfe_frac") or 0.0
-    if reason == "TP":
-        t_state = "target_success"
-    elif tp_frac > 0 and mfe >= 0.5 * tp_frac:
-        t_state = "target_failure"
-    elif tp_frac > 0 and mfe < 0.25 * tp_frac:
-        t_state = "trade_failure"
-    else:
-        t_state = "mixed"
+    t_state = classify_trade_state(reason, mfe, tp_frac)
     trade = {
         "pair": pos.get("pair") or state.get("_pair") or SYMBOL,
         "side": pos["side"],
@@ -552,62 +515,8 @@ def close_position(pos, exit_price, reason, now, balance):
     return trade, new_balance
 
 
-def serialize_positions(positions):
-    """Store the positions list as compact JSON inside the legacy `last_error`
-    string field — the ONLY writable field proven to round-trip the sync
-    endpoint's schema whitelist at full length (689+ chars, exact match).
-    SAD BUT NECESSARY: the sync endpoint silently drops any state field not
-    in its original 2025 schema, so pos_*/equity/open_positions fields all
-    vanished. If you change this format, probe the round-trip first."""
-    compact = [
-        {"s": p["side"], "e": p["entry_price"], "t": p["tp_price"],
-         "n": p["notional"], "m": p["margin"], "o": p["opened_at"],
-         "a": bool(p.get("aligned")), "pr": p.get("pair") or SYMBOL,
-         "mf": round(p.get("mfe_frac") or 0.0, 6),
-         "me": round(p.get("mae_frac") or 0.0, 6)}
-        for p in positions[:MAX_POSITIONS]
-    ]
-    return {"last_error": json.dumps(compact, separators=(",", ":"))}
 
 
-def parse_positions(state):
-    """Rebuild the positions list from the JSON in `last_error`."""
-    raw = state.get("last_error") or ""
-    if not isinstance(raw, str) or not raw.startswith("["):
-        return []
-    try:
-        data = json.loads(raw)
-    except (ValueError, TypeError):
-        return []
-    out = []
-    for p in data[:MAX_POSITIONS]:
-        try:
-            if p.get("s") in ("long", "short"):
-                out.append({
-                    "pair": p.get("pr") or SYMBOL,
-                    "side": p["s"],
-                    "entry_price": float(p["e"]),
-                    "tp_price": float(p["t"]),
-                    "notional": float(p["n"]),
-                    "margin": float(p["m"]),
-                    "opened_at": p["o"],
-                    "aligned": bool(p.get("a", False)),
-                    "mfe_frac": float(p.get("mf") or 0.0),
-                    "mae_frac": float(p.get("me") or 0.0),
-                })
-        except (KeyError, TypeError, ValueError):
-            continue
-    return out
-
-
-# ── v4 Section 1.1 — PARAMETER LINEAGE LOCK ──
-# Every locked risk/execution parameter must match param_registry.json,
-# which is timestamped BEFORE results are observed under it. A mismatch
-# (someone changed a constant in code without re-locking the registry)
-# hard-blocks new entries — existing open positions still ride to their
-# HARD_SL / MAX_AGE / TP kills normally. This does not evaluate the
-# GRID-SEARCHED legacy values (SL_ATR_MULT etc.) — see the registry's
-# known_gaps_not_claimed / inherited-value notes for that caveat.
 def registry_check():
     try:
         with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "param_registry.json")) as f:
@@ -681,7 +590,7 @@ def process_tick(state):
     # ── HEDGE SCALPER POSITION MANAGEMENT: TP only, no SL, no time-stop.
     # Every open position runs until its own TP hits. Wedged positions simply
     # sit and consume margin budget; the bot keeps chopping with the rest.
-    positions = parse_positions(state)
+    positions = parse_positions(state, SYMBOL)
     bal_raw = state.get("balance")
     balance = bal_raw if isinstance(bal_raw, (int, float)) and bal_raw > 0 else START_BALANCE
     # ── OWNER 09-08 SELF-DIAGNOSTIC ENGINE: hard drawdown boundary.
@@ -862,7 +771,7 @@ def process_tick(state):
             + "\nA locked constant changed without re-locking param_registry.json. Existing positions still ride their HARD_SL/MAX_AGE/TP kills normally."
         )
     if state.get("status") == "running" and reg_ok:
-        atr = compute_atr(c1m[:-1])
+        atr = compute_atr(c1m[:-1], ATR_PERIOD)
         hour = datetime.now(timezone.utc).hour
         atr_gate = NIGHT_ATR_MIN if (hour < 7 or hour >= 21) else ATR_MIN
         closes = [c["close"] for c in c1m[:-1]]
@@ -1054,7 +963,7 @@ def process_tick(state):
         su.update({"side": "none", "entry_price": 0, "tp_price": 0, "notional": 0,
                    "margin": 0, "opened_at": None, "position_open": False})
     # positions JSON LAST — it lives in last_error and must not be clobbered
-    su.update(serialize_positions(still_open))
+    su.update(serialize_positions(still_open, MAX_POSITIONS, SYMBOL))
     # ── HEARTBEAT: silence (all slots full, nothing closing) must not look
     # like the bot died. Ping Telegram once an hour with no open/close events.
     hb_prev = None
