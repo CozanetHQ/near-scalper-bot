@@ -90,8 +90,9 @@ HARD_SL_FRAC = float(os.environ.get("HARD_SL_FRAC", "0.06"))   # RE-LOCKED 2026-
 # BEFORE the first run under them (v4 Sec 1.1 discipline).
 EV_PRIOR_WINRATE = float(os.environ.get("EV_PRIOR_WINRATE", "0.85"))   # pseudo-observed win rate blended into p_win. Conservative vs 93.8% backtest; above the ~0.81 EV breakeven.
 EV_PRIOR_WEIGHT = float(os.environ.get("EV_PRIOR_WEIGHT", "20"))      # pseudo-trade weight of the prior vs observed W/L since reset.
-EV_MARGIN_REQ = float(os.environ.get("EV_MARGIN_REQ", "0.0005"))       # per-unit-of-notional: EV must clear this AFTER fees+slip+expected kill loss, else WAIT.
-SLIP_ASSUMED_PCT = float(os.environ.get("SLIP_ASSUMED_PCT", "0.0005")) # EV-model slippage per side (live paper SLIP_PCT stays 0; the EV math must still pay for friction).
+EV_MARGIN_REQ = float(os.environ.get("EV_MARGIN_REQ", "0.0005"))
+EV_ASSUMED_LOSS_FRAC = float(os.environ.get("EV_ASSUMED_LOSS_FRAC", "0.02"))   # OWNER RELEASE 2026-09-11: the EV gate plans against a 2% adverse move, not the full 6% HARD_SL. HARD_SL_FRAC (0.06) is unchanged as the ACTUAL backstop exit; this is only the gate's planning assumption, re-locked as an explicit owner override after 20h of zero-trade deadlock.
+SLIP_ASSUMED_PCT = float(os.environ.get("SLIP_ASSUMED_PCT", "0.0001")) # EV-model slippage per side (live paper SLIP_PCT stays 0; the EV math must still pay for friction).
 TREND_RUNAWAY_CANDLES = int(os.environ.get("TREND_RUNAWAY_CANDLES", "6"))  # last N closed 15m candles ALL one color => runaway regime: counter-trend entries blocked (wedge lesson).
 SPIKE_RANGE_MULT = float(os.environ.get("SPIKE_RANGE_MULT", "3.0"))    # live 1m candle range > N x 1m ATR => spike regime: block entries this tick.
 MAX_POS_AGE_HOURS = float(os.environ.get("MAX_POS_AGE_HOURS", "48"))  # locked 2026-09-10: hard-close at market if a position has been open >= 48h regardless of TP-aging tier. TP_AGING relaxes the TARGET; it never forces an exit — this does.
@@ -145,7 +146,7 @@ def nearest_swing_tp(closed15m, side, price):
         return min(above) if above else None
     below = [l for l in levels["lo"] if l < price]
     return max(below) if below else None
-MIN_TP_DIST_FRAC = float(os.environ.get("MIN_TP_DIST_FRAC", "0.00125"))  # TP floor as a FRACTION of price (~0.13%): below this, fees eat the scalp alive. Was an absolute $0.003 in the single-pair NEAR era ($2.4 price); multi-pair demands price-proportionate ($0.003/$2.42 ≈ 0.125%). Registry-locked.
+MIN_TP_DIST_FRAC = float(os.environ.get("MIN_TP_DIST_FRAC", "0.006"))  # TP floor as a FRACTION of price (~0.13%): below this, fees eat the scalp alive. Was an absolute $0.003 in the single-pair NEAR era ($2.4 price); multi-pair demands price-proportionate ($0.003/$2.42 ≈ 0.125%). Registry-locked.
 EMA_FAST = 9         # scalper momentum: EMA9 vs EMA21 on 1m closes
 EMA_SLOW = 21
 ATR_MIN = 0.0008      # GRID SEARCH WINNER: low gate — more shots on goal
@@ -589,6 +590,7 @@ def registry_check():
             "TREND_RUNAWAY_CANDLES": TREND_RUNAWAY_CANDLES,
             "SPIKE_RANGE_MULT": SPIKE_RANGE_MULT,
             "MIN_TP_DIST_FRAC": MIN_TP_DIST_FRAC,
+            "EV_ASSUMED_LOSS_FRAC": EV_ASSUMED_LOSS_FRAC,
             "MAX_POSITIONS": MAX_POSITIONS,
             "PAIRS": ",".join(PAIRS),
         }
@@ -894,7 +896,7 @@ def process_tick(state):
             p_win = (EV_PRIOR_WEIGHT * EV_PRIOR_WINRATE + wins_obs) / (EV_PRIOR_WEIGHT + wins_obs + losses_obs)
             tp_frac = entry_tp_dist / price
             ev_frac = (p_win * (tp_frac - 2 * FEE_RATE)
-                       - (1 - p_win) * HARD_SL_FRAC
+                       - (1 - p_win) * EV_ASSUMED_LOSS_FRAC
                        - 2 * SLIP_ASSUMED_PCT)
             if ev_frac < EV_MARGIN_REQ:
                 wait_reason = (f"EV gate: p={p_win:.2f} ev={ev_frac*100:+.2f}%/unit "
