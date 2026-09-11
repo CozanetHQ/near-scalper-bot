@@ -648,7 +648,7 @@ def process_tick(state):
                 "No new entries until the next UTC day. Open positions ride to TP as normal.".format(balance, 100 * DAILY_LOSS_LIMIT, day_start))
         except Exception:
             pass
-    scan = fetch_candles("1m", 15)  # gap-aware TP scan (shared)
+    scan = fetch_candles("1m", 15, symbol)  # gap-aware TP scan — 2026-09-11 LIVE BUG FIX (owner-authorized): the missing symbol arg defaulted to NEARUSDT, so every pair's MFE/MAE telemetry ran on NEAR candles — 20/120 live trades were bogus MAE_KILLs.
     closed_any = []
     still_open = []
     for pos in positions:
