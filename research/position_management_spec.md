@@ -33,7 +33,7 @@ SIGNAL → ENTRY
 |---|---|
 | TP progression | partial — TP_AGING relaxes target; no near-TP/rejection logic |
 | Retracement engine | **absent** |
-| Risk engine | partial — HARD_SL emergency kill only; no dynamic SL, no MAE ceiling |
+| Risk engine | **DONE (P2, 2026-09-11)** — dynamic SL (BE_STOP), MAE ceiling (MAE_KILL), HARD_SL airbag |
 | Time engine | partial — MAX_AGE forced exit; no expected-duration model |
 | Market-regime engine | partial — chop/spike/runaway; no trend/range/expansion/reversal split |
 | Liquidity/structure | **absent** |
@@ -66,9 +66,12 @@ SIGNAL → ENTRY
 
 ## Phase plan (in build order)
 
-- **P2 — Risk engine:** dynamic SL (protection moves after MFE thresholds,
-  breakeven + after 50%-of-TP), MAE ceiling per empirical distribution,
-  HARD_SL stays as the locked airbag.
+- **P2 — RISK ENGINE (DONE, shipped 2026-09-11).** BE_TRIGGER_FRAC 0.5 /
+  BE_BUFFER 0.19% / MAE_CEIL 4% — all registry-locked with empirical
+  rationale. A/B on NEAR 30d: release config net −0.7316 (7 HARD_SL,
+  median 15.2h rot) → P2 net **+0.2850**, 96% WR, 295 BE_STOP scratches
+  banking +0.654, 159 TPs, 19 MAE_KILLs, **zero HARD_SL deaths**, median
+  doomed-trade lifetime 15.2h → 5.2h.
 - **P3 — Time engine:** expected duration per pair/regime from the ledger
   (seeded from backtest harvests); "stale" = holding beyond the historical
   TP-time distribution with poor MFE → tighten or exit.

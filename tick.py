@@ -91,7 +91,12 @@ HARD_SL_FRAC = float(os.environ.get("HARD_SL_FRAC", "0.06"))   # RE-LOCKED 2026-
 EV_PRIOR_WINRATE = float(os.environ.get("EV_PRIOR_WINRATE", "0.85"))   # pseudo-observed win rate blended into p_win. Conservative vs 93.8% backtest; above the ~0.81 EV breakeven.
 EV_PRIOR_WEIGHT = float(os.environ.get("EV_PRIOR_WEIGHT", "20"))      # pseudo-trade weight of the prior vs observed W/L since reset.
 EV_MARGIN_REQ = float(os.environ.get("EV_MARGIN_REQ", "0.0005"))
-EV_ASSUMED_LOSS_FRAC = float(os.environ.get("EV_ASSUMED_LOSS_FRAC", "0.02"))   # OWNER RELEASE 2026-09-11: the EV gate plans against a 2% adverse move, not the full 6% HARD_SL. HARD_SL_FRAC (0.06) is unchanged as the ACTUAL backstop exit; this is only the gate's planning assumption, re-locked as an explicit owner override after 20h of zero-trade deadlock.
+EV_ASSUMED_LOSS_FRAC = float(os.environ.get("EV_ASSUMED_LOSS_FRAC", "0.02"))
+# ── P2 RISK ENGINE (owner spec 2026-09-11, params locked a priori from the
+# mfe_mae_seed_NEAR_30d.json empirical harvest — see research/position_management_spec.md)
+DYN_SL = os.environ.get("DYN_SL", "1")   # breakeven protection once MFE reaches BE_TRIGGER of TP distance
+BE_TRIGGER_FRAC = float(os.environ.get("BE_TRIGGER_FRAC", "0.5"))   # 141/146 trades reach 50% of TP dist; of those 91% hit TP — the cohort worth making risk-free
+MAE_CEIL_FRAC = float(os.environ.get("MAE_CEIL_FRAC", "0.04"))      # 4%: winners MAE p90 = 2.89%, ~5/128 winners ever bled past 4%, all 7 HARD_SL deaths ride through it — caps tail kills by a third   # OWNER RELEASE 2026-09-11: the EV gate plans against a 2% adverse move, not the full 6% HARD_SL. HARD_SL_FRAC (0.06) is unchanged as the ACTUAL backstop exit; this is only the gate's planning assumption, re-locked as an explicit owner override after 20h of zero-trade deadlock.
 SLIP_ASSUMED_PCT = float(os.environ.get("SLIP_ASSUMED_PCT", "0.0001")) # EV-model slippage per side (live paper SLIP_PCT stays 0; the EV math must still pay for friction).
 TREND_RUNAWAY_CANDLES = int(os.environ.get("TREND_RUNAWAY_CANDLES", "6"))  # last N closed 15m candles ALL one color => runaway regime: counter-trend entries blocked (wedge lesson).
 SPIKE_RANGE_MULT = float(os.environ.get("SPIKE_RANGE_MULT", "3.0"))    # live 1m candle range > N x 1m ATR => spike regime: block entries this tick.
@@ -174,6 +179,7 @@ RSI_EARLY_VELOCITY = 3  # early entry: RSI still below/above gate but swinging t
 LEVERAGE = 10
 START_BALANCE = 3.0
 FEE_RATE = 0.0006
+BE_BUFFER_FRAC = 2 * FEE_RATE + 2 * SLIP_ASSUMED_PCT + 0.0005   # P2: BE_STOP exit covers round-trip costs + crumb
 POLL_INTERVAL = 15
 MAX_RUNTIME = int(os.environ.get('MAX_RUNTIME', 240))  # ~4 min loop; next run chains immediately
 
@@ -618,6 +624,9 @@ def registry_check():
             "SPIKE_RANGE_MULT": SPIKE_RANGE_MULT,
             "MIN_TP_DIST_FRAC": MIN_TP_DIST_FRAC,
             "EV_ASSUMED_LOSS_FRAC": EV_ASSUMED_LOSS_FRAC,
+            "BE_TRIGGER_FRAC": BE_TRIGGER_FRAC,
+            "MAE_CEIL_FRAC": MAE_CEIL_FRAC,
+            "BE_BUFFER_FRAC": BE_BUFFER_FRAC,
             "MAX_POSITIONS": MAX_POSITIONS,
             "PAIRS": ",".join(PAIRS),
         }
@@ -772,6 +781,48 @@ def process_tick(state):
                 f"PnL ${trade['net_pnl']:.4f} | Balance ${balance:.4f}"
             )
             continue
+        # ── P2 RISK ENGINE — MAE ceiling: beyond the empirical recovery band,
+        # the ride stops paying. Caps tail loss at MAE_CEIL_FRAC instead of
+        # letting doomed trades rot to the 6% HARD_SL (median 15.2h in the seed).
+        if MAE_CEIL_FRAC > 0 and (pos.get("mae_frac") or 0.0) >= MAE_CEIL_FRAC:
+            trade, balance = close_position(pos, price, "MAE_KILL", now, balance)
+            closed_any.append(trade)
+            _pt(
+                "\U0001F6A8 *MAE_KILL — {pos['side'].upper()} exit at ceiling*\n"
+                f"Adverse {(pos.get('mae_frac') or 0.0)*100:.1f}% >= locked {MAE_CEIL_FRAC*100:.0f}% — recovery odds gone\n"
+                f"PnL ${trade['net_pnl']:.4f} | Balance ${balance:.4f}"
+            )
+            continue
+        # ── P2 RISK ENGINE — dynamic SL: once MFE reached BE_TRIGGER of the TP
+        # distance (the 91%-TP cohort in the seed), the trade becomes risk-free:
+        # exit at breakeven+costs if price retraces through it. NEVER averages
+        # down (owner principle 1) — this only manages the existing position.
+        if DYN_SL == "1" and tp > 0:
+            _tp_frac = abs(tp - pos["entry_price"]) / pos["entry_price"]
+            _mfe = pos.get("mfe_frac") or 0.0
+            if _tp_frac > 0 and _mfe >= BE_TRIGGER_FRAC * _tp_frac:
+                if is_long:
+                    _be = pos["entry_price"] * (1 + BE_BUFFER_FRAC)
+                    if price <= _be:
+                        trade, balance = close_position(pos, _be, "BE_STOP", now, balance)
+                        closed_any.append(trade)
+                        _pt(
+                            "\U0001F6E1\uFE0F *BE_STOP — {pos['side'].upper()} protected at breakeven*\n"
+                            f"MFE {_mfe*100:.2f}% armed protection; retracement capped at entry+costs\n"
+                            f"PnL ${trade['net_pnl']:.4f} | Balance ${balance:.4f}"
+                        )
+                        continue
+                else:
+                    _be = pos["entry_price"] * (1 - BE_BUFFER_FRAC)
+                    if price >= _be:
+                        trade, balance = close_position(pos, _be, "BE_STOP", now, balance)
+                        closed_any.append(trade)
+                        _pt(
+                            "\U0001F6E1\uFE0F *BE_STOP — {pos['side'].upper()} protected at breakeven*\n"
+                            f"MFE {_mfe*100:.2f}% armed protection; retracement capped at entry+costs\n"
+                            f"PnL ${trade['net_pnl']:.4f} | Balance ${balance:.4f}"
+                        )
+                        continue
         # MAX_POS_AGE — locked hard age kill. TP_AGING only relaxes the target;
         # this is the actual forced exit the old design never had.
         pos_age_h = None

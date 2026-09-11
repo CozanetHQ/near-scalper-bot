@@ -105,6 +105,26 @@
       "value": 0.02,
       "locked": "2026-09-11",
       "rationale": "OWNER RELEASE: the EV gate plans against a 2% adverse move instead of the full 6% HARD_SL. HARD_SL_FRAC 0.06 remains the actual exit backstop unchanged; this is the gate's planning assumption only."
+    },
+    "DYN_SL": {
+      "value": "1",
+      "locked": "2026-09-11",
+      "rationale": "P2 risk engine: breakeven protection enabled (owner position-management spec)."
+    },
+    "BE_TRIGGER_FRAC": {
+      "value": 0.5,
+      "locked": "2026-09-11",
+      "rationale": "Empirical (mfe_mae_seed_NEAR_30d.json): 141/146 trades reach 50% of TP distance and 91% of those hit TP \u2014 arm risk-free status exactly there."
+    },
+    "MAE_CEIL_FRAC": {
+      "value": 0.04,
+      "locked": "2026-09-11",
+      "rationale": "Empirical: winners' MAE p90 = 2.89%; only ~5/128 winners bled past 4% while all 7 HARD_SL deaths ride through 4% toward 6% \u2014 ceiling costs ~5 small wins but cuts every tail kill by a third."
+    },
+    "BE_BUFFER_FRAC": {
+      "value": 0.0019,
+      "locked": "2026-09-11",
+      "rationale": "Round-trip fees (0.12%) + assumed slip (0.02%) + crumb: BE_STOP exits cover costs, never lock a guaranteed loss."
     }
   },
   "known_gaps_not_claimed": [
