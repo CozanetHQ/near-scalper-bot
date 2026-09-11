@@ -1,0 +1,138 @@
+{
+  "BTCUSDT": {
+    "full_30d": {
+      "trades": 173,
+      "win_rate": 90.2,
+      "net": -0.5442,
+      "final_balance": 2.1088,
+      "profit_factor": 0.54,
+      "avg_win": 0.004,
+      "avg_loss": -0.0691,
+      "max_drawdown": 0.7142
+    },
+    "first_15d": {
+      "trades": 173,
+      "win_rate": 90.2,
+      "net": -0.5442,
+      "final_balance": 2.1088,
+      "profit_factor": 0.54,
+      "avg_win": 0.004,
+      "avg_loss": -0.0691,
+      "max_drawdown": 0.7142
+    },
+    "last_15d": {
+      "trades": 690,
+      "win_rate": 97.7,
+      "net": 2.6145,
+      "final_balance": 5.2675,
+      "profit_factor": 2.38,
+      "avg_win": 0.0067,
+      "avg_loss": -0.1186,
+      "max_drawdown": 2.7577
+    },
+    "first_trade_close": "2026-08-19T15:26:00+00:00",
+    "last_trade_close": "2026-08-12T13:32:00+00:00"
+  },
+  "ETHUSDT": {
+    "full_30d": {
+      "trades": 503,
+      "win_rate": 94.2,
+      "net": 0.3201,
+      "final_balance": 2.9731,
+      "profit_factor": 1.09,
+      "avg_win": 0.008,
+      "avg_loss": -0.1192,
+      "max_drawdown": 1.8033
+    },
+    "first_15d": {
+      "trades": 503,
+      "win_rate": 94.2,
+      "net": 0.3201,
+      "final_balance": 2.9731,
+      "profit_factor": 1.09,
+      "avg_win": 0.008,
+      "avg_loss": -0.1192,
+      "max_drawdown": 1.8033
+    },
+    "last_15d": {
+      "trades": 178,
+      "win_rate": 95.5,
+      "net": -0.2271,
+      "final_balance": 2.4259,
+      "profit_factor": 0.81,
+      "avg_win": 0.0056,
+      "avg_loss": -0.1483,
+      "max_drawdown": 1.0456
+    },
+    "first_trade_close": "2026-08-21T21:52:00+00:00",
+    "last_trade_close": "2026-08-12T13:32:00+00:00"
+  },
+  "SOLUSDT": {
+    "full_30d": {
+      "trades": 327,
+      "win_rate": 95.7,
+      "net": 0.2277,
+      "final_balance": 2.8807,
+      "profit_factor": 1.14,
+      "avg_win": 0.0058,
+      "avg_loss": -0.1129,
+      "max_drawdown": 1.3362
+    },
+    "first_15d": {
+      "trades": 327,
+      "win_rate": 95.7,
+      "net": 0.2277,
+      "final_balance": 2.8807,
+      "profit_factor": 1.14,
+      "avg_win": 0.0058,
+      "avg_loss": -0.1129,
+      "max_drawdown": 1.3362
+    },
+    "last_15d": {
+      "trades": 856,
+      "win_rate": 96.4,
+      "net": 0.8308,
+      "final_balance": 3.4838,
+      "profit_factor": 1.17,
+      "avg_win": 0.007,
+      "avg_loss": -0.1606,
+      "max_drawdown": 2.517
+    },
+    "first_trade_close": "2026-08-19T15:06:00+00:00",
+    "last_trade_close": "2026-08-12T13:32:00+00:00"
+  },
+  "XRPUSDT": {
+    "full_30d": {
+      "trades": 110,
+      "win_rate": 87.3,
+      "net": -0.8398,
+      "final_balance": 1.8132,
+      "profit_factor": 0.41,
+      "avg_win": 0.0062,
+      "avg_loss": -0.1022,
+      "max_drawdown": 1.0154
+    },
+    "first_15d": {
+      "trades": 110,
+      "win_rate": 87.3,
+      "net": -0.8398,
+      "final_balance": 1.8132,
+      "profit_factor": 0.41,
+      "avg_win": 0.0062,
+      "avg_loss": -0.1022,
+      "max_drawdown": 1.0154
+    },
+    "last_15d": {
+      "trades": 1057,
+      "win_rate": 98.0,
+      "net": 6.6276,
+      "final_balance": 9.2806,
+      "profit_factor": 2.03,
+      "avg_win": 0.0126,
+      "avg_loss": -0.3071,
+      "max_drawdown": 7.9486
+    },
+    "first_trade_close": "2026-08-19T20:51:00+00:00",
+    "last_trade_close": "2026-08-12T12:47:00+00:00"
+  }
+}

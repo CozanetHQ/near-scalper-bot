@@ -90,7 +90,7 @@
 <body>
 
 <header>
-  <h1>NEAR SCALPER <span class="sub">V5 · MULTI-PAIR ENGINE · PAPER</span></h1>
+  <h1>SCALPER v5 <span class="sub">INSTITUTIONAL TERMINAL · MULTI-PAIR ENGINE · PAPER DESK</span></h1>
   <span class="pill live" id="status"><span class="dot"></span><span id="status-txt">LIVE</span></span>
   <span id="clock">—</span>
 </header>
@@ -102,6 +102,9 @@
   <div class="kpi"><div class="k">Win rate</div><div class="v" id="k-wr">—</div><div class="s">closed trades</div></div>
   <div class="kpi"><div class="k">Open slots</div><div class="v" id="k-pos">—</div><div class="s" id="k-mgn">margin —</div></div>
   <div class="kpi"><div class="k">Peak balance</div><div class="v" id="k-peak">—</div><div class="s">high-water mark</div></div>
+  <div class="kpi"><div class="k">Profit factor</div><div class="v" id="k-pf">—</div><div class="s">gross win / gross loss</div></div>
+  <div class="kpi"><div class="k">Expectancy</div><div class="v" id="k-exp">—</div><div class="s">avg $ per trade</div></div>
+  <div class="kpi"><div class="k">Max drawdown</div><div class="v" id="k-mdd">—</div><div class="s" id="k-mddpk">from peak</div></div>
 </div>
 
 <div class="grid">
@@ -112,7 +115,17 @@
   <div class="panel">
     <h2><span>Exit mix</span><span class="r">since reset</span></h2>
     <table id="exits"><thead><tr><th>Exit</th><th class="num">N</th><th class="num">PnL $</th><th class="num">Avg $</th></tr></thead><tbody></tbody></table>
+    <h2 style="border-top:1px solid var(--line);margin-top:2px"><span>P2 telemetry</span><span class="r">target vs trade failure</span></h2>
+    <div id="tele" style="padding:8px 12px"></div>
   </div>
+</div>
+
+<div class="panel" style="margin-bottom:10px">
+  <h2><span>Performance by pair</span><span class="r">net · win rate · avg win/loss since reset</span></h2>
+  <table id="pairperf"><thead><tr>
+    <th>Pair</th><th class="num">Trades</th><th class="num">Net $</th><th class="num">WR %</th>
+    <th class="num">Avg win</th><th class="num">Avg loss</th><th class="num">Last close</th>
+  </tr></thead><tbody></tbody></table>
 </div>
 
 <div class="panel" style="margin-bottom:10px">
@@ -141,7 +154,7 @@
 
 <footer>
   ALL PARAMS LOCKED A PRIORI IN param_registry.json · P1 TELEMETRY + P2 RISK ENGINE (BE STOP · MAE CEIL 4% · HARD SL 6% AIRBAG) LIVE<br>
-  Paper trading engine · Bitget USDT perps · git history = immutable audit trail · refresh 30s
+  Paper trading engine · Bitget USDT perps · git history = immutable audit trail · registry-locked params · refresh 30s
 </footer>
 
 <script>
@@ -223,6 +236,63 @@ function render() {
   document.getElementById("k-trades").textContent = trades.length + " closed trades";
   document.getElementById("k-wr").textContent = trades.length ? (100*wins/trades.length).toFixed(0) + "%" : "—";
   document.getElementById("k-peak").textContent = fmt(acct.peak_balance ?? bal, 4);
+  const gw = trades.filter(t => +t.net_pnl > 0).reduce((a, t) => a + +t.net_pnl, 0);
+  const gl = Math.abs(trades.filter(t => +t.net_pnl < 0).reduce((a, t) => a + +t.net_pnl, 0));
+  const pf = gl > 0 ? gw / gl : (gw > 0 ? "∞" : null);
+  document.getElementById("k-pf").textContent = pf == null ? "—" : (pf === "∞" ? "∞" : pf.toFixed(2));
+  const exp = trades.length ? trades.reduce((a, t) => a + (+t.net_pnl || 0), 0) / trades.length : null;
+  document.getElementById("k-exp").textContent = exp == null ? "—" : fmt(exp, 4);
+  document.getElementById("k-exp").className = "v " + (exp >= 0 ? "grn" : "red");
+  let _pk = start, _mdd = 0;
+  for (const v of [start, ...trades.map(t => +t.balance_after || start)]) {
+    if (v > _pk) _pk = v;
+    if (_pk - v > _mdd) _mdd = _pk - v;
+  }
+  document.getElementById("k-mdd").textContent = fmt(_mdd, 4);
+  document.getElementById("k-mdd").className = "v " + (_mdd > start * 0.12 ? "red" : "amb");
+  document.getElementById("k-mddpk").textContent = "peak " + fmt(_pk, 2);
+
+  const tstates = {};
+  for (const t of trades) {
+    const k = t.trade_state || "unclassified";
+    tstates[k] = tstates[k] || { n: 0, pnl: 0 };
+    tstates[k].n++; tstates[k].pnl += +t.net_pnl || 0;
+  }
+  const tmax = Math.max(1, ...Object.values(tstates).map(v => v.n));
+  const tcolors = { target_success: "var(--grn)", target_failure: "var(--amb)",
+                    trade_failure: "var(--red)", mixed: "var(--blu)", unclassified: "var(--dim)" };
+  const tnames = { target_success: "TARGET SUCCESS", target_failure: "TARGET FAILURE",
+                   trade_failure: "TRADE FAILURE", mixed: "MIXED", unclassified: "UNCLASSIFIED" };
+  const tc = document.getElementById("tele");
+  tc.innerHTML = Object.keys(tstates).length
+    ? Object.entries(tstates).sort((a, b) => b[1].n - a[1].n).map(([k, v]) =>
+        '<div style="display:flex;align-items:center;gap:8px;margin:5px 0">' +
+        '<span style="width:110px;font-size:9px;color:var(--mut)">' + (tnames[k] || k) + "</span>" +
+        '<span style="flex:1;height:8px;background:#131a29;border-radius:4px;overflow:hidden">' +
+        '<span style="display:block;height:100%;width:' + (100*v.n/tmax) + '%;background:' + (tcolors[k] || "var(--dim)") + ';opacity:.75"></span></span>' +
+        '<span style="width:32px;text-align:right;font-size:10px">' + v.n + "</span>" +
+        '<span style="width:64px;text-align:right;font-size:10px;color:' + (v.pnl >= 0 ? "var(--grn)" : "var(--red)") + '">' + fmt(v.pnl, 3) + "</span></div>").join("")
+    : '<div class="empty" style="padding:10px">no closed trades yet</div>';
+
+  const byPair = {};
+  for (const t of trades) {
+    const k = t.pair || "?";
+    byPair[k] = byPair[k] || { n: 0, net: 0, w: 0, l: 0, gw: 0, gl: 0, last: null };
+    const o = byPair[k];
+    o.n++; o.net += +t.net_pnl || 0;
+    if (+t.net_pnl > 0) { o.w++; o.gw += +t.net_pnl; } else { o.l++; o.gl += Math.abs(+t.net_pnl); }
+    if (t.closed_at) o.last = t.closed_at;
+  }
+  const pp = document.querySelector("#pairperf tbody");
+  pp.innerHTML = Object.entries(byPair).sort((a, b) => b[1].net - a[1].net).map(([k, o]) =>
+    "<tr><td><b>" + k + "</b></td>" +
+    '<td class="num">' + o.n + "</td>" +
+    '<td class="num" style="color:' + (o.net >= 0 ? "var(--grn)" : "var(--red)") + '">' + fmt(o.net, 4) + "</td>" +
+    '<td class="num">' + (o.n ? (100 * o.w / o.n).toFixed(0) : "—") + "</td>" +
+    '<td class="num grn">' + (o.w ? fmt(o.gw / o.w, 3) : "—") + "</td>" +
+    '<td class="num red">' + (o.l ? fmt(o.gl / o.l, 3) : "—") + "</td>" +
+    '<td class="num dim">' + (o.last ? ago(o.last) + " ago" : "—") + "</td></tr>").join("")
+    || '<tr><td colspan="7" class="empty">no closed trades yet</td></tr>';
 
   let positions = [];
   for (const [sym, p] of Object.entries(pairs)) {

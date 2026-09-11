@@ -2,3 +2,4 @@ state/state.json.tmp
 __pycache__/
 *.pyc
 data_1m*.json
+data_*USDT_30d.json
