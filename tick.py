@@ -788,7 +788,7 @@ def process_tick(state):
             trade, balance = close_position(pos, price, "MAE_KILL", now, balance)
             closed_any.append(trade)
             _pt(
-                "\U0001F6A8 *MAE_KILL — {pos['side'].upper()} exit at ceiling*\n"
+                f"\U0001F6A8 *MAE_KILL — {pos['side'].upper()} exit at ceiling*\n"
                 f"Adverse {(pos.get('mae_frac') or 0.0)*100:.1f}% >= locked {MAE_CEIL_FRAC*100:.0f}% — recovery odds gone\n"
                 f"PnL ${trade['net_pnl']:.4f} | Balance ${balance:.4f}"
             )
@@ -807,7 +807,7 @@ def process_tick(state):
                         trade, balance = close_position(pos, _be, "BE_STOP", now, balance)
                         closed_any.append(trade)
                         _pt(
-                            "\U0001F6E1\uFE0F *BE_STOP — {pos['side'].upper()} protected at breakeven*\n"
+                            f"\U0001F6E1\uFE0F *BE_STOP — {pos['side'].upper()} protected at breakeven*\n"
                             f"MFE {_mfe*100:.2f}% armed protection; retracement capped at entry+costs\n"
                             f"PnL ${trade['net_pnl']:.4f} | Balance ${balance:.4f}"
                         )
@@ -818,7 +818,7 @@ def process_tick(state):
                         trade, balance = close_position(pos, _be, "BE_STOP", now, balance)
                         closed_any.append(trade)
                         _pt(
-                            "\U0001F6E1\uFE0F *BE_STOP — {pos['side'].upper()} protected at breakeven*\n"
+                            f"\U0001F6E1\uFE0F *BE_STOP — {pos['side'].upper()} protected at breakeven*\n"
                             f"MFE {_mfe*100:.2f}% armed protection; retracement capped at entry+costs\n"
                             f"PnL ${trade['net_pnl']:.4f} | Balance ${balance:.4f}"
                         )

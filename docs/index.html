@@ -150,9 +150,20 @@ const fmt = (n, d=2) => n == null || isNaN(n) ? "—" :
   (n < 0 ? "−" : "") + "$" + Math.abs(n).toFixed(d);
 const pct = (n, d=2) => n == null || isNaN(n) ? "—" :
   (n < 0 ? "−" : "") + Math.abs(n*100).toFixed(d) + "%";
+const toMs = iso => {
+  if (!iso) return NaN;
+  // bot emits e.g. "2026-09-11T08:05:55.379779+00:00" — JS Date chokes on
+  // 6-digit microseconds; trim to milliseconds and only append Z if the
+  // string has no explicit offset already.
+  let s = iso.replace(/(\.\d{3})\d+/, "$1");
+  if (!/[Zz]|[+-]\d{2}:\d{2}$/.test(s)) s += "Z";
+  const t = new Date(s).getTime();
+  return isNaN(t) ? NaN : t;
+};
 const ago = iso => {
-  if (!iso) return "—";
-  const m = Math.max(0, (Date.now() - new Date(iso + (iso.endsWith("Z") ? "" : "Z")).getTime()) / 60000);
+  const ms = toMs(iso);
+  if (isNaN(ms)) return "—";
+  const m = Math.max(0, (Date.now() - ms) / 60000);
   if (m < 60) return m.toFixed(0) + "m";
   if (m < 1440) return (m/60).toFixed(1) + "h";
   return (m/1440).toFixed(1) + "d";
@@ -191,7 +202,8 @@ function render() {
   const pairs = st.pairs || {};
   const trades = CACHE.trades;
 
-  const ageMin = acct.last_tick_at ? (Date.now() - new Date(acct.last_tick_at + "Z").getTime()) / 60000 : 99;
+  const _tickMs = toMs(acct.last_tick_at);
+  const ageMin = isNaN(_tickMs) ? 99 : (Date.now() - _tickMs) / 60000;
   const pill = document.getElementById("status");
   pill.className = "pill " + (ageMin < 12 ? "live" : "stale");
   pill.querySelector("#status-txt").textContent = ageMin < 12 ? "LIVE" : "STALE " + Math.round(ageMin) + "m";
@@ -200,7 +212,7 @@ function render() {
   const start = 3.0;
   const net = trades.length ? trades[trades.length-1].balance_after ?? bal : bal - start;
   const day0 = new Date(); day0.setUTCHours(0,0,0,0);
-  const dayTrades = trades.filter(t => t.closed_at && new Date(t.closed_at + "Z") >= day0);
+  const dayTrades = trades.filter(t => t.closed_at && toMs(t.closed_at) >= day0.getTime());
   const dayPnl = dayTrades.reduce((a, t) => a + (+t.net_pnl || 0), 0);
   const wins = trades.filter(t => +t.net_pnl > 0).length;
   document.getElementById("k-bal").textContent = fmt(bal, 4);
