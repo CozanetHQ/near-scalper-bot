@@ -52,8 +52,8 @@ TREND_CHASE = os.environ.get("TREND_CHASE", "0")  # OWNER 09-08 hypothesis: duri
 # price for a realized loss of its margin. Paper default OFF (sim floats wedges
 # forever); ON it exposes the true tail of high-leverage configs.
 SCALP_TP_ATR = 1.6  # OWNER 09-08: two-week lab verdict — 1.6x ATR is the robust center (capital-time 0.0070 $/(cap.h) IDENTICAL on both regime weeks; hostile-week maxDD halved -$0.76 vs -$5.20 at 1.2x; 2.0x hits the recycle cliff)   # TP distance = 1.2x 1m ATR (adaptive to live volatility)
-MAX_POSITIONS = int(os.environ.get("MAX_POSITIONS", "1"))  # OWNER 09-11 concentration: ONE trade at a time, whole account behind it. Registry-locked.
-CONCENTRATED = os.environ.get("CONCENTRATED", "1")  # OWNER 09-11: deploy the entire remaining margin budget into the single position. Registry-locked.
+MAX_POSITIONS = int(os.environ.get("MAX_POSITIONS", "8"))  # OWNER 09-11: back to 8 slots after the concentration review (whole-account trial: one MAE_KILL outweighed a month of wins). Registry-locked.
+CONCENTRATED = os.environ.get("CONCENTRATED", "0")  # OWNER 09-11: 0 — slot sizing (each position ~1/8 of budget, losses sliced small). 1 = whole-account deployment. Registry-locked.
 # lab confirmed 4 slots strictly better: realized +3.84 vs +3.58, equity +0.51 vs -0.30, half the wedges    # hedge scalper: multiple concurrent positions — wedged trades don't stop the chopping
 MARGIN_BUDGET = float(os.environ.get("MARGIN_BUDGET", "0.85"))  # owner 09-07 17:40: raised so $0.05 TPs actually materialize at $3 balance (watch-period experiment; live plan stays 40%).
 # Lab (same fresh week, 4 slots): 0.80 → realized +63% but equity -$2.94 (wedge

@@ -31,10 +31,10 @@
       "rationale": "Locked leverage per spec Section 8.3 (\"leverage is locked and versioned\")."
     },
     "MAX_POSITIONS": {
-      "value": 1,
+      "value": 8,
       "locked": "2026-09-11",
-      "rationale": "OWNER directive (concentration experiment): one bot, one trade at a time, the whole account behind it. Superseded value 8 (multi-slot era 09-11) preserved for the record.",
-      "superseded_value": 8
+      "rationale": "OWNER decision after the concentration trial review: back to 8 slots \u2014 same engine decisions, but each loss is sliced to ~1/8 of budget instead of one kill outweighing a month of wins. Whole-account value 1 preserved with its sim disclosure (-30%/month vs +10.7%/month at 8 slots, identical signals).",
+      "superseded_value": 1
     },
     "MARGIN_BUDGET": {
       "value": 0.85,
@@ -128,9 +128,9 @@
       "rationale": "Round-trip fees (0.12%) + assumed slip (0.02%) + crumb: BE_STOP exits cover costs, never lock a guaranteed loss."
     },
     "CONCENTRATED": {
-      "value": "1",
+      "value": "0",
       "locked": "2026-09-11",
-      "rationale": "OWNER directive: deploy the entire remaining margin budget into the single position; target-based sizing bypassed. Risk shape: MAE_KILL 4% adverse ~= 34% of balance, HARD_SL 6% ~= 50%; the 12% daily loss limit trips RISK-OFF for the UTC day after a single kill \u2014 deliberate, owner-authorized."
+      "rationale": "OWNER decision: slot-based sizing restored. The param stays in the registry as a documented one-flip switch for future experiments."
     }
   },
   "known_gaps_not_claimed": [
