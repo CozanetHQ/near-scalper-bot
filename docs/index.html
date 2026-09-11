@@ -26,6 +26,9 @@
           letter-spacing: 1px; display: inline-flex; align-items: center; gap: 6px; }
   .pill.live { color: var(--grn); border-color: #1d5c36; background: rgba(34,197,94,.07); }
   .pill.stale { color: var(--amb); border-color: #6b4c14; background: rgba(245,166,35,.08); }
+.viewseg { font-size: 10px; padding: 3px 9px; border-radius: 20px; border: 1px solid #243049;
+  color: var(--mut); cursor: pointer; user-select: none; letter-spacing: .5px; }
+.viewseg.on { color: var(--grn); border-color: #1d5c36; background: rgba(34,197,94,.07); }
   .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor;
          animation: blink 1.6s infinite; }
   @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: .25; } }
@@ -93,6 +96,8 @@
   <h1>SCALPER v5 <span class="sub">INSTITUTIONAL TERMINAL · MULTI-PAIR ENGINE · PAPER DESK</span></h1>
   <span class="pill live" id="status"><span class="dot"></span><span id="status-txt">LIVE</span></span>
   <span class="pill stale" id="recovery" style="display:none;border-color:#6b4c14;background:rgba(245,166,35,.08)">RECOVERY · ¼ SLOTS</span>
+  <span class="viewseg" id="v-lifetime" title="All trades since account reset 2026-09-10">LIFETIME</span>
+  <span class="viewseg" id="v-clean" title="Only trades after the telemetry bug fix 2026-09-11 15:06 UTC — records before it are void (cross-pair candle bug)">CLEAN · SINCE FIX</span>
   <span id="clock">—</span>
 </header>
 
@@ -209,12 +214,19 @@ function tick() {
   render();
 }
 
+const FIX_TS = Date.parse("2026-09-11T15:06:15Z");  // telemetry bug fix commit 227c869 — records before this are void
+let VIEW = "lifetime";
+
 function render() {
   const st = CACHE.state;
   if (!st) return;
   const acct = st.account || {};
   const pairs = st.pairs || {};
-  const trades = CACHE.trades;
+  document.getElementById("v-lifetime").className = "viewseg" + (VIEW === "lifetime" ? " on" : "");
+  document.getElementById("v-clean").className = "viewseg" + (VIEW === "clean" ? " on" : "");
+  const trades = VIEW === "clean"
+    ? CACHE.trades.filter(t => t.closed_at && toMs(t.closed_at) >= FIX_TS)
+    : CACHE.trades;
 
   const _tickMs = toMs(acct.last_tick_at);
   const ageMin = isNaN(_tickMs) ? 99 : (Date.now() - _tickMs) / 60000;
@@ -230,7 +242,9 @@ function render() {
 
   const bal = acct.balance ?? 3.0;
   const start = 3.0;
-  const net = trades.length ? trades[trades.length-1].balance_after ?? bal : bal - start;
+  const net = VIEW === "clean"
+    ? trades.reduce((a, t) => a + (+t.net_pnl || 0), 0)
+    : (trades.length ? trades[trades.length-1].balance_after ?? bal : bal - start);
   const day0 = new Date(); day0.setUTCHours(0,0,0,0);
   const dayTrades = trades.filter(t => t.closed_at && toMs(t.closed_at) >= day0.getTime());
   const dayPnl = dayTrades.reduce((a, t) => a + (+t.net_pnl || 0), 0);
@@ -240,7 +254,8 @@ function render() {
   document.getElementById("k-day").className = "v " + (dayPnl >= 0 ? "grn" : "red");
   document.getElementById("k-net").textContent = fmt(net, 4);
   document.getElementById("k-net").className = "v " + (net >= 0 ? "grn" : "red");
-  document.getElementById("k-trades").textContent = trades.length + " closed trades";
+  document.getElementById("k-trades").textContent = trades.length +
+    (VIEW === "clean" ? " closed · clean view" : " closed trades");
   document.getElementById("k-wr").textContent = trades.length ? (100*wins/trades.length).toFixed(0) + "%" : "—";
   document.getElementById("k-peak").textContent = fmt(acct.peak_balance ?? bal, 4);
   const gw = trades.filter(t => +t.net_pnl > 0).reduce((a, t) => a + +t.net_pnl, 0);
@@ -250,14 +265,18 @@ function render() {
   const exp = trades.length ? trades.reduce((a, t) => a + (+t.net_pnl || 0), 0) / trades.length : null;
   document.getElementById("k-exp").textContent = exp == null ? "—" : fmt(exp, 4);
   document.getElementById("k-exp").className = "v " + (exp >= 0 ? "grn" : "red");
-  let _pk = start, _mdd = 0;
-  for (const v of [start, ...trades.map(t => +t.balance_after || start)]) {
+  const _start = (VIEW === "clean" && trades.length)
+    ? Math.max(0.0001, (+trades[0].balance_after || start) - (+trades[0].net_pnl || 0))
+    : start;
+  let _pk = _start, _mdd = 0;
+  for (const v of [_start, ...trades.map(t => +t.balance_after || _start)]) {
     if (v > _pk) _pk = v;
     if (_pk - v > _mdd) _mdd = _pk - v;
   }
   document.getElementById("k-mdd").textContent = fmt(_mdd, 4);
   document.getElementById("k-mdd").className = "v " + (_mdd > start * 0.12 ? "red" : "amb");
-  document.getElementById("k-mddpk").textContent = "peak " + fmt(_pk, 2);
+  document.getElementById("k-mddpk").textContent = "peak " + fmt(_pk, 2) +
+    (VIEW === "clean" ? " · since fix" : "");
 
   const tstates = {};
   for (const t of trades) {
@@ -431,6 +450,8 @@ function drawEq(pts) {
 }
 
 async function refresh() {
+  document.getElementById("v-lifetime").onclick = () => { VIEW = "lifetime"; render(); };
+  document.getElementById("v-clean").onclick = () => { VIEW = "clean"; render(); };
   try { await loadState(); tick(); } catch (e) {
     document.getElementById("status").className = "pill stale";
     document.getElementById("status-txt").textContent = "FEED " + (e.message || "ERR");
