@@ -504,9 +504,32 @@ def close_position(pos, exit_price, reason, now, balance):
     fees = notional * FEE_RATE * 2
     net = gross - fees - (notional * SLIP_PCT * 2)  # stress: slippage both sides
     new_balance = balance + net
+    # Owner spec 2026-09-11, principle 2: trade failure (immediately wrong) and
+    # target failure (moved substantially toward TP, then failed) are DIFFERENT
+    # situations and get different management downstream. Classify at close:
+    #   target_success — TP hit
+    #   target_failure — MFE >= 50% of TP distance but never hit
+    #   trade_failure  — barely moved favorably before exit (MFE < 25% of TP dist)
+    tp_price = pos.get("tp_price") or 0
+    tp_frac = abs(tp_price - entry) / entry if (tp_price and entry) else 0.0
+    mfe = pos.get("mfe_frac") or 0.0
+    if reason == "TP":
+        t_state = "target_success"
+    elif tp_frac > 0 and mfe >= 0.5 * tp_frac:
+        t_state = "target_failure"
+    elif tp_frac > 0 and mfe < 0.25 * tp_frac:
+        t_state = "trade_failure"
+    else:
+        t_state = "mixed"
     trade = {
         "pair": pos.get("pair") or state.get("_pair") or SYMBOL,
         "side": pos["side"],
+        "trade_state": t_state,
+        "mfe_frac": round(mfe, 6),
+        "mae_frac": round(pos.get("mae_frac") or 0.0, 6),
+        "minutes_held": (int((datetime.fromisoformat(now) - datetime.fromisoformat(pos["opened_at"])).total_seconds() // 60)
+                          if pos.get("opened_at") else None),
+        "tp_frac": round(tp_frac, 6),
         "entry_price": entry,
         "exit_price": exit_price,
         "notional": notional,
@@ -533,7 +556,9 @@ def serialize_positions(positions):
     compact = [
         {"s": p["side"], "e": p["entry_price"], "t": p["tp_price"],
          "n": p["notional"], "m": p["margin"], "o": p["opened_at"],
-         "a": bool(p.get("aligned")), "pr": p.get("pair") or SYMBOL}
+         "a": bool(p.get("aligned")), "pr": p.get("pair") or SYMBOL,
+         "mf": round(p.get("mfe_frac") or 0.0, 6),
+         "me": round(p.get("mae_frac") or 0.0, 6)}
         for p in positions[:MAX_POSITIONS]
     ]
     return {"last_error": json.dumps(compact, separators=(",", ":"))}
@@ -561,6 +586,8 @@ def parse_positions(state):
                     "margin": float(p["m"]),
                     "opened_at": p["o"],
                     "aligned": bool(p.get("a", False)),
+                    "mfe_frac": float(p.get("mf") or 0.0),
+                    "mae_frac": float(p.get("me") or 0.0),
                 })
         except (KeyError, TypeError, ValueError):
             continue
@@ -684,14 +711,30 @@ def process_tick(state):
         if tp <= 0:
             continue
         is_long = pos["side"] == "long"
+        # ── Position telemetry: MFE/MAE from candle extremes since entry.
+        # Favorable = toward TP. This is the raw feed for the empirical
+        # MFE->retracement->P(TP) and MAE->recovery->P(further loss)
+        # distributions (owner spec 2026-09-11, principle 3).
+        _e = pos["entry_price"]
+        opened_ms = None
+        if pos.get("opened_at"):
+            try:
+                opened_ms = int(datetime.fromisoformat(pos["opened_at"]).timestamp() * 1000)
+            except (ValueError, TypeError):
+                opened_ms = None
+        for candle in scan:
+            if opened_ms is not None and candle["ts"] < opened_ms:
+                continue
+            if is_long:
+                fav = (candle["high"] - _e) / _e
+                adv = (_e - candle["low"]) / _e
+            else:
+                fav = (_e - candle["low"]) / _e
+                adv = (candle["high"] - _e) / _e
+            pos["mfe_frac"] = max(pos.get("mfe_frac") or 0.0, fav)
+            pos["mae_frac"] = max(pos.get("mae_frac") or 0.0, adv)
         hit_tp = price >= tp if is_long else price <= tp
         if not hit_tp:
-            opened_ms = None
-            if pos.get("opened_at"):
-                try:
-                    opened_ms = int(datetime.fromisoformat(pos["opened_at"]).timestamp() * 1000)
-                except (ValueError, TypeError):
-                    opened_ms = None
             for candle in scan:
                 if opened_ms is not None and candle["ts"] < opened_ms:
                     continue
@@ -918,6 +961,9 @@ def process_tick(state):
                     still_open.append({
                         "side": want, "entry_price": entry, "tp_price": tp,
                         "notional": notional, "margin": margin, "opened_at": now,
+                        # Position telemetry (owner spec 2026-09-11: the empirical
+                        # MFE/MAE/duration record every management decision reads).
+                        "mfe_frac": 0.0, "mae_frac": 0.0,
                         "aligned": aligned, "pair": symbol,
                     })
                     opened_this_tick = True

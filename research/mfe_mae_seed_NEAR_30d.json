@@ -1,0 +1,1316 @@
+[
+ {
+  "reason": "HARD_SL",
+  "trade_state": "target_failure",
+  "mfe_frac": 0.001151,
+  "mae_frac": 0.064522,
+  "minutes_held": 907,
+  "tp_frac": 0.00189,
+  "net_pnl": -0.167469
+ },
+ {
+  "reason": "HARD_SL",
+  "trade_state": "target_failure",
+  "mfe_frac": 0.003954,
+  "mae_frac": 0.061536,
+  "minutes_held": 912,
+  "tp_frac": 0.00189,
+  "net_pnl": -0.182255
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.004826,
+  "mae_frac": 0.057674,
+  "minutes_held": 1980,
+  "tp_frac": 0.00189,
+  "net_pnl": 0.001936
+ },
+ {
+  "reason": "HARD_SL",
+  "trade_state": "target_failure",
+  "mfe_frac": 0.001323,
+  "mae_frac": 0.060959,
+  "minutes_held": 1077,
+  "tp_frac": 0.00189,
+  "net_pnl": -0.171845
+ },
+ {
+  "reason": "HARD_SL",
+  "trade_state": "mixed",
+  "mfe_frac": 0.000541,
+  "mae_frac": 0.061185,
+  "minutes_held": 1064,
+  "tp_frac": 0.00189,
+  "net_pnl": -0.171973
+ },
+ {
+  "reason": "HARD_SL",
+  "trade_state": "mixed",
+  "mfe_frac": 0.000661,
+  "mae_frac": 0.06116,
+  "minutes_held": 1064,
+  "tp_frac": 0.00189,
+  "net_pnl": -0.172239
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.011321,
+  "mae_frac": 0.003836,
+  "minutes_held": 131,
+  "tp_frac": 0.006,
+  "net_pnl": 0.013921
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.01188,
+  "mae_frac": 0.003269,
+  "minutes_held": 135,
+  "tp_frac": 0.006,
+  "net_pnl": 0.013921
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.009202,
+  "mae_frac": 0.005988,
+  "minutes_held": 137,
+  "tp_frac": 0.006,
+  "net_pnl": 0.013921
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.010325,
+  "mae_frac": 0.004848,
+  "minutes_held": 141,
+  "tp_frac": 0.006,
+  "net_pnl": 0.013921
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.011603,
+  "mae_frac": 0.008296,
+  "minutes_held": 247,
+  "tp_frac": 0.006,
+  "net_pnl": 0.013642
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.0108,
+  "mae_frac": 0.009115,
+  "minutes_held": 249,
+  "tp_frac": 0.006,
+  "net_pnl": 0.013642
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.010306,
+  "mae_frac": 0.009619,
+  "minutes_held": 251,
+  "tp_frac": 0.006,
+  "net_pnl": 0.013642
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.009626,
+  "mae_frac": 0.010313,
+  "minutes_held": 253,
+  "tp_frac": 0.006,
+  "net_pnl": 0.013642
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.009986,
+  "mae_frac": 0.021274,
+  "minutes_held": 251,
+  "tp_frac": 0.006,
+  "net_pnl": 0.013485
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.009187,
+  "mae_frac": 0.022098,
+  "minutes_held": 253,
+  "tp_frac": 0.006,
+  "net_pnl": 0.013485
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.004223,
+  "mae_frac": 0.034277,
+  "minutes_held": 1404,
+  "tp_frac": 0.00189,
+  "net_pnl": 0.00193
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.003913,
+  "mae_frac": 0.034598,
+  "minutes_held": 1410,
+  "tp_frac": 0.00189,
+  "net_pnl": 0.00193
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.003724,
+  "mae_frac": 0.033828,
+  "minutes_held": 1153,
+  "tp_frac": 0.00189,
+  "net_pnl": 0.00193
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.004033,
+  "mae_frac": 0.033507,
+  "minutes_held": 1161,
+  "tp_frac": 0.00189,
+  "net_pnl": 0.00193
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.00242,
+  "mae_frac": 0.028919,
+  "minutes_held": 1412,
+  "tp_frac": 0.00189,
+  "net_pnl": 0.001802
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.002726,
+  "mae_frac": 0.027742,
+  "minutes_held": 1409,
+  "tp_frac": 0.00189,
+  "net_pnl": 0.001802
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.002668,
+  "mae_frac": 0.026799,
+  "minutes_held": 1002,
+  "tp_frac": 0.00189,
+  "net_pnl": 0.00184
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.001941,
+  "mae_frac": 0.026504,
+  "minutes_held": 1404,
+  "tp_frac": 0.00189,
+  "net_pnl": 0.001802
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.00722,
+  "mae_frac": 0.000679,
+  "minutes_held": 23,
+  "tp_frac": 0.006,
+  "net_pnl": 0.01316
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.007281,
+  "mae_frac": 0.000926,
+  "minutes_held": 25,
+  "tp_frac": 0.006,
+  "net_pnl": 0.01316
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.006607,
+  "mae_frac": 0.001605,
+  "minutes_held": 27,
+  "tp_frac": 0.006,
+  "net_pnl": 0.01316
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.006054,
+  "mae_frac": 0.002162,
+  "minutes_held": 29,
+  "tp_frac": 0.006,
+  "net_pnl": 0.01316
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.007614,
+  "mae_frac": 0.009272,
+  "minutes_held": 161,
+  "tp_frac": 0.006,
+  "net_pnl": 0.012897
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.006516,
+  "mae_frac": 0.010389,
+  "minutes_held": 163,
+  "tp_frac": 0.006,
+  "net_pnl": 0.012897
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.009075,
+  "mae_frac": 0.007787,
+  "minutes_held": 167,
+  "tp_frac": 0.006,
+  "net_pnl": 0.012848
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.008467,
+  "mae_frac": 0.008405,
+  "minutes_held": 171,
+  "tp_frac": 0.006,
+  "net_pnl": 0.012824
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.003435,
+  "mae_frac": 0.012267,
+  "minutes_held": 360,
+  "tp_frac": 0.003,
+  "net_pnl": 0.004797
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.003007,
+  "mae_frac": 0.012702,
+  "minutes_held": 360,
+  "tp_frac": 0.003,
+  "net_pnl": 0.004797
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.005326,
+  "mae_frac": 0.010346,
+  "minutes_held": 360,
+  "tp_frac": 0.003,
+  "net_pnl": 0.004749
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.005445,
+  "mae_frac": 0.00979,
+  "minutes_held": 360,
+  "tp_frac": 0.003,
+  "net_pnl": 0.004749
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.002675,
+  "mae_frac": 0.011914,
+  "minutes_held": 400,
+  "tp_frac": 0.00189,
+  "net_pnl": 0.001802
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.006283,
+  "mae_frac": 0.004331,
+  "minutes_held": 69,
+  "tp_frac": 0.006,
+  "net_pnl": 0.012535
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.007675,
+  "mae_frac": 0.002924,
+  "minutes_held": 75,
+  "tp_frac": 0.006,
+  "net_pnl": 0.012535
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.006447,
+  "mae_frac": 0.001338,
+  "minutes_held": 73,
+  "tp_frac": 0.006,
+  "net_pnl": 0.012535
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.006689,
+  "mae_frac": 0.001094,
+  "minutes_held": 76,
+  "tp_frac": 0.006,
+  "net_pnl": 0.012535
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.008049,
+  "mae_frac": 0.005671,
+  "minutes_held": 94,
+  "tp_frac": 0.006,
+  "net_pnl": 0.012461
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.003653,
+  "mae_frac": 0.036525,
+  "minutes_held": 2316,
+  "tp_frac": 0.00189,
+  "net_pnl": 0.002027
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.002279,
+  "mae_frac": 0.025131,
+  "minutes_held": 1035,
+  "tp_frac": 0.00189,
+  "net_pnl": 0.002048
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.002835,
+  "mae_frac": 0.02459,
+  "minutes_held": 1001,
+  "tp_frac": 0.00189,
+  "net_pnl": 0.001694
+ },
+ {
+  "reason": "MAX_AGE",
+  "trade_state": "target_failure",
+  "mfe_frac": 0.003466,
+  "mae_frac": 0.051424,
+  "minutes_held": 2880,
+  "tp_frac": 0.00189,
+  "net_pnl": -0.066741
+ },
+ {
+  "reason": "MAX_AGE",
+  "trade_state": "target_failure",
+  "mfe_frac": 0.003026,
+  "mae_frac": 0.051888,
+  "minutes_held": 2880,
+  "tp_frac": 0.00189,
+  "net_pnl": -0.068392
+ },
+ {
+  "reason": "MAX_AGE",
+  "trade_state": "target_failure",
+  "mfe_frac": 0.003026,
+  "mae_frac": 0.051888,
+  "minutes_held": 2880,
+  "tp_frac": 0.00189,
+  "net_pnl": -0.077321
+ },
+ {
+  "reason": "MAX_AGE",
+  "trade_state": "target_failure",
+  "mfe_frac": 0.002083,
+  "mae_frac": 0.052884,
+  "minutes_held": 2880,
+  "tp_frac": 0.00189,
+  "net_pnl": -0.081453
+ },
+ {
+  "reason": "MAX_AGE",
+  "trade_state": "target_failure",
+  "mfe_frac": 0.004094,
+  "mae_frac": 0.050762,
+  "minutes_held": 2880,
+  "tp_frac": 0.00189,
+  "net_pnl": -0.06029
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.006178,
+  "mae_frac": 0.001977,
+  "minutes_held": 124,
+  "tp_frac": 0.006,
+  "net_pnl": 0.010889
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.006485,
+  "mae_frac": 0.001667,
+  "minutes_held": 128,
+  "tp_frac": 0.006,
+  "net_pnl": 0.014121
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.004474,
+  "mae_frac": 0.009438,
+  "minutes_held": 505,
+  "tp_frac": 0.00189,
+  "net_pnl": 0.001531
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.002872,
+  "mae_frac": 0.006354,
+  "minutes_held": 460,
+  "tp_frac": 0.00189,
+  "net_pnl": 0.002026
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.004641,
+  "mae_frac": 0.00629,
+  "minutes_held": 479,
+  "tp_frac": 0.00189,
+  "net_pnl": 0.002023
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.005624,
+  "mae_frac": 0.005318,
+  "minutes_held": 434,
+  "tp_frac": 0.00189,
+  "net_pnl": 0.002023
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.005257,
+  "mae_frac": 0.005685,
+  "minutes_held": 363,
+  "tp_frac": 0.00189,
+  "net_pnl": 0.001522
+ },
+ {
+  "reason": "MAX_AGE",
+  "trade_state": "target_failure",
+  "mfe_frac": 0.002207,
+  "mae_frac": 0.056672,
+  "minutes_held": 2880,
+  "tp_frac": 0.00189,
+  "net_pnl": -0.088858
+ },
+ {
+  "reason": "MAX_AGE",
+  "trade_state": "target_failure",
+  "mfe_frac": 0.002207,
+  "mae_frac": 0.056672,
+  "minutes_held": 2880,
+  "tp_frac": 0.00189,
+  "net_pnl": -0.090264
+ },
+ {
+  "reason": "MAX_AGE",
+  "trade_state": "target_failure",
+  "mfe_frac": 0.002686,
+  "mae_frac": 0.056222,
+  "minutes_held": 2880,
+  "tp_frac": 0.00189,
+  "net_pnl": -0.090441
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.006281,
+  "mae_frac": 0.003392,
+  "minutes_held": 57,
+  "tp_frac": 0.006,
+  "net_pnl": 0.01514
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.006531,
+  "mae_frac": 0.00314,
+  "minutes_held": 59,
+  "tp_frac": 0.006,
+  "net_pnl": 0.01514
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.006406,
+  "mae_frac": 0.003266,
+  "minutes_held": 62,
+  "tp_frac": 0.006,
+  "net_pnl": 0.01514
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.00678,
+  "mae_frac": 0.002888,
+  "minutes_held": 67,
+  "tp_frac": 0.006,
+  "net_pnl": 0.01514
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.009046,
+  "mae_frac": 0.004991,
+  "minutes_held": 300,
+  "tp_frac": 0.006,
+  "net_pnl": 0.010635
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.009107,
+  "mae_frac": 0.004928,
+  "minutes_held": 302,
+  "tp_frac": 0.006,
+  "net_pnl": 0.014785
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.008613,
+  "mae_frac": 0.00543,
+  "minutes_held": 304,
+  "tp_frac": 0.006,
+  "net_pnl": 0.014785
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.007932,
+  "mae_frac": 0.00612,
+  "minutes_held": 306,
+  "tp_frac": 0.006,
+  "net_pnl": 0.014785
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.009478,
+  "mae_frac": 0.004552,
+  "minutes_held": 311,
+  "tp_frac": 0.006,
+  "net_pnl": 0.014785
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.007517,
+  "mae_frac": 0.001242,
+  "minutes_held": 29,
+  "tp_frac": 0.006,
+  "net_pnl": 0.009268
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.008318,
+  "mae_frac": 0.000621,
+  "minutes_held": 32,
+  "tp_frac": 0.006,
+  "net_pnl": 0.014443
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.008379,
+  "mae_frac": 0.000559,
+  "minutes_held": 34,
+  "tp_frac": 0.006,
+  "net_pnl": 0.014443
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.008933,
+  "mae_frac": 0.000186,
+  "minutes_held": 37,
+  "tp_frac": 0.006,
+  "net_pnl": 0.014443
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.008195,
+  "mae_frac": 0.000931,
+  "minutes_held": 39,
+  "tp_frac": 0.006,
+  "net_pnl": 0.014443
+ },
+ {
+  "reason": "MAX_AGE",
+  "trade_state": "target_failure",
+  "mfe_frac": 0.00328,
+  "mae_frac": 0.043888,
+  "minutes_held": 2880,
+  "tp_frac": 0.00189,
+  "net_pnl": -0.123957
+ },
+ {
+  "reason": "MAX_AGE",
+  "trade_state": "mixed",
+  "mfe_frac": 0.000833,
+  "mae_frac": 0.04622,
+  "minutes_held": 2880,
+  "tp_frac": 0.00189,
+  "net_pnl": -0.133159
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.002663,
+  "mae_frac": 0.040312,
+  "minutes_held": 2180,
+  "tp_frac": 0.00189,
+  "net_pnl": 0.002318
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.003519,
+  "mae_frac": 0.037229,
+  "minutes_held": 1674,
+  "tp_frac": 0.00189,
+  "net_pnl": 0.00232
+ },
+ {
+  "reason": "MAX_AGE",
+  "trade_state": "trade_failure",
+  "mfe_frac": 0.000439,
+  "mae_frac": 0.055322,
+  "minutes_held": 2880,
+  "tp_frac": 0.00189,
+  "net_pnl": -0.086523
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.004298,
+  "mae_frac": 0.03862,
+  "minutes_held": 1558,
+  "tp_frac": 0.00189,
+  "net_pnl": 0.002294
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.004538,
+  "mae_frac": 0.03839,
+  "minutes_held": 1549,
+  "tp_frac": 0.00189,
+  "net_pnl": 0.002294
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.005799,
+  "mae_frac": 0.037183,
+  "minutes_held": 1556,
+  "tp_frac": 0.00189,
+  "net_pnl": 0.002294
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.004943,
+  "mae_frac": 0.022736,
+  "minutes_held": 442,
+  "tp_frac": 0.00189,
+  "net_pnl": 0.002318
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.011714,
+  "mae_frac": 0.003803,
+  "minutes_held": 30,
+  "tp_frac": 0.006,
+  "net_pnl": 0.016031
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.00252,
+  "mae_frac": 0.034112,
+  "minutes_held": 809,
+  "tp_frac": 0.00189,
+  "net_pnl": 0.00234
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.005802,
+  "mae_frac": 0.017345,
+  "minutes_held": 384,
+  "tp_frac": 0.00189,
+  "net_pnl": 0.002303
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.00698,
+  "mae_frac": 0.021244,
+  "minutes_held": 352,
+  "tp_frac": 0.006,
+  "net_pnl": 0.011272
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.008494,
+  "mae_frac": 0.003072,
+  "minutes_held": 39,
+  "tp_frac": 0.006,
+  "net_pnl": 0.015569
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.011113,
+  "mae_frac": 0.000483,
+  "minutes_held": 45,
+  "tp_frac": 0.006,
+  "net_pnl": 0.015569
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.008798,
+  "mae_frac": 0.008677,
+  "minutes_held": 152,
+  "tp_frac": 0.006,
+  "net_pnl": 0.015257
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.008798,
+  "mae_frac": 0.008677,
+  "minutes_held": 158,
+  "tp_frac": 0.006,
+  "net_pnl": 0.015257
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.008798,
+  "mae_frac": 0.008677,
+  "minutes_held": 160,
+  "tp_frac": 0.006,
+  "net_pnl": 0.015257
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.006041,
+  "mae_frac": 0.000665,
+  "minutes_held": 13,
+  "tp_frac": 0.006,
+  "net_pnl": 0.015412
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.007001,
+  "mae_frac": 0.000543,
+  "minutes_held": 17,
+  "tp_frac": 0.006,
+  "net_pnl": 0.015412
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.006154,
+  "mae_frac": 0.005852,
+  "minutes_held": 77,
+  "tp_frac": 0.006,
+  "net_pnl": 0.015257
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.006336,
+  "mae_frac": 0.005672,
+  "minutes_held": 80,
+  "tp_frac": 0.006,
+  "net_pnl": 0.015257
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.009336,
+  "mae_frac": 0.006972,
+  "minutes_held": 60,
+  "tp_frac": 0.006,
+  "net_pnl": 0.014869
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.009153,
+  "mae_frac": 0.007152,
+  "minutes_held": 64,
+  "tp_frac": 0.006,
+  "net_pnl": 0.014869
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.00952,
+  "mae_frac": 0.006791,
+  "minutes_held": 68,
+  "tp_frac": 0.006,
+  "net_pnl": 0.014869
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.007565,
+  "mae_frac": 0.008715,
+  "minutes_held": 70,
+  "tp_frac": 0.006,
+  "net_pnl": 0.014869
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.010746,
+  "mae_frac": 0.005585,
+  "minutes_held": 79,
+  "tp_frac": 0.006,
+  "net_pnl": 0.016605
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.006508,
+  "mae_frac": 0.000608,
+  "minutes_held": 5,
+  "tp_frac": 0.006,
+  "net_pnl": 0.016605
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.007064,
+  "mae_frac": 0.000122,
+  "minutes_held": 9,
+  "tp_frac": 0.006,
+  "net_pnl": 0.016605
+ },
+ {
+  "reason": "HARD_SL",
+  "trade_state": "mixed",
+  "mfe_frac": 0.000642,
+  "mae_frac": 0.061489,
+  "minutes_held": 382,
+  "tp_frac": 0.00189,
+  "net_pnl": -0.186824
+ },
+ {
+  "reason": "HARD_SL",
+  "trade_state": "target_failure",
+  "mfe_frac": 0.002633,
+  "mae_frac": 0.062103,
+  "minutes_held": 416,
+  "tp_frac": 0.00189,
+  "net_pnl": -0.186814
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.011179,
+  "mae_frac": 0.004975,
+  "minutes_held": 31,
+  "tp_frac": 0.006,
+  "net_pnl": 0.016194
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.014107,
+  "mae_frac": 0.002094,
+  "minutes_held": 41,
+  "tp_frac": 0.006,
+  "net_pnl": 0.016194
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.012299,
+  "mae_frac": 0.003874,
+  "minutes_held": 43,
+  "tp_frac": 0.006,
+  "net_pnl": 0.016194
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.01467,
+  "mae_frac": 0.002774,
+  "minutes_held": 60,
+  "tp_frac": 0.006,
+  "net_pnl": 0.015953
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.006172,
+  "mae_frac": 0.001481,
+  "minutes_held": 29,
+  "tp_frac": 0.006,
+  "net_pnl": 0.015953
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.006432,
+  "mae_frac": 0.002041,
+  "minutes_held": 29,
+  "tp_frac": 0.006,
+  "net_pnl": 0.015792
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.006681,
+  "mae_frac": 0.001856,
+  "minutes_held": 34,
+  "tp_frac": 0.006,
+  "net_pnl": 0.015792
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.006058,
+  "mae_frac": 0.002473,
+  "minutes_held": 37,
+  "tp_frac": 0.006,
+  "net_pnl": 0.015792
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.006136,
+  "mae_frac": 0.000186,
+  "minutes_held": 25,
+  "tp_frac": 0.006,
+  "net_pnl": 0.015792
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.006011,
+  "mae_frac": 0.001611,
+  "minutes_held": 34,
+  "tp_frac": 0.006,
+  "net_pnl": 0.015792
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.006982,
+  "mae_frac": 0.001995,
+  "minutes_held": 32,
+  "tp_frac": 0.006,
+  "net_pnl": 0.015401
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.006433,
+  "mae_frac": 0.005121,
+  "minutes_held": 43,
+  "tp_frac": 0.006,
+  "net_pnl": 0.015322
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.006315,
+  "mae_frac": 0.004002,
+  "minutes_held": 45,
+  "tp_frac": 0.006,
+  "net_pnl": 0.015322
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.006005,
+  "mae_frac": 0.003565,
+  "minutes_held": 38,
+  "tp_frac": 0.006,
+  "net_pnl": 0.015322
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.006069,
+  "mae_frac": 0.003254,
+  "minutes_held": 46,
+  "tp_frac": 0.006,
+  "net_pnl": 0.015322
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.006272,
+  "mae_frac": 0.001568,
+  "minutes_held": 30,
+  "tp_frac": 0.006,
+  "net_pnl": 0.015322
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.006521,
+  "mae_frac": 0.003926,
+  "minutes_held": 90,
+  "tp_frac": 0.006,
+  "net_pnl": 0.014871
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.006589,
+  "mae_frac": 0.003231,
+  "minutes_held": 90,
+  "tp_frac": 0.006,
+  "net_pnl": 0.014797
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.006412,
+  "mae_frac": 0.001206,
+  "minutes_held": 67,
+  "tp_frac": 0.006,
+  "net_pnl": 0.014797
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.006732,
+  "mae_frac": 0.000889,
+  "minutes_held": 69,
+  "tp_frac": 0.006,
+  "net_pnl": 0.014797
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.006034,
+  "mae_frac": 0.000762,
+  "minutes_held": 58,
+  "tp_frac": 0.006,
+  "net_pnl": 0.014797
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.006162,
+  "mae_frac": 0.000953,
+  "minutes_held": 64,
+  "tp_frac": 0.006,
+  "net_pnl": 0.014508
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.006055,
+  "mae_frac": 0.004016,
+  "minutes_held": 47,
+  "tp_frac": 0.006,
+  "net_pnl": 0.014434
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.006517,
+  "mae_frac": 0.007795,
+  "minutes_held": 94,
+  "tp_frac": 0.006,
+  "net_pnl": 0.014223
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.006067,
+  "mae_frac": 0.008238,
+  "minutes_held": 97,
+  "tp_frac": 0.006,
+  "net_pnl": 0.014223
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.006517,
+  "mae_frac": 0.007795,
+  "minutes_held": 102,
+  "tp_frac": 0.006,
+  "net_pnl": 0.014153
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.006388,
+  "mae_frac": 0.007921,
+  "minutes_held": 104,
+  "tp_frac": 0.006,
+  "net_pnl": 0.014153
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.006142,
+  "mae_frac": 0.00403,
+  "minutes_held": 54,
+  "tp_frac": 0.006,
+  "net_pnl": 0.014364
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.00692,
+  "mae_frac": 0.004934,
+  "minutes_held": 99,
+  "tp_frac": 0.006,
+  "net_pnl": 0.013876
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.006678,
+  "mae_frac": 0.002825,
+  "minutes_held": 86,
+  "tp_frac": 0.006,
+  "net_pnl": 0.013806
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.006355,
+  "mae_frac": 0.007767,
+  "minutes_held": 150,
+  "tp_frac": 0.006,
+  "net_pnl": 0.013737
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.006036,
+  "mae_frac": 0.007321,
+  "minutes_held": 130,
+  "tp_frac": 0.006,
+  "net_pnl": 0.013668
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.006751,
+  "mae_frac": 0.006172,
+  "minutes_held": 116,
+  "tp_frac": 0.006,
+  "net_pnl": 0.013668
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.006686,
+  "mae_frac": 0.006236,
+  "minutes_held": 118,
+  "tp_frac": 0.006,
+  "net_pnl": 0.013668
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.006557,
+  "mae_frac": 0.006364,
+  "minutes_held": 129,
+  "tp_frac": 0.006,
+  "net_pnl": 0.01353
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.00701,
+  "mae_frac": 0.005916,
+  "minutes_held": 131,
+  "tp_frac": 0.006,
+  "net_pnl": 0.01353
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.006312,
+  "mae_frac": 0.004316,
+  "minutes_held": 86,
+  "tp_frac": 0.006,
+  "net_pnl": 0.013668
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.006325,
+  "mae_frac": 0.002323,
+  "minutes_held": 88,
+  "tp_frac": 0.006,
+  "net_pnl": 0.01353
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.00607,
+  "mae_frac": 0.002841,
+  "minutes_held": 38,
+  "tp_frac": 0.006,
+  "net_pnl": 0.01353
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.006332,
+  "mae_frac": 0.001163,
+  "minutes_held": 12,
+  "tp_frac": 0.006,
+  "net_pnl": 0.01353
+ },
+ {
+  "reason": "TP",
+  "trade_state": "target_success",
+  "mfe_frac": 0.006137,
+  "mae_frac": 0.002584,
+  "minutes_held": 16,
+  "tp_frac": 0.006,
+  "net_pnl": 0.01353
+ }
+]
