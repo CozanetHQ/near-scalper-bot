@@ -8,19 +8,6 @@ def candle_color(c):
     return "bull" if c["close"] >= c["open"] else "bear"
 
 
-def compute_rsi(closes, period):
-    """Cutler's RSI on a list of closes (oldest -> newest). Returns None if not enough data."""
-    if len(closes) < period + 1:
-        return None
-    deltas = [closes[i + 1] - closes[i] for i in range(len(closes) - 1)]
-    window = deltas[-period:]
-    gains = sum(d for d in window if d > 0) / period
-    losses = sum(-d for d in window if d < 0) / period
-    if losses == 0:
-        return 100.0
-    return 100.0 - (100.0 / (1.0 + gains / losses))
-
-
 def compute_ema(closes, period):
     """Standard EMA over a list of closes (oldest -> newest)."""
     if len(closes) < period:

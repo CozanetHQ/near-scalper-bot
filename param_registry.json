@@ -31,9 +31,10 @@
       "rationale": "Locked leverage per spec Section 8.3 (\"leverage is locked and versioned\")."
     },
     "MAX_POSITIONS": {
-      "value": 8,
+      "value": 1,
       "locked": "2026-09-11",
-      "rationale": "Multi-pair era: 8 global slots shared across 5 pairs (was 2 in the single-pair watch period, owner 09-07). Owner-approved 2026-09-11 to match the multi-pair design and dashboard. Same 85% margin budget \u2014 slots get smaller, surface gets wider."
+      "rationale": "OWNER directive (concentration experiment): one bot, one trade at a time, the whole account behind it. Superseded value 8 (multi-slot era 09-11) preserved for the record.",
+      "superseded_value": 8
     },
     "MARGIN_BUDGET": {
       "value": 0.85,
@@ -125,6 +126,11 @@
       "value": 0.0019,
       "locked": "2026-09-11",
       "rationale": "Round-trip fees (0.12%) + assumed slip (0.02%) + crumb: BE_STOP exits cover costs, never lock a guaranteed loss."
+    },
+    "CONCENTRATED": {
+      "value": "1",
+      "locked": "2026-09-11",
+      "rationale": "OWNER directive: deploy the entire remaining margin budget into the single position; target-based sizing bypassed. Risk shape: MAE_KILL 4% adverse ~= 34% of balance, HARD_SL 6% ~= 50%; the 12% daily loss limit trips RISK-OFF for the UTC day after a single kill \u2014 deliberate, owner-authorized."
     }
   },
   "known_gaps_not_claimed": [

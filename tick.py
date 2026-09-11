@@ -52,7 +52,8 @@ TREND_CHASE = os.environ.get("TREND_CHASE", "0")  # OWNER 09-08 hypothesis: duri
 # price for a realized loss of its margin. Paper default OFF (sim floats wedges
 # forever); ON it exposes the true tail of high-leverage configs.
 SCALP_TP_ATR = 1.6  # OWNER 09-08: two-week lab verdict — 1.6x ATR is the robust center (capital-time 0.0070 $/(cap.h) IDENTICAL on both regime weeks; hostile-week maxDD halved -$0.76 vs -$5.20 at 1.2x; 2.0x hits the recycle cliff)   # TP distance = 1.2x 1m ATR (adaptive to live volatility)
-MAX_POSITIONS = int(os.environ.get("MAX_POSITIONS", "8"))  # multi-pair era 09-11: 8 global slots across 5 pairs (owner-approved; was 2 in the single-pair watch period). Registry-locked.
+MAX_POSITIONS = int(os.environ.get("MAX_POSITIONS", "1"))  # OWNER 09-11 concentration: ONE trade at a time, whole account behind it. Registry-locked.
+CONCENTRATED = os.environ.get("CONCENTRATED", "1")  # OWNER 09-11: deploy the entire remaining margin budget into the single position. Registry-locked.
 # lab confirmed 4 slots strictly better: realized +3.84 vs +3.58, equity +0.51 vs -0.30, half the wedges    # hedge scalper: multiple concurrent positions — wedged trades don't stop the chopping
 MARGIN_BUDGET = float(os.environ.get("MARGIN_BUDGET", "0.85"))  # owner 09-07 17:40: raised so $0.05 TPs actually materialize at $3 balance (watch-period experiment; live plan stays 40%).
 # Lab (same fresh week, 4 slots): 0.80 → realized +63% but equity -$2.94 (wedge
@@ -536,7 +537,7 @@ def registry_check():
             "BE_TRIGGER_FRAC": BE_TRIGGER_FRAC,
             "MAE_CEIL_FRAC": MAE_CEIL_FRAC,
             "BE_BUFFER_FRAC": BE_BUFFER_FRAC,
-            "MAX_POSITIONS": MAX_POSITIONS,
+            "CONCENTRATED": CONCENTRATED,
             "PAIRS": ",".join(PAIRS),
         }
         mismatches = []
@@ -913,7 +914,14 @@ def process_tick(state):
                 aligned = (bias != "none" and want == ("long" if bias == "bull" else "short"))
                 base = WIN_TARGET_PCT * balance if WIN_TARGET_PCT > 0 else WIN_TARGET_DOLLARS
                 target = base * TREND_MULT if (aligned and TREND_MULT != 1.0) else base
-                notional = min(target / per_unit, slot_cap, margin_left * LEVERAGE, 40.0)
+                if CONCENTRATED == "1":
+                    # OWNER 09-11: whole account straight into the trade — the
+                    # single position gets the entire remaining budget; TP still
+                    # >= 1.6x ATR (or the 0.6% fee-survival floor), whichever
+                    # the market allows (math_spec §6).
+                    notional = min(slot_cap, margin_left * LEVERAGE, 40.0)
+                else:
+                    notional = min(target / per_unit, slot_cap, margin_left * LEVERAGE, 40.0)
                 if notional >= 1.0:  # don't open dust positions
                     margin = notional / LEVERAGE
                     entry = price
