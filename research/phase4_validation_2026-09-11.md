@@ -124,3 +124,48 @@ locked a priori per v4 Sec 1.1 — no tuning on live results.
   lineage mismatch degrades to graceful WAIT instead of UnboundLocalError.
 - Second Engine advisory scores now logged on every entry (advisory_score,
   wall_ratio), round-tripped through the compact position format (probe passed).
+
+---
+
+# P3 TIME ENGINE STUDY — 2026-09-11 (11,243 trades, 5 pairs, 30d fresh data)
+
+## Duration distributions (pooled)
+- TP: p50 17m, p90 157m, p99 360m — winners finish FAST.
+- BE_STOP: p50 30m, p90 360m.
+- MAE_KILL: p50 182m, p90 936m — killers die SLOW (the 3-16h lingerers).
+- MAX_AGE (48h floor): only 49/11,243 trades.
+
+## Conditional survival (the core P3 evidence)
+| survived past | n | P(ever TP) | net-positive | combined net |
+|---|---|---|---|---|
+| 10m | 7,807 | 30.3% | 93.5% | -$8.74 |
+| 60m | 4,043 | 22.7% | 88.8% | -$21.55 |
+| 240m | 1,951 | 10.3% | 88.8% | -$14.59 |
+| 480m (8h) | 300 | 7.3% | 54.7% | -$12.22 |
+| 1,440m (24h) | 121 | 4.1% | 32.2% | -$5.85 |
+
+The edge lives in fast completion; lingering positions are a net drag at every
+age despite BE scratches. MAE_KILLs accrue disproportionately to 3-16h lingerers.
+
+## Counterfactual: MAX_POS_AGE 48h -> 8h (full re-simulation, both windows)
+| pair | full-30d delta | OOS-h2 delta |
+|---|---|---|
+| BTC | +0.1048 | +1.4301 |
+| ETH | +8.1097 | +2.8513 |
+| SOL | -1.0450 | +2.6587 |
+| XRP | +0.2027 | -1.0357 |
+| NEAR | -0.4301 | -0.5002 |
+| TOTAL | +6.9420 | +5.4042 |
+
+Per-symbol (owner standing rule: thresholds from empirical distributions PER
+SYMBOL): 8h on BTC/ETH/SOL only, 48h unchanged on XRP/NEAR
+= +7.16 full / +6.94 OOS — strictly dominates the global 8h in both windows.
+XRP/NEAR winners resolve fast (TP p99 ~5h), so a cap only kills their rare
+slow winners; BTC/ETH/SOL trades resolve slowly, so the cap removes their
+toxic lingerers.
+
+## AI recommendation (owner locks per v4 Sec 1.1 re-lock procedure)
+Re-lock MAX_POS_AGE_HOURS per symbol: 8h BTC/ETH/SOL, 48h XRP/NEAR.
+Caveats: single 30d dataset, deterministic re-simulation, two windows;
+the wall/recovery dynamics interact with position lifetimes. Value picked
+before any live results under it — a-priori discipline intact.
