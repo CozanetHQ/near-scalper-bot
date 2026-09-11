@@ -169,3 +169,47 @@ Re-lock MAX_POS_AGE_HOURS per symbol: 8h BTC/ETH/SOL, 48h XRP/NEAR.
 Caveats: single 30d dataset, deterministic re-simulation, two windows;
 the wall/recovery dynamics interact with position lifetimes. Value picked
 before any live results under it — a-priori discipline intact.
+
+---
+
+# P3 REVISION — PER-PAIR TIME ENGINE (owner directive 2026-09-11: no universal rules)
+
+Owner standing rule, now structural: **every rule is tested and locked PER PAIR.**
+The registry carries a `per_pair` section as locked source of truth; tick.py
+resolves pair_param() = lab env > registry per_pair > global. This section
+supersedes the pooled P3 recommendation above (8h-on-BTC/ETH/SOL mix).
+
+## Per-pair TP-hit probability cliffs (conditional survival, 30d fresh dumps)
+- BTC: TP p50 50m, p99 360m. P(TP|alive): 20.8% @10m → 6.9% @4h → 1.8% @6h.
+- ETH: TP p50 50m, p99 835m (~14h — slowest winners). P(TP): 26.8% @10m → 9.8% @4h → 10.3% @12h.
+- SOL: TP p50 22m, p99 352m. P(TP): 29.1% → 8.4% @4h → 1.9% @6h.
+- XRP: TP p50 13m, p99 290m. P(TP): 31.8% → 13.9% @4h → 3.8% @6h.
+- NEAR: TP p50 12m, p99 321m. P(TP): 36.9% → 15.4% @4h → 7.2% @6h.
+
+## Age-cap counterfactual grid — full re-simulations, both windows (net, $)
+| pair | 48h | 4h | 6h | 8h | 12h | verdict (both windows) |
+|---|---|---|---|---|---|---|
+| BTC full | +0.87 | −0.13 | −0.07 | **+0.98** | — | 8h wins both |
+| BTC OOS | +2.34 | +0.11 | +0.83 | **+3.77** | — | |
+| ETH full | +0.15 | +0.31 | +3.21 | **+8.26** | +4.95 | 8h wins both |
+| ETH OOS | +2.01 | −0.11 | +1.31 | **+4.86** | +4.34 | |
+| SOL full | +2.37 | −0.18 | **+6.60** | +1.33 | — | 6h beats 48h both |
+| SOL OOS | +0.83 | −0.70 | **+1.66** | +3.49 | — | windows |
+| XRP full | **−0.31** | −1.84 | −1.00 | −0.11 | — | keep 48h — every cap |
+| XRP OOS | **+5.73** | −0.27 | +1.71 | +4.69 | — | hurts both windows |
+| NEAR full | **+0.43** | −0.81 | −0.51 | +0.003 | — | keep 48h — every cap |
+| NEAR OOS | **+0.88** | −1.67 | −0.36 | +0.38 | — | hurts both windows |
+
+Methodology: survival curves nominate candidates; full re-simulation decides —
+force-close-at-market ≠ the survivors' realized exits (BE protection does the
+saving better than a market kill on XRP/NEAR, whose cliff is early but whose
+tails still pay). One pair's optimum is another pair's loss — the universal 8h
+rule is dead.
+
+## Proposed per-pair locks (await owner authorization; values in the registry
+## per_pair.MAX_POS_AGE_HOURS, currently 48h for all five)
+- BTC 48h → 8h (+0.10 full / +1.43 OOS)
+- ETH 48h → 8h (+8.11 full / +2.85 OOS)
+- SOL 48h → 6h (+4.23 full / +0.83 OOS)
+- XRP: unchanged 48h
+- NEAR: unchanged 48h
