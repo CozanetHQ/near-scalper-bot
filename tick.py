@@ -47,7 +47,7 @@ TREND_CHASE = os.environ.get("TREND_CHASE", "0")  # OWNER 09-08 hypothesis: duri
 # price for a realized loss of its margin. Paper default OFF (sim floats wedges
 # forever); ON it exposes the true tail of high-leverage configs.
 SCALP_TP_ATR = 1.6  # OWNER 09-08: two-week lab verdict — 1.6x ATR is the robust center (capital-time 0.0070 $/(cap.h) IDENTICAL on both regime weeks; hostile-week maxDD halved -$0.76 vs -$5.20 at 1.2x; 2.0x hits the recycle cliff)   # TP distance = 1.2x 1m ATR (adaptive to live volatility)
-MAX_POSITIONS = int(os.environ.get("MAX_POSITIONS", "2"))  # owner 09-07: watch period at 2 slots (was 4).
+MAX_POSITIONS = int(os.environ.get("MAX_POSITIONS", "8"))  # multi-pair era 09-11: 8 global slots across 5 pairs (owner-approved; was 2 in the single-pair watch period). Registry-locked.
 # lab confirmed 4 slots strictly better: realized +3.84 vs +3.58, equity +0.51 vs -0.30, half the wedges    # hedge scalper: multiple concurrent positions — wedged trades don't stop the chopping
 MARGIN_BUDGET = float(os.environ.get("MARGIN_BUDGET", "0.85"))  # owner 09-07 17:40: raised so $0.05 TPs actually materialize at $3 balance (watch-period experiment; live plan stays 40%).
 # Lab (same fresh week, 4 slots): 0.80 → realized +63% but equity -$2.94 (wedge
@@ -431,6 +431,7 @@ def sync(pair, state_update=None, trade=None):
             acct["peak_balance"] = float(su["balance"])
         acct["status"] = su.get("status") or acct.get("status") or "running"
         acct["last_tick_at"] = su.get("last_tick_at") or acct.get("last_tick_at")
+        acct["max_positions"] = MAX_POSITIONS  # dashboard reads this — no hardcoded slot counts anywhere
     ps = master.setdefault("pairs", {}).setdefault(pair, fresh_pair_state(pair))
     for k, v in su.items():
         if k == "balance":
@@ -588,6 +589,7 @@ def registry_check():
             "TREND_RUNAWAY_CANDLES": TREND_RUNAWAY_CANDLES,
             "SPIKE_RANGE_MULT": SPIKE_RANGE_MULT,
             "MIN_TP_DIST_FRAC": MIN_TP_DIST_FRAC,
+            "MAX_POSITIONS": MAX_POSITIONS,
             "PAIRS": ",".join(PAIRS),
         }
         mismatches = []

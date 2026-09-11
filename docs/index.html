@@ -115,7 +115,8 @@ function render(m){
   eqEl.textContent = "$" + fmt(eq, 2);
   eqEl.className = "v " + (eq >= bal ? "up" : "dn");
   document.getElementById("t-fl").textContent = "floating " + (floating >= 0 ? "+" : "") + "$" + fmt(floating, 4);
-  document.getElementById("t-pos").textContent = allPos.length + " / 8";
+  const maxPos = Number(acct.max_positions) || 8;
+  document.getElementById("t-pos").textContent = allPos.length + " / " + maxPos;
   document.getElementById("t-mgn").textContent = "margin locked $" + fmt(usedMargin, 2) + " (" + ((usedMargin/Math.max(bal,0.01))*100).toFixed(0) + "%)";
 
   // epoch trades: since last reset (approx: all in window)

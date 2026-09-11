@@ -31,8 +31,9 @@
       "rationale": "Locked leverage per spec Section 8.3 (\"leverage is locked and versioned\")."
     },
     "MAX_POSITIONS": {
-      "value": 2,
-      "rationale": "Owner-set slot count, 2026-09-07 watch period."
+      "value": 8,
+      "locked": "2026-09-11",
+      "rationale": "Multi-pair era: 8 global slots shared across 5 pairs (was 2 in the single-pair watch period, owner 09-07). Owner-approved 2026-09-11 to match the multi-pair design and dashboard. Same 85% margin budget \u2014 slots get smaller, surface gets wider."
     },
     "MARGIN_BUDGET": {
       "value": 0.85,
