@@ -1,0 +1,22 @@
+
+=== split-TP + raised-BE, k=1.6, TAKER (live today) ===
+n=1280 WR=91.3% net=-0.0630%/trade CI[-0.119%,-0.010%] final=$5.825 maxDD=48.4%
+                  count      mean       sum
+exit_type                                  
+BE_RAISED           404  0.000151  0.060838
+BE_RAISED_BANKED    221  0.001634  0.361079
+EOD                   8 -0.017184 -0.137468
+MAE_KILL             70 -0.037757 -2.643000
+MAX_AGE              33 -0.017699 -0.584073
+TP                  544  0.003927  2.136151
+
+=== split-TP + raised-BE, k=1.6, MAKER (economics lever) ===
+n=1280 WR=91.3% net=+0.0170%/trade CI[-0.039%,+0.070%] final=$8.752 maxDD=35.6%
+                  count      mean       sum
+exit_type                                  
+BE_RAISED           404  0.000951  0.384038
+BE_RAISED_BANKED    221  0.002434  0.537879
+EOD                   8 -0.016384 -0.131068
+MAE_KILL             70 -0.036957 -2.587000
+MAX_AGE              33 -0.016899 -0.557673
+TP                  544  0.004727  2.571351
