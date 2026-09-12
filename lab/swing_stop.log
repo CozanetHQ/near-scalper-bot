@@ -1,0 +1,30 @@
+
+=== SWING (raw, today's fees) ===
+trades=1555  win_rate=64.1%  average/trade=-0.0569%  surely in [-0.097%, -0.017%]  end=$9.69  worst_dip=48%
+stop sizes: median 1.07%  mean 1.34%  worst 8.05%
+            count     mean      sum
+exit_type                          
+EOD             8 -0.00316 -0.02528
+MAX_AGE        12 -0.00827 -0.09926
+SWING_STOP    541 -0.01006 -5.44281
+TP            994  0.00471  4.68282
+
+=== SWING capped at 4% (today's fees) ===
+trades=1564  win_rate=63.9%  average/trade=-0.0604%  surely in [-0.101%, -0.021%]  end=$9.59  worst_dip=48%
+stop sizes: median 1.07%  mean 1.31%  worst 4.00%
+            count     mean      sum
+exit_type                          
+EOD             8 -0.00316 -0.02528
+MAX_AGE        12 -0.00827 -0.09926
+SWING_STOP    547 -0.01007 -5.51018
+TP            997  0.00470  4.69057
+
+=== SWING (raw, maker fees) ===
+trades=1563  win_rate=64.0%  average/trade=+0.0168%  surely in [-0.025%, +0.056%]  end=$16.71  worst_dip=39%
+stop sizes: median 1.07%  mean 1.34%  worst 8.05%
+            count     mean      sum
+exit_type                          
+EOD             8 -0.00236 -0.01888
+MAX_AGE        12 -0.00747 -0.08966
+SWING_STOP    548 -0.00933 -5.11300
+TP            995  0.00551  5.48342
