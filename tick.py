@@ -764,12 +764,13 @@ def process_tick(state):
         # ── P2 RISK ENGINE — MAE ceiling: beyond the empirical recovery band,
         # the ride stops paying. Caps tail loss at MAE_CEIL_FRAC instead of
         # letting doomed trades rot to the 6% HARD_SL (median 15.2h in the seed).
-        if MAE_CEIL_FRAC > 0 and (pos.get("mae_frac") or 0.0) >= MAE_CEIL_FRAC:
+        _mae_ceil = pair_param("MAE_CEIL_FRAC", symbol, MAE_CEIL_FRAC)
+        if _mae_ceil > 0 and (pos.get("mae_frac") or 0.0) >= _mae_ceil:
             trade, balance = close_position(pos, price, "MAE_KILL", now, balance)
             closed_any.append(trade)
             _pt(
                 f"\U0001F6A8 *MAE_KILL — {pos['side'].upper()} exit at ceiling*\n"
-                f"Adverse {(pos.get('mae_frac') or 0.0)*100:.1f}% >= locked {MAE_CEIL_FRAC*100:.0f}% — recovery odds gone\n"
+                f"Adverse {(pos.get('mae_frac') or 0.0)*100:.1f}% >= locked {_mae_ceil*100:.1f}% — recovery odds gone\n"
                 f"PnL ${trade['net_pnl']:.4f} | Balance ${balance:.4f}"
             )
             continue

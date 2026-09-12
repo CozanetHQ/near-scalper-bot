@@ -251,3 +251,52 @@ mark $2.5822. Sub-positions at reset:
 - LONG entry 2.6096 -> tp 2.6253, mfe 0.13% mae 1.64%, opened 2026-09-11T17:28:00.356896+00:00
 - LONG entry 2.6057 -> tp 2.6213, mfe 0.28% mae 1.49%, opened 2026-09-11T17:31:13.974004+00:00
 - LONG entry 2.6075 -> tp 2.6231, mfe 0.19% mae 1.56%, opened 2026-09-11T17:37:09.997909+00:00
+
+
+---
+
+# NEAR MAE CEILING TIGHTENED — 2026-09-12 (owner-directed, option 2)
+
+Owner: "the bot is losing massive" — NEAR is 8 trades net -$0.76 this session
+while the other four pairs are collectively +$0.16. Two MAE_KILLs at the
+4% ceiling ate everything the wins made. Owner chose option 2: sim a
+tighter wall on NEAR's own history before locking anything.
+
+**Root cause of the NEAR decline (separate from the wall fix):** chronological
+WR trend across NEAR's 138 lifetime trades: 100% -> 90% -> 95% -> 90% -> 85% ->
+90% -> 78%, with kills accelerating (0,2,1,2,3,2,4 per 20-trade window). Morning
+regime favored NEAR; the session drifted into chop and NEAR's entries stopped
+getting the follow-through their exits assume. Compounding this: no per-pair
+slot cap exists, so NEAR — the highest-firing pair — repeatedly stacks multiple
+correlated same-direction slots. One adverse move then kills several stacked
+positions at once (confirmed: today's two kills were both NEAR longs ~40min
+apart). This wall fix does NOT address the stacking issue — that is still open.
+
+**Simulation (resim: replace any historical trade whose recorded mae_frac >=
+candidate wall with a forced exit at -wall, fees unchanged; else keep actual
+outcome):**
+
+| wall | full-138 net | delta | recent-60 net | delta |
+|------|-------------|-------|----------------|-------|
+| 4.0% (actual) | -0.9730 | - | -1.1736 | - |
+| 1.5% | -1.4172 | -0.4442 | -1.1298 | +0.0438 |
+| 2.0% | -1.2575 | -0.2845 | -0.9878 | +0.1858 |
+| **2.5%** | **-0.8062** | **+0.1669** | **-0.8774** | **+0.2962** |
+| 3.0% | -1.1212 | -0.1481 | -1.1469 | +0.0266 |
+| 3.5% | -1.5256 | -0.5525 | -1.4165 | -0.2429 |
+
+Non-monotonic — 2.5% is the local optimum in BOTH windows independently, not
+"tighter is always better." Cost: 7/124 non-killed NEAR winners (BE_STOP/TP)
+had mae_frac >= 2.5% and would have been force-killed early instead of
+recovering — a real, disclosed tradeoff, not a free lunch.
+
+**HONEST CAVEAT:** NEAR remains net-negative even at 2.5% wall on this sample
+(-0.81 full history, -0.88 recent tail). This roughly HALVES the bleed. It does
+not fix NEAR's profitability. The bigger lever is the slot-stacking gap above.
+
+**Change:** `param_registry.json` per_pair.MAE_CEIL_FRAC: NEARUSDT = 0.025,
+all other pairs = 0.04 (explicit, global default, structure rollout pattern).
+`tick.py` MAE_KILL check now resolves via `pair_param("MAE_CEIL_FRAC", symbol,
+MAE_CEIL_FRAC)` instead of the raw global constant — this parameter was
+DEFINED with per-pair intent but never actually wired through pair_param()
+until now; it was a global-only constant in practice for every pair.

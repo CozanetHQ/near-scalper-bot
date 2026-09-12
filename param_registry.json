@@ -191,6 +191,38 @@
     "locked_by": "structure rollout (defaults = global, behavior identical)",
     "rationale": "Standing rule 2026-09-11: rules lock PER PAIR. Default = global locked value 48h until a pair-specific value is owner-authorized (proposals in research/phase4_validation_2026-09-11.md: BTC 8h, ETH 8h, SOL 6h, XRP 48h keep, NEAR 48h keep \u2014 validated on both windows)."
    }
+  },
+  "MAE_CEIL_FRAC": {
+   "NEARUSDT": {
+    "value": 0.025,
+    "locked_at": "2026-09-12T04:56:57.932606+00:00",
+    "locked_by": "owner-directed empirical sim (option 2)",
+    "rationale": "Owner-directed sim 2026-09-11/12: NEAR full lifetime (138 trades) and recent chop-regime tail (last 60) both independently pick 2.5% as the local-optimum wall \u2014 NOT monotonic (3.0%/3.5% are WORSE than both 4.0% actual and 2.5%, so this is not just 'tighter=better'). Resim method: for each historical trade, if its recorded mae_frac >= candidate wall, replace its outcome with a forced exit at -wall (approx, same fee model); else keep actual outcome. Full-138: actual net -0.9730 -> 2.5% net -0.8062 (delta +0.1669). Recent-60: actual net -1.1736 -> 2.5% net -0.8774 (delta +0.2962). Cost: 7/124 non-killed winners (BE_STOP/TP) had mae_frac >= 2.5% and would have been force-killed early instead of recovering. HONEST CAVEAT: NEAR remains net-negative even at 2.5% on this sample \u2014 this cuts the bleed roughly in half, it does NOT make NEAR profitable. The unresolved structural issue is slot stacking (no per-pair slot cap): NEAR has repeatedly held multiple correlated same-direction slots simultaneously, so one adverse move kills several stacked positions at once. Full math in research/phase4_validation_2026-09-11.md."
+   },
+   "BTCUSDT": {
+    "value": 0.04,
+    "locked_at": "2026-09-12T04:56:57.932606+00:00",
+    "locked_by": "structure rollout (defaults = global, behavior identical)",
+    "rationale": "Default = global locked value 0.04 until a pair-specific override is owner-authorized (structure rollout, behavior identical to global for this pair)."
+   },
+   "ETHUSDT": {
+    "value": 0.04,
+    "locked_at": "2026-09-12T04:56:57.932606+00:00",
+    "locked_by": "structure rollout (defaults = global, behavior identical)",
+    "rationale": "Default = global locked value 0.04 until a pair-specific override is owner-authorized (structure rollout, behavior identical to global for this pair)."
+   },
+   "SOLUSDT": {
+    "value": 0.04,
+    "locked_at": "2026-09-12T04:56:57.932606+00:00",
+    "locked_by": "structure rollout (defaults = global, behavior identical)",
+    "rationale": "Default = global locked value 0.04 until a pair-specific override is owner-authorized (structure rollout, behavior identical to global for this pair)."
+   },
+   "XRPUSDT": {
+    "value": 0.04,
+    "locked_at": "2026-09-12T04:56:57.932606+00:00",
+    "locked_by": "structure rollout (defaults = global, behavior identical)",
+    "rationale": "Default = global locked value 0.04 until a pair-specific override is owner-authorized (structure rollout, behavior identical to global for this pair)."
+   }
   }
  }
 }
