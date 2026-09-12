@@ -338,3 +338,20 @@ state is NOT yet gating entries. That is the next refinement target and needs
 its own study before any lock (data: bucket midday entries by regime at entry
 — requires recording rg at entry time in the trade record, which the engine
 does not yet do — flagged as engine gap for the next iteration).
+
+---
+
+# REGIME-AT-ENTRY TELEMETRY WIRED — 2026-09-12 (engine gap closed)
+
+The chop-gate study was blocked on data: trade records carried no regime
+label. Fixed today (owner "yes go on"): every NEW position now records
+`regime_at_entry` ({"chop","runaway"} — spike blocks entries entirely so
+nothing opens on spike ticks) and `atr_frac_at_entry` (1m ATR/price at
+entry, the volatility context a chop-gate bucketing needs). Fields ride
+the compact position format through the sync-endpoint whitelist
+(`rg`/`av` keys — round-trip probe passed, legacy positions parse as
+None) and persist into trades.jsonl at close via close_position.
+
+Study gate: once ~50-100 regime-tagged NEAR trades accumulate, bucket
+outcomes by regime x ATR-tercile and lock or reject the chop entry gate
+on THAT data. No lock before its own evidence (standing per-pair rule).

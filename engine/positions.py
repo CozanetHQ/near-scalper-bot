@@ -19,7 +19,8 @@ def serialize_positions(positions, max_positions, default_symbol):
          "a": bool(p.get("aligned")), "pr": p.get("pair") or default_symbol,
          "mf": round(p.get("mfe_frac") or 0.0, 6),
          "me": round(p.get("mae_frac") or 0.0, 6),
-         "sc": p.get("advisory_score"), "wr": p.get("wall_ratio")}
+         "sc": p.get("advisory_score"), "wr": p.get("wall_ratio"),
+         "rg": p.get("regime_at_entry"), "av": p.get("atr_frac_at_entry")}
         for p in positions[:max_positions]
     ]
     return {"last_error": json.dumps(compact, separators=(",", ":"))}
@@ -50,6 +51,8 @@ def parse_positions(state, default_symbol=None):
                     "mfe_frac": float(p.get("mf") or 0.0),
                     "mae_frac": float(p.get("me") or 0.0),
                     "advisory_score": p.get("sc"), "wall_ratio": p.get("wr"),
+                    "regime_at_entry": p.get("rg"),
+                    "atr_frac_at_entry": (float(p["av"]) if p.get("av") is not None else None),
                 })
         except (KeyError, TypeError, ValueError):
             continue

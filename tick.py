@@ -548,6 +548,8 @@ def close_position(pos, exit_price, reason, now, balance):
         "aligned": pos.get("aligned", None),
         "advisory_score": pos.get("advisory_score"),
         "wall_ratio": pos.get("wall_ratio"),
+        "regime_at_entry": pos.get("regime_at_entry"),
+        "atr_frac_at_entry": pos.get("atr_frac_at_entry"),
         "opened_at": pos["opened_at"],
         "closed_at": now,
     }
@@ -1029,6 +1031,11 @@ def process_tick(state):
                         "aligned": aligned, "pair": symbol,
                         "advisory_score": (advisory or {}).get("overall_score"),
                         "wall_ratio": (advisory or {}).get("wall_ratio"),
+                        # Regime study (owner 2026-09-12): record the classifier's
+                        # label + ATR context at ENTRY so per-regime outcome studies
+                        # (chop entry gate) have clean data. rg in {"chop","runaway"}.
+                        "regime_at_entry": regime,
+                        "atr_frac_at_entry": (round(atr / price, 6) if atr else None),
                     })
                     opened_this_tick = True
                     # OWNER 09-07: plain-dollar math on every entry — no percentages to decode.
