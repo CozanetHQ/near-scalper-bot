@@ -1,0 +1,7 @@
+=== RATCHET EXIT + MAKER EXECUTION (the candidate combination) ===
+ratchet k=1.6 fee=0.02% slip=0.01%: n=2074 net=+0.0678%/trade CI[+0.035%,+0.100%] final=$41.600 maxDD=22.4%
+   folds: f1: +0.056%  f2: +0.123%  f3: +0.024%
+ratchet k=1.6 fee=0.02% slip=0.03%: n=2074 net=+0.0278%/trade CI[-0.005%,+0.060%] final=$17.237 maxDD=25.8%
+   folds: f1: +0.016%  f2: +0.083%  f3: -0.016%
+ratchet k=1.6 fee=0.02% slip=0.00%: n=2078 net=+0.0887%/trade CI[+0.056%,+0.121%] final=$66.264 maxDD=20.7%
+   folds: f1: +0.079%  f2: +0.143%  f3: +0.045%
