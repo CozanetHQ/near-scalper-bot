@@ -1,0 +1,61 @@
+variant                             k     n     WR  NET/trade   CI low  CI high  final$  maxDD
+BASE (BE@50%, full TP)            1.6  1219  91.2%   -0.0417%  -0.098%  +0.014%   6.519  40.7%
+R (ratchet-only, 4 levels)        1.6  1993  94.8%   -0.0214%  -0.055%  +0.011%   6.994  33.0%
+P (bank 25% @ L1-L3 + runner)     1.6  2074  95.0%   -0.0617%  -0.093%  -0.031%   5.619  44.7%
+BASE (BE@50%, full TP)            2.0  1201  91.3%   -0.0393%  -0.096%  +0.017%   7.000  36.4%
+R (ratchet-only, 4 levels)        2.0  1997  94.6%   -0.0269%  -0.061%  +0.006%   6.637  36.4%
+P (bank 25% @ L1-L3 + runner)     2.0  2099  94.9%   -0.0659%  -0.099%  -0.035%   5.466  46.2%
+
+--- exit mix (k=2.0) ---
+
+BASE (BE@50%, full TP):
+           count      mean       sum
+exit_type                           
+BE_STOP      611  0.000500  0.305500
+EOD            8 -0.010568 -0.084545
+MAE_KILL      71 -0.036541 -2.594400
+MAX_AGE       26 -0.017753 -0.461581
+TP           485  0.004872  2.362936
+
+R (ratchet-only, 4 levels):
+           count      mean       sum
+exit_type                           
+EOD            8 -0.012183 -0.097464
+MAE_KILL      70 -0.036686 -2.568000
+MAX_AGE       30 -0.018567 -0.557005
+RATCHET     1646  0.000923  1.519726
+TP           243  0.004795  1.165133
+
+P (bank 25% @ L1-L3 + runner):
+                count      mean       sum
+exit_type                                
+EOD                 8 -0.012183 -0.097464
+LADDER_RATCHET   1730  0.000698  1.208159
+MAE_KILL           70 -0.036900 -2.583000
+MAX_AGE            30 -0.018567 -0.557005
+TP                261  0.002476  0.646316
+
+--- walk-forward folds (k=2.0) ---
+
+BASE (BE@50%, full TP):
+       count      mean       sum  mean_pct
+fold                                      
+fold1    401  0.000023  0.009362  0.002335
+fold2    400 -0.000456 -0.182552 -0.045638
+fold3    400 -0.000747 -0.298901 -0.074725
+
+R (ratchet-only, 4 levels):
+       count      mean       sum  mean_pct
+fold                                      
+fold1    666 -0.000612 -0.407526 -0.061190
+fold2    665  0.000226  0.150609  0.022648
+fold3    666 -0.000421 -0.280693 -0.042146
+
+P (bank 25% @ L1-L3 + runner):
+       count      mean       sum  mean_pct
+fold                                      
+fold1    700 -0.000687 -0.481136 -0.068734
+fold2    699 -0.000343 -0.240094 -0.034348
+fold3    700 -0.000945 -0.661764 -0.094538
+
+saved ladder_exit_results.csv
