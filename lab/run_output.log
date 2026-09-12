@@ -1,0 +1,58 @@
+
+=== BASELINE (no chop gate, fixed 1.6xATR TP) ===
+trades=1666 win_rate=88.5% expectancy=-0.0861% /trade total=-143.407%
+           count      mean       sum
+exit_type                           
+BE_STOP      708  0.000500  0.354000
+EOD            5 -0.009940 -0.049699
+MAE_KILL     173 -0.031862 -5.512200
+MAX_AGE       14 -0.017445 -0.244225
+TP           766  0.005245  4.018053
+         count      mean       sum
+regime                            
+CHOP      1168 -0.000816 -0.952994
+TREND      482 -0.000849 -0.409254
+unknown     16 -0.004489 -0.071822
+
+=== V6 (chop-gated + dynamic wall TP) ===
+trades=740 win_rate=89.3% expectancy=-0.0696% /trade total=-51.535%
+           count      mean       sum
+exit_type                           
+BE_STOP      301  0.000500  0.150500
+EOD            3 -0.008307 -0.024922
+MAE_KILL      64 -0.035072 -2.244600
+MAX_AGE       12 -0.016983 -0.203792
+TP           360  0.005021  1.807462
+         count      mean       sum
+regime                            
+TREND      724 -0.000613 -0.443530
+unknown     16 -0.004489 -0.071822
+
+BASELINE expectancy 95% bootstrap CI: [-0.1423%, -0.0311%] mean=-0.0859%
+V6       expectancy 95% bootstrap CI: [-0.1564%, 0.0108%] mean=-0.0696%
+
+--- Kelly-fraction sizing suggestion (v6 buckets, min 30 trades) ---
+BTCUSDT    TREND  n=  70 wr=85.7% avg_w=0.249% avg_l=2.963% -> kelly_mult=0.25 (kelly_scaled)
+BTCUSDT    unknown n=   2 wr=50.0% avg_w=0.050% avg_l=2.204% -> kelly_mult=1.00 (insufficient_sample)
+ETHUSDT    TREND  n=  83 wr=88.0% avg_w=0.275% avg_l=3.469% -> kelly_mult=0.25 (kelly_scaled)
+NEARUSDT   TREND  n= 246 wr=89.8% avg_w=0.317% avg_l=2.640% -> kelly_mult=0.25 (kelly_scaled)
+NEARUSDT   unknown n=   3 wr=33.3% avg_w=0.460% avg_l=2.640% -> kelly_mult=1.00 (insufficient_sample)
+SOLUSDT    TREND  n= 148 wr=93.2% avg_w=0.251% avg_l=3.824% -> kelly_mult=0.25 (kelly_scaled)
+XRPUSDT    TREND  n= 177 wr=88.7% avg_w=0.346% avg_l=3.488% -> kelly_mult=0.25 (kelly_scaled)
+XRPUSDT    unknown n=   3 wr=66.7% avg_w=0.050% avg_l=1.528% -> kelly_mult=1.00 (insufficient_sample)
+
+--- BASELINE walk-forward folds ---
+       count      mean       sum
+fold                            
+fold1    556 -0.000499 -0.277342
+fold2    555 -0.001393 -0.772999
+fold3    555 -0.000691 -0.383730
+
+--- V6 walk-forward folds ---
+       count      mean       sum
+fold                            
+fold1    247 -0.000250 -0.061752
+fold2    246 -0.001068 -0.262840
+fold3    247 -0.000772 -0.190761
+
+Saved results_baseline.csv, results_v6.csv
