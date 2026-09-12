@@ -3,60 +3,90 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>NEAR Scalper — Multi-Pair Terminal</title>
+<title>SCALPER v5 — Institutional Terminal</title>
 <style>
   :root {
-    --bg: #07090e; --panel: #0d111a; --panel2: #101521; --line: #1b2232;
-    --txt: #e7edf5; --mut: #7e8b9e; --dim: #55607a;
-    --grn: #22c55e; --red: #f0435c; --amb: #f5a623; --teal: #14b8a6; --blu: #3b82f6;
+    --bg: #060810; --panel: #0c111d; --panel2: #101728; --line: #1a2336;
+    --txt: #e8eef7; --mut: #7f8ca2; --dim: #525d78;
+    --grn: #2dd471; --red: #f2435c; --amb: #f5a623; --teal: #17c3b2; --blu: #4d8dff;
     --mono: "SF Mono", "JetBrains Mono", "Cascadia Code", Consolas, monospace;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: var(--bg); color: var(--txt); font-family: var(--mono);
-         font-variant-numeric: tabular-nums; padding: 14px; max-width: 1240px; margin: 0 auto; }
+  body { background:
+      radial-gradient(1200px 400px at 20% -10%, rgba(23,195,178,.05), transparent),
+      radial-gradient(900px 300px at 85% -10%, rgba(77,141,255,.05), transparent),
+      var(--bg);
+    color: var(--txt); font-family: var(--mono); font-variant-numeric: tabular-nums;
+    padding: 16px; max-width: 1280px; margin: 0 auto; }
   a { color: var(--blu); text-decoration: none; }
   .mut { color: var(--mut); } .dim { color: var(--dim); } .grn { color: var(--grn); }
   .red { color: var(--red); } .amb { color: var(--amb); } .teal { color: var(--teal); }
 
-  header { display: flex; align-items: center; gap: 12px; padding: 6px 2px 14px;
+  header { display: flex; align-items: center; gap: 12px; padding: 4px 2px 16px;
            border-bottom: 1px solid var(--line); margin-bottom: 14px; flex-wrap: wrap; }
-  header h1 { font-size: 15px; font-weight: 700; letter-spacing: 1.5px; }
-  header .sub { font-size: 10px; color: var(--mut); letter-spacing: 1px; }
-  .pill { font-size: 10px; padding: 3px 9px; border-radius: 20px; border: 1px solid;
+  .brand { display: flex; flex-direction: column; }
+  .brand h1 { font-size: 16px; font-weight: 800; letter-spacing: 2px; }
+  .brand h1 em { font-style: normal; color: var(--teal); }
+  .brand .sub { font-size: 9px; color: var(--mut); letter-spacing: 1.6px; margin-top: 2px; }
+  .pill { font-size: 10px; padding: 3px 10px; border-radius: 20px; border: 1px solid;
           letter-spacing: 1px; display: inline-flex; align-items: center; gap: 6px; }
-  .pill.live { color: var(--grn); border-color: #1d5c36; background: rgba(34,197,94,.07); }
+  .pill.live { color: var(--grn); border-color: #1d5c36; background: rgba(45,212,113,.07); }
   .pill.stale { color: var(--amb); border-color: #6b4c14; background: rgba(245,166,35,.08); }
-.viewseg { font-size: 10px; padding: 3px 9px; border-radius: 20px; border: 1px solid #243049;
-  color: var(--mut); cursor: pointer; user-select: none; letter-spacing: .5px; }
-.viewseg.on { color: var(--grn); border-color: #1d5c36; background: rgba(34,197,94,.07); }
+  .views { display: inline-flex; border: 1px solid var(--line); border-radius: 20px; overflow: hidden; }
+  .viewseg { font-size: 10px; padding: 4px 11px; color: var(--mut); cursor: pointer;
+             user-select: none; letter-spacing: .8px; border-right: 1px solid var(--line); }
+  .viewseg:last-child { border-right: none; }
+  .viewseg:hover { color: var(--txt); }
+  .viewseg.on { color: var(--grn); background: rgba(45,212,113,.08); }
   .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor;
          animation: blink 1.6s infinite; }
   @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: .25; } }
   #clock { margin-left: auto; font-size: 11px; color: var(--mut); }
 
-  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
-          gap: 8px; margin-bottom: 10px; }
-  .kpi { background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
-         padding: 10px 12px; }
-  .kpi .k { font-size: 9px; color: var(--mut); letter-spacing: 1.2px; text-transform: uppercase; }
-  .kpi .v { font-size: 17px; font-weight: 700; margin-top: 3px; }
-  .kpi .s { font-size: 9px; color: var(--dim); margin-top: 2px; }
+  .hero { display: grid; grid-template-columns: 1.15fr 1fr; gap: 10px; margin-bottom: 10px; }
+  @media (max-width: 900px) { .hero { grid-template-columns: 1fr; } }
+  .herocard { background: linear-gradient(160deg, var(--panel2), var(--panel));
+    border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px;
+    display: flex; flex-direction: column; }
+  .herocard .lbl { font-size: 9px; color: var(--mut); letter-spacing: 1.6px;
+                   text-transform: uppercase; }
+  .herocard .big { font-size: 32px; font-weight: 800; margin-top: 4px; line-height: 1; }
+  .chips { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .chip { font-size: 10px; padding: 3px 9px; border-radius: 8px; border: 1px solid var(--line);
+          color: var(--mut); background: rgba(255,255,255,.015); }
+  .chip b { font-weight: 700; color: var(--txt); }
+  .chip.up { border-color: #1d5c36; color: var(--grn); }
+  .chip.dn { border-color: #6b1f2b; color: var(--red); }
+  .trial { margin-top: auto; padding-top: 10px; font-size: 9px; color: var(--dim);
+           letter-spacing: 1px; border-top: 1px dashed var(--line); }
 
-  .grid { display: grid; grid-template-columns: 1.6fr 1fr; gap: 10px; margin-bottom: 10px; }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(126px, 1fr));
+          gap: 8px; margin-bottom: 10px; }
+  .kpi { background: var(--panel); border: 1px solid var(--line); border-radius: 9px;
+         padding: 10px 12px; position: relative; overflow: hidden; }
+  .kpi::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 2px;
+                 background: var(--teal); opacity: .5; }
+  .kpi .k { font-size: 8.5px; color: var(--mut); letter-spacing: 1.4px; text-transform: uppercase; }
+  .kpi .v { font-size: 17px; font-weight: 700; margin-top: 4px; }
+  .kpi .s { font-size: 9px; color: var(--dim); margin-top: 3px; }
+
+  .grid { display: grid; grid-template-columns: 1.55fr 1fr; gap: 10px; margin-bottom: 10px; }
   @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
-  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
-  .panel h2 { font-size: 10px; color: var(--mut); letter-spacing: 1.5px; padding: 9px 12px;
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 9px;
+           overflow: hidden; }
+  .panel h2 { font-size: 9.5px; color: var(--mut); letter-spacing: 1.6px; padding: 10px 12px;
               border-bottom: 1px solid var(--line); text-transform: uppercase;
               display: flex; justify-content: space-between; }
   .panel h2 .r { color: var(--dim); letter-spacing: 0; text-transform: none; }
 
   table { width: 100%; border-collapse: collapse; font-size: 11px; }
-  th { font-size: 9px; color: var(--dim); text-align: left; font-weight: 500;
-       padding: 6px 10px; border-bottom: 1px solid var(--line); letter-spacing: .5px; }
-  td { padding: 6px 10px; border-bottom: 1px solid #131a29; white-space: nowrap; }
+  th { font-size: 8.5px; color: var(--dim); text-align: left; font-weight: 500;
+       padding: 6px 10px; border-bottom: 1px solid var(--line); letter-spacing: .6px;
+       text-transform: uppercase; }
+  td { padding: 6px 10px; border-bottom: 1px solid #121829; white-space: nowrap; }
   tr:last-child td { border-bottom: none; }
   td.num, th.num { text-align: right; }
-  tr:hover td { background: rgba(59,130,246,.03); }
+  tr:hover td { background: rgba(77,141,255,.035); }
 
   .b { font-size: 9px; padding: 1px 7px; border-radius: 10px; border: 1px solid; letter-spacing: .5px; }
   .b-TP { color: var(--grn); border-color: #1d5c36; }
@@ -71,63 +101,94 @@
 
   #eq { width: 100%; display: block; }
 
-  .pairs { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 8px; }
-  .pcard { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px;
-           padding: 10px 12px; }
+  .pairs { display: grid; grid-template-columns: repeat(auto-fit, minmax(212px, 1fr)); gap: 8px; }
+  .pcard { background: var(--panel2); border: 1px solid var(--line); border-radius: 9px;
+           padding: 11px 13px; }
   .pcard .top { display: flex; justify-content: space-between; align-items: baseline; }
   .pcard .sym { font-size: 12px; font-weight: 700; letter-spacing: 1px; }
   .pcard .px { font-size: 13px; font-weight: 600; }
-  .pcard .row { display: flex; gap: 10px; margin-top: 6px; font-size: 9px; color: var(--mut); flex-wrap: wrap; }
+  .pcard .row { display: flex; gap: 8px; margin-top: 7px; font-size: 9px; color: var(--mut);
+                flex-wrap: wrap; }
   .tf { font-size: 8px; padding: 1px 5px; border-radius: 8px; }
-  .tf.bull { color: var(--grn); background: rgba(34,197,94,.09); }
-  .tf.bear { color: var(--red); background: rgba(240,67,92,.09); }
-  .tf.flat { color: var(--dim); background: rgba(85,96,122,.12); }
-  .pcard .wl { margin-top: 7px; font-size: 10px; display: flex; gap: 8px; }
+  .tf.bull { color: var(--grn); background: rgba(45,212,113,.09); }
+  .tf.bear { color: var(--red); background: rgba(242,67,92,.09); }
+  .tf.flat { color: var(--dim); background: rgba(82,93,120,.12); }
+  .pcard .wl { margin-top: 8px; font-size: 10px; display: flex; gap: 8px; align-items: center; }
   .open-tag { font-size: 9px; color: var(--blu); border: 1px solid #1e3a5f; border-radius: 10px;
-              padding: 1px 7px; background: rgba(59,130,246,.08); }
+              padding: 1px 7px; background: rgba(77,141,255,.08); }
 
-  footer { text-align: center; font-size: 9px; color: var(--dim); padding: 16px 0 6px; line-height: 1.7; }
+  footer { text-align: center; font-size: 9px; color: var(--dim); padding: 16px 0 6px;
+           line-height: 1.8; }
   .empty { padding: 18px; text-align: center; color: var(--dim); font-size: 10px; }
 </style>
 </head>
 <body>
 
 <header>
-  <h1>SCALPER v5 <span class="sub">INSTITUTIONAL TERMINAL · MULTI-PAIR ENGINE · PAPER DESK</span></h1>
+  <div class="brand">
+    <h1>SCALPER <em>v5</em></h1>
+    <span class="sub">INSTITUTIONAL TERMINAL · MULTI-PAIR ENGINE · PAPER DESK</span>
+  </div>
   <span class="pill live" id="status"><span class="dot"></span><span id="status-txt">LIVE</span></span>
-  <span class="pill stale" id="recovery" style="display:none;border-color:#6b4c14;background:rgba(245,166,35,.08)">RECOVERY · ¼ SLOTS</span>
-  <span class="viewseg" id="v-lifetime" title="All trades since account reset 2026-09-10">LIFETIME</span>
-  <span class="viewseg" id="v-clean" title="Only trades after the telemetry bug fix 2026-09-11 15:06 UTC — records before it are void (cross-pair candle bug)">CLEAN · SINCE FIX</span>
+  <span class="pill stale" id="recovery" style="display:none">RECOVERY · ¼ SLOTS</span>
+  <span class="pill stale" id="riskoff" style="display:none;border-color:#6b1f2b;background:rgba(242,67,92,.08)">DAILY LOSS LIMIT · RISK-OFF</span>
+  <div class="views">
+    <span class="viewseg on" id="v-session" title="Trades since the $10 session reset 2026-09-11 18:05 UTC — the tracked trial">SESSION · $10 TRIAL</span>
+    <span class="viewseg" id="v-clean" title="Trades after the telemetry bug fix 2026-09-11 15:06 UTC — earlier records void (cross-pair candle bug)">CLEAN · SINCE FIX</span>
+    <span class="viewseg" id="v-lifetime" title="All trades in the ledger (includes the void pre-fix records)">LIFETIME</span>
+  </div>
   <span id="clock">—</span>
 </header>
 
+<div class="hero">
+  <div class="herocard">
+    <span class="lbl">Account balance · paper</span>
+    <span class="big" id="h-bal">—</span>
+    <div class="chips">
+      <span class="chip" id="h-eq">equity —</span>
+      <span class="chip" id="h-unrl">unrealized —</span>
+      <span class="chip" id="h-net">session net —</span>
+      <span class="chip" id="h-day">today —</span>
+    </div>
+    <div class="trial" id="h-trial">SESSION · $10.00 START · 2026-09-11 18:05 UTC</div>
+  </div>
+  <div class="herocard">
+    <span class="lbl">Session equity curve</span>
+    <svg id="eq" height="118" viewBox="0 0 600 118" preserveAspectRatio="none"></svg>
+  </div>
+</div>
+
 <div class="kpis">
-  <div class="kpi"><div class="k">Balance</div><div class="v" id="k-bal">—</div><div class="s">paper account</div></div>
-  <div class="kpi"><div class="k">Today PnL</div><div class="v" id="k-day">—</div><div class="s">since UTC midnight</div></div>
-  <div class="kpi"><div class="k">Since reset</div><div class="v" id="k-net">—</div><div class="s" id="k-trades">—</div></div>
-  <div class="kpi"><div class="k">Win rate</div><div class="v" id="k-wr">—</div><div class="s">closed trades</div></div>
-  <div class="kpi"><div class="k">Open slots</div><div class="v" id="k-pos">—</div><div class="s" id="k-mgn">margin —</div></div>
-  <div class="kpi"><div class="k">Peak balance</div><div class="v" id="k-peak">—</div><div class="s">high-water mark</div></div>
+  <div class="kpi"><div class="k">Session net</div><div class="v" id="k-net">—</div><div class="s" id="k-trades">—</div></div>
+  <div class="kpi"><div class="k">Win rate</div><div class="v" id="k-wr">—</div><div class="s" id="k-wrw">—</div></div>
   <div class="kpi"><div class="k">Profit factor</div><div class="v" id="k-pf">—</div><div class="s">gross win / gross loss</div></div>
   <div class="kpi"><div class="k">Expectancy</div><div class="v" id="k-exp">—</div><div class="s">avg $ per trade</div></div>
   <div class="kpi"><div class="k">Max drawdown</div><div class="v" id="k-mdd">—</div><div class="s" id="k-mddpk">from peak</div></div>
+  <div class="kpi"><div class="k">Open slots</div><div class="v" id="k-pos">—</div><div class="s" id="k-mgn">margin —</div></div>
+  <div class="kpi"><div class="k">Peak balance</div><div class="v" id="k-peak">—</div><div class="s">high-water mark</div></div>
+  <div class="kpi"><div class="k">Best / worst pair</div><div class="v" id="k-bp" style="font-size:13px">—</div><div class="s" id="k-bps">session net by pair</div></div>
 </div>
 
 <div class="grid">
   <div class="panel">
-    <h2><span>Equity curve</span><span class="r" id="eq-delta">—</span></h2>
-    <svg id="eq" height="140" viewBox="0 0 600 140" preserveAspectRatio="none"></svg>
-  </div>
-  <div class="panel">
-    <h2><span>Exit mix</span><span class="r">since reset</span></h2>
-    <table id="exits"><thead><tr><th>Exit</th><th class="num">N</th><th class="num">PnL $</th><th class="num">Avg $</th></tr></thead><tbody></tbody></table>
+    <h2><span>Exit mix</span><span class="r" id="ex-note">current view</span></h2>
+    <table id="exits"><thead><tr><th>Exit</th><th class="num">N</th><th class="num">PnL $</th><th class="num">Avg $</th><th class="num">Share</th></tr></thead><tbody></tbody></table>
     <h2 style="border-top:1px solid var(--line);margin-top:2px"><span>P2 telemetry</span><span class="r">target vs trade failure</span></h2>
     <div id="tele" style="padding:8px 12px"></div>
+  </div>
+  <div class="panel">
+    <h2><span>Open positions — live</span><span class="r" id="pos-note">—</span></h2>
+    <table id="pos"><thead><tr>
+      <th>Pair</th><th>Side</th><th class="num">Entry</th><th class="num">Last</th>
+      <th class="num">Live PnL</th><th class="num">MFE</th><th class="num">MAE</th>
+      <th class="num">Age</th><th>Protection</th><th class="num">Notional</th>
+    </tr></thead><tbody></tbody></table>
+    <div class="empty" id="pos-empty" style="display:none">No open positions — engine waiting for signal + EV clearance</div>
   </div>
 </div>
 
 <div class="panel" style="margin-bottom:10px">
-  <h2><span>Performance by pair</span><span class="r">net · win rate · avg win/loss since reset</span></h2>
+  <h2><span>Performance by pair</span><span class="r">net · win rate · avg win/loss · current view</span></h2>
   <table id="pairperf"><thead><tr>
     <th>Pair</th><th class="num">Trades</th><th class="num">Net $</th><th class="num">WR %</th>
     <th class="num">Avg win</th><th class="num">Avg loss</th><th class="num">Last close</th>
@@ -135,32 +196,22 @@
 </div>
 
 <div class="panel" style="margin-bottom:10px">
-  <h2><span>Open positions — live</span><span class="r" id="pos-note">—</span></h2>
-  <table id="pos"><thead><tr>
-    <th>Pair</th><th>Side</th><th class="num">Entry</th><th class="num">Last</th>
-    <th class="num">Live PnL</th><th class="num">MFE</th><th class="num">MAE</th>
-    <th class="num">Age</th><th>Protection</th><th class="num">Notional</th>
-  </tr></thead><tbody></tbody></table>
-  <div class="empty" id="pos-empty" style="display:none">No open positions — engine waiting for signal + EV clearance</div>
-</div>
-
-<div class="panel" style="margin-bottom:10px">
-  <h2><span>Pairs</span><span class="r">bias 4h / 15m / 1m</span></h2>
+  <h2><span>Pairs</span><span class="r">bias 4h / 15m / 1m · regime snapshot</span></h2>
   <div class="pairs" id="pairs"></div>
 </div>
 
 <div class="panel">
-  <h2><span>Trade ledger</span><span class="r" id="led-note">last 30</span></h2>
+  <h2><span>Trade ledger</span><span class="r" id="led-note">last 30 · current view</span></h2>
   <table id="led"><thead><tr>
     <th>Closed</th><th>Pair</th><th>Side</th><th>Exit</th><th>Class</th>
     <th class="num">PnL $</th><th class="num">MFE</th><th class="num">MAE</th><th class="num">Held</th>
   </tr></thead><tbody></tbody></table>
-  <div class="empty" id="led-empty" style="display:none">Ledger empty — first closed trades will appear here</div>
+  <div class="empty" id="led-empty" style="display:none">No trades in this view yet</div>
 </div>
 
 <footer>
   ALL PARAMS LOCKED A PRIORI IN param_registry.json · P2 RISK ENGINE (BE STOP · MAE CEIL 4% · HARD SL 6% AIRBAG) · DD WALL 25% → RECOVERY ¼ SLOTS · DAILY LOSS LIMIT 12% WIRED<br>
-  Paper trading engine · Bitget USDT perps · git history = immutable audit trail · registry-locked params · refresh 30s
+  Paper trading engine · Bitget USDT perps · git history = immutable audit trail · per-pair rules via registry per_pair · refresh 30s
 </footer>
 
 <script>
@@ -171,10 +222,7 @@ const pct = (n, d=2) => n == null || isNaN(n) ? "—" :
   (n < 0 ? "−" : "") + Math.abs(n*100).toFixed(d) + "%";
 const toMs = iso => {
   if (!iso) return NaN;
-  // bot emits e.g. "2026-09-11T08:05:55.379779+00:00" — JS Date chokes on
-  // 6-digit microseconds; trim to milliseconds and only append Z if the
-  // string has no explicit offset already.
-  let s = iso.replace(/(\.\d{3})\d+/, "$1");
+  let s = String(iso).replace(/(\.\d{3})\d+/, "$1");
   if (!/[Zz]|[+-]\d{2}:\d{2}$/.test(s)) s += "Z";
   const t = new Date(s).getTime();
   return isNaN(t) ? NaN : t;
@@ -193,6 +241,10 @@ const cls = r => ({TP:"b-TP", BE_STOP:"b-BE_STOP", MAE_KILL:"b-MAE_KILL", HARD_S
   LIQ:"b-LIQ", MAX_AGE:"b-MAX_AGE"}[r] || "b-MAX_AGE");
 const tcls = s => ({target_success:"b-tgts", target_failure:"b-tgtf", trade_failure:"b-trdf", mixed:"b-mix"}[s] || "b-mix");
 
+const FIX_TS = Date.parse("2026-09-11T15:06:15Z");
+let SESSION_TS = null, SESSION_BAL = 10.0;
+let VIEW = "session";
+
 let CACHE = { state: null, trades: [] };
 
 async function pull(url) {
@@ -200,9 +252,11 @@ async function pull(url) {
   if (!r.ok) throw new Error(r.status);
   return r.text();
 }
-
 async function loadState() {
   CACHE.state = JSON.parse(await pull(BASE + "state/state.json"));
+  const a = CACHE.state.account || {};
+  if (a.session_start_at) SESSION_TS = toMs(a.session_start_at);
+  if (a.session_start_balance) SESSION_BAL = +a.session_start_balance;
   try {
     const t = await pull(BASE + "data/trades.jsonl");
     CACHE.trades = t.trim() ? t.trim().split("\n").filter(l => l.trim().startsWith("{")).map(JSON.parse) : [];
@@ -214,19 +268,35 @@ function tick() {
   render();
 }
 
-const FIX_TS = Date.parse("2026-09-11T15:06:15Z");  // telemetry bug fix commit 227c869 — records before this are void
-let VIEW = "lifetime";
+function viewTrades() {
+  if (VIEW === "session")
+    // chain guard: 3 trades settled mid-flight on the old $3 account during the
+    // reset race (closed_at past the reset, balance_after ~2.7-2.8). Their P&L
+    // never touched the $10 account — only trades on the new balance chain
+    // (balance_after >= half the session start) belong to this session.
+    return { ts: CACHE.trades.filter(t => SESSION_TS && t.closed_at &&
+                 toMs(t.closed_at) >= SESSION_TS &&
+                 (+t.balance_after || 0) >= SESSION_BAL * 0.5),
+             start: SESSION_BAL, label: "session" };
+  if (VIEW === "clean")
+    return { ts: CACHE.trades.filter(t => t.closed_at && toMs(t.closed_at) >= FIX_TS),
+             start: null, label: "clean" };
+  return { ts: CACHE.trades, start: null, label: "lifetime" };
+}
 
 function render() {
   const st = CACHE.state;
   if (!st) return;
   const acct = st.account || {};
   const pairs = st.pairs || {};
-  document.getElementById("v-lifetime").className = "viewseg" + (VIEW === "lifetime" ? " on" : "");
+  document.getElementById("v-session").className = "viewseg" + (VIEW === "session" ? " on" : "");
   document.getElementById("v-clean").className = "viewseg" + (VIEW === "clean" ? " on" : "");
-  const trades = VIEW === "clean"
-    ? CACHE.trades.filter(t => t.closed_at && toMs(t.closed_at) >= FIX_TS)
-    : CACHE.trades;
+  document.getElementById("v-lifetime").className = "viewseg" + (VIEW === "lifetime" ? " on" : "");
+
+  const V = viewTrades();
+  const trades = V.ts;
+  const first = trades.length ? (+trades[0].balance_after || 0) - (+trades[0].net_pnl || 0) : null;
+  const start = V.start != null ? V.start : (first != null && first > 0 ? first : 3.0);
 
   const _tickMs = toMs(acct.last_tick_at);
   const ageMin = isNaN(_tickMs) ? 99 : (Date.now() - _tickMs) / 60000;
@@ -235,90 +305,64 @@ function render() {
   pill.querySelector("#status-txt").textContent = ageMin < 12 ? "LIVE" : "STALE " + Math.round(ageMin) + "m";
   try {
     const snap = JSON.parse(acct.last_reversal_at || "{}");
-    const rbadge = document.getElementById("recovery");
-    if (snap.sf) { rbadge.style.display = "inline-flex"; }
-    else { rbadge.style.display = "none"; }
+    document.getElementById("recovery").style.display = snap.sf ? "inline-flex" : "none";
+    document.getElementById("riskoff").style.display = snap.drd ? "inline-flex" : "none";
   } catch (e) {}
 
-  const bal = acct.balance ?? 3.0;
-  const start = 3.0;
-  const net = VIEW === "clean"
-    ? trades.reduce((a, t) => a + (+t.net_pnl || 0), 0)
-    : (trades.length ? trades[trades.length-1].balance_after ?? bal : bal - start);
+  const bal = acct.balance ?? start;
+  let unrl = 0, unrlOk = false;
+  for (const p of Object.values(pairs)) {
+    const u = +p.unrealized_pnl;
+    if (!isNaN(u)) { unrl += u; unrlOk = true; }
+  }
+  const equity = bal + (unrlOk ? unrl : 0);
+
   const day0 = new Date(); day0.setUTCHours(0,0,0,0);
   const dayTrades = trades.filter(t => t.closed_at && toMs(t.closed_at) >= day0.getTime());
   const dayPnl = dayTrades.reduce((a, t) => a + (+t.net_pnl || 0), 0);
+  const sessNet = VIEW === "session" ? bal - SESSION_BAL
+    : trades.reduce((a, t) => a + (+t.net_pnl || 0), 0);
+  document.getElementById("h-bal").textContent = fmt(bal, 4);
+  document.getElementById("h-eq").innerHTML = "equity <b>" + fmt(equity, 4) + "</b>";
+  const hu = document.getElementById("h-unrl");
+  hu.innerHTML = "unrealized <b>" + fmt(unrlOk ? unrl : 0, 4) + "</b>";
+  hu.className = "chip " + (!unrlOk || Math.abs(unrl) < 1e-9 ? "" : unrl > 0 ? "up" : "dn");
+  const hn = document.getElementById("h-net");
+  hn.innerHTML = V.label + " net <b>" + fmt(sessNet, 4) + "</b> · <b>" +
+    (start > 0 ? (sessNet / start * 100).toFixed(2) : "—") + "%</b>";
+  hn.className = "chip " + (sessNet > 0 ? "up" : sessNet < 0 ? "dn" : "");
+  const hd = document.getElementById("h-day");
+  hd.innerHTML = "today <b>" + fmt(dayPnl, 4) + "</b>";
+  hd.className = "chip " + (dayPnl > 0 ? "up" : dayPnl < 0 ? "dn" : "");
+  document.getElementById("h-trial").textContent =
+    "SESSION · $" + SESSION_BAL.toFixed(2) + " START · " +
+    (acct.session_start_at ? acct.session_start_at.slice(0,16).replace("T"," ") + " UTC" : "—") +
+    (VIEW === "session" ? " · TRACKED TRIAL" : " · VIEWING " + V.label.toUpperCase());
+
   const wins = trades.filter(t => +t.net_pnl > 0).length;
-  document.getElementById("k-bal").textContent = fmt(bal, 4);
-  document.getElementById("k-day").textContent = fmt(dayPnl, 4);
-  document.getElementById("k-day").className = "v " + (dayPnl >= 0 ? "grn" : "red");
-  document.getElementById("k-net").textContent = fmt(net, 4);
-  document.getElementById("k-net").className = "v " + (net >= 0 ? "grn" : "red");
-  document.getElementById("k-trades").textContent = trades.length +
-    (VIEW === "clean" ? " closed · clean view" : " closed trades");
+  const losses = trades.length - wins;
+  document.getElementById("k-net").textContent = fmt(sessNet, 4);
+  document.getElementById("k-net").className = "v " + (sessNet >= 0 ? "grn" : "red");
+  document.getElementById("k-trades").textContent = trades.length + " closed · " + V.label;
   document.getElementById("k-wr").textContent = trades.length ? (100*wins/trades.length).toFixed(0) + "%" : "—";
-  document.getElementById("k-peak").textContent = fmt(acct.peak_balance ?? bal, 4);
+  document.getElementById("k-wrw").textContent = trades.length ? wins + "W / " + losses + "L" : "—";
   const gw = trades.filter(t => +t.net_pnl > 0).reduce((a, t) => a + +t.net_pnl, 0);
   const gl = Math.abs(trades.filter(t => +t.net_pnl < 0).reduce((a, t) => a + +t.net_pnl, 0));
   const pf = gl > 0 ? gw / gl : (gw > 0 ? "∞" : null);
   document.getElementById("k-pf").textContent = pf == null ? "—" : (pf === "∞" ? "∞" : pf.toFixed(2));
   const exp = trades.length ? trades.reduce((a, t) => a + (+t.net_pnl || 0), 0) / trades.length : null;
   document.getElementById("k-exp").textContent = exp == null ? "—" : fmt(exp, 4);
-  document.getElementById("k-exp").className = "v " + (exp >= 0 ? "grn" : "red");
-  const _start = (VIEW === "clean" && trades.length)
-    ? Math.max(0.0001, (+trades[0].balance_after || start) - (+trades[0].net_pnl || 0))
-    : start;
-  let _pk = _start, _mdd = 0;
-  for (const v of [_start, ...trades.map(t => +t.balance_after || _start)]) {
+  document.getElementById("k-exp").className = "v " + (exp != null && exp >= 0 ? "grn" : "red");
+  let _pk = start, _mdd = 0;
+  for (const v of [start, ...trades.map(t => +t.balance_after || start)]) {
     if (v > _pk) _pk = v;
     if (_pk - v > _mdd) _mdd = _pk - v;
   }
   document.getElementById("k-mdd").textContent = fmt(_mdd, 4);
   document.getElementById("k-mdd").className = "v " + (_mdd > start * 0.12 ? "red" : "amb");
   document.getElementById("k-mddpk").textContent = "peak " + fmt(_pk, 2) +
-    (VIEW === "clean" ? " · since fix" : "");
-
-  const tstates = {};
-  for (const t of trades) {
-    const k = t.trade_state || "unclassified";
-    tstates[k] = tstates[k] || { n: 0, pnl: 0 };
-    tstates[k].n++; tstates[k].pnl += +t.net_pnl || 0;
-  }
-  const tmax = Math.max(1, ...Object.values(tstates).map(v => v.n));
-  const tcolors = { target_success: "var(--grn)", target_failure: "var(--amb)",
-                    trade_failure: "var(--red)", mixed: "var(--blu)", unclassified: "var(--dim)" };
-  const tnames = { target_success: "TARGET SUCCESS", target_failure: "TARGET FAILURE",
-                   trade_failure: "TRADE FAILURE", mixed: "MIXED", unclassified: "UNCLASSIFIED" };
-  const tc = document.getElementById("tele");
-  tc.innerHTML = Object.keys(tstates).length
-    ? Object.entries(tstates).sort((a, b) => b[1].n - a[1].n).map(([k, v]) =>
-        '<div style="display:flex;align-items:center;gap:8px;margin:5px 0">' +
-        '<span style="width:110px;font-size:9px;color:var(--mut)">' + (tnames[k] || k) + "</span>" +
-        '<span style="flex:1;height:8px;background:#131a29;border-radius:4px;overflow:hidden">' +
-        '<span style="display:block;height:100%;width:' + (100*v.n/tmax) + '%;background:' + (tcolors[k] || "var(--dim)") + ';opacity:.75"></span></span>' +
-        '<span style="width:32px;text-align:right;font-size:10px">' + v.n + "</span>" +
-        '<span style="width:64px;text-align:right;font-size:10px;color:' + (v.pnl >= 0 ? "var(--grn)" : "var(--red)") + '">' + fmt(v.pnl, 3) + "</span></div>").join("")
-    : '<div class="empty" style="padding:10px">no closed trades yet</div>';
-
-  const byPair = {};
-  for (const t of trades) {
-    const k = t.pair || "?";
-    byPair[k] = byPair[k] || { n: 0, net: 0, w: 0, l: 0, gw: 0, gl: 0, last: null };
-    const o = byPair[k];
-    o.n++; o.net += +t.net_pnl || 0;
-    if (+t.net_pnl > 0) { o.w++; o.gw += +t.net_pnl; } else { o.l++; o.gl += Math.abs(+t.net_pnl); }
-    if (t.closed_at) o.last = t.closed_at;
-  }
-  const pp = document.querySelector("#pairperf tbody");
-  pp.innerHTML = Object.entries(byPair).sort((a, b) => b[1].net - a[1].net).map(([k, o]) =>
-    "<tr><td><b>" + k + "</b></td>" +
-    '<td class="num">' + o.n + "</td>" +
-    '<td class="num" style="color:' + (o.net >= 0 ? "var(--grn)" : "var(--red)") + '">' + fmt(o.net, 4) + "</td>" +
-    '<td class="num">' + (o.n ? (100 * o.w / o.n).toFixed(0) : "—") + "</td>" +
-    '<td class="num grn">' + (o.w ? fmt(o.gw / o.w, 3) : "—") + "</td>" +
-    '<td class="num red">' + (o.l ? fmt(o.gl / o.l, 3) : "—") + "</td>" +
-    '<td class="num dim">' + (o.last ? ago(o.last) + " ago" : "—") + "</td></tr>").join("")
-    || '<tr><td colspan="7" class="empty">no closed trades yet</td></tr>';
+    (_mdd > 0 && _pk > 0 ? " · " + (100*_mdd/_pk).toFixed(1) + "%" : "");
+  document.getElementById("k-peak").textContent = fmt(acct.peak_balance ?? _pk, 4);
 
   let positions = [];
   for (const [sym, p] of Object.entries(pairs)) {
@@ -326,10 +370,7 @@ function render() {
     if (typeof raw === "string" && raw.startsWith("[")) {
       try {
         for (const q of JSON.parse(raw)) {
-          if (q && (q.s === "long" || q.s === "short")) {
-            q.pr = q.pr || sym;
-            positions.push(q);
-          }
+          if (q && (q.s === "long" || q.s === "short")) { q.pr = q.pr || sym; positions.push(q); }
         }
       } catch (e) {}
     }
@@ -337,7 +378,8 @@ function render() {
   const maxPos = Number(acct.max_positions) || 8;
   const marginUsed = positions.reduce((a, q) => a + (q.m || 0), 0);
   document.getElementById("k-pos").textContent = positions.length + " / " + maxPos;
-  document.getElementById("k-mgn").textContent = "margin " + fmt(marginUsed, 2) + " · " + (100*marginUsed/bal).toFixed(0) + "% of bal";
+  document.getElementById("k-mgn").textContent = "margin " + fmt(marginUsed, 2) +
+    " · " + (bal > 0 ? (100*marginUsed/bal).toFixed(0) : "—") + "% of bal";
 
   const tb = document.querySelector("#pos tbody");
   tb.innerHTML = "";
@@ -364,10 +406,85 @@ function render() {
     tb.appendChild(tr);
   }
 
+  const byPair = {};
+  for (const t of trades) {
+    const k = t.pair || "?";
+    byPair[k] = byPair[k] || { n: 0, net: 0, w: 0, l: 0, gw: 0, gl: 0, last: null };
+    const o = byPair[k];
+    o.n++; o.net += +t.net_pnl || 0;
+    if (+t.net_pnl > 0) { o.w++; o.gw += +t.net_pnl; } else { o.l++; o.gl += Math.abs(+t.net_pnl); }
+    if (t.closed_at) o.last = t.closed_at;
+  }
+  const pp = document.querySelector("#pairperf tbody");
+  pp.innerHTML = Object.entries(byPair).sort((a, b) => b[1].net - a[1].net).map(([k, o]) =>
+    "<tr><td><b>" + k + "</b></td>" +
+    '<td class="num">' + o.n + "</td>" +
+    '<td class="num" style="color:' + (o.net >= 0 ? "var(--grn)" : "var(--red)") + '">' + fmt(o.net, 4) + "</td>" +
+    '<td class="num">' + (o.n ? (100 * o.w / o.n).toFixed(0) : "—") + "</td>" +
+    '<td class="num grn">' + (o.w ? fmt(o.gw / o.w, 3) : "—") + "</td>" +
+    '<td class="num red">' + (o.l ? fmt(o.gl / o.l, 3) : "—") + "</td>" +
+    '<td class="num dim">' + (o.last ? ago(o.last) + " ago" : "—") + "</td></tr>").join("")
+    || '<tr><td colspan="7" class="empty">no closed trades in this view yet</td></tr>';
+  const parr = Object.entries(byPair);
+  if (parr.length >= 2) {
+    parr.sort((a, b) => b[1].net - a[1].net);
+    const b1 = parr[0], b2 = parr[parr.length-1];
+    document.getElementById("k-bp").innerHTML =
+      '<span class="grn">' + b1[0].replace("USDT","") + " " + fmt(b1[1].net, 2) + "</span> / " +
+      '<span class="red">' + b2[0].replace("USDT","") + " " + fmt(b2[1].net, 2) + "</span>";
+  } else {
+    document.getElementById("k-bp").textContent = "—";
+  }
+
+  const by = {};
+  for (const t of trades) {
+    by[t.reason] = by[t.reason] || { n: 0, pnl: 0 };
+    by[t.reason].n++; by[t.reason].pnl += +t.net_pnl || 0;
+  }
+  const et = document.querySelector("#exits tbody");
+  const reasons = Object.entries(by).sort((a, b) => b[1].n - a[1].n);
+  const totN = trades.length || 1;
+  et.innerHTML = reasons.map(([r, v]) =>
+    '<tr><td><span class="b ' + cls(r) + '">' + r + "</span></td>" +
+    '<td class="num">' + v.n + "</td>" +
+    '<td class="num" style="color:' + (v.pnl >= 0 ? "var(--grn)" : "var(--red)") + '">' + fmt(v.pnl, 4) + "</td>" +
+    '<td class="num">' + fmt(v.pnl / v.n, 4) + "</td>" +
+    '<td class="num dim">' + (100*v.n/totN).toFixed(0) + "%</td></tr>").join("")
+    || '<tr><td colspan="5" class="empty">No exits yet</td></tr>';
+  document.getElementById("ex-note").textContent = V.label + " view";
+
+  const tstates = {};
+  for (const t of trades) {
+    const k = t.trade_state || "unclassified";
+    tstates[k] = tstates[k] || { n: 0, pnl: 0 };
+    tstates[k].n++; tstates[k].pnl += +t.net_pnl || 0;
+  }
+  const tmax = Math.max(1, ...Object.values(tstates).map(v => v.n));
+  const tcolors = { target_success: "var(--grn)", target_failure: "var(--amb)",
+                    trade_failure: "var(--red)", mixed: "var(--blu)", unclassified: "var(--dim)" };
+  const tnames = { target_success: "TARGET SUCCESS", target_failure: "TARGET FAILURE",
+                   trade_failure: "TRADE FAILURE", mixed: "MIXED", unclassified: "UNCLASSIFIED" };
+  const tc = document.getElementById("tele");
+  tc.innerHTML = Object.keys(tstates).length
+    ? Object.entries(tstates).sort((a, b) => b[1].n - a[1].n).map(([k, v]) =>
+        '<div style="display:flex;align-items:center;gap:8px;margin:5px 0">' +
+        '<span style="width:110px;font-size:9px;color:var(--mut)">' + (tnames[k] || k) + "</span>" +
+        '<span style="flex:1;height:8px;background:#121829;border-radius:4px;overflow:hidden">' +
+        '<span style="display:block;height:100%;width:' + (100*v.n/tmax) + '%;background:' + (tcolors[k] || "var(--dim)") + ';opacity:.75"></span></span>' +
+        '<span style="width:32px;text-align:right;font-size:10px">' + v.n + "</span>" +
+        '<span style="width:64px;text-align:right;font-size:10px;color:' + (v.pnl >= 0 ? "var(--grn)" : "var(--red)") + '">' + fmt(v.pnl, 3) + "</span></div>").join("")
+    : '<div class="empty" style="padding:10px">no closed trades yet</div>';
+
   const pc = document.getElementById("pairs");
   pc.innerHTML = "";
   for (const [sym, p] of Object.entries(pairs)) {
     const tfv = (c) => c === "bull" ? "bull" : c === "bear" ? "bear" : "flat";
+    let rg = "", w = "";
+    try {
+      const snap = JSON.parse(p.last_reversal_at || "{}");
+      rg = snap.rg ? '<span class="chip" style="padding:1px 6px">' + snap.rg + "</span>" : "";
+      w = snap.w ? '<span class="chip" style="padding:1px 6px;color:var(--dim)" title="' + snap.w + '">WAIT: ' + String(snap.w).split("—")[0].trim() + "</span>" : "";
+    } catch (e) {}
     const card = document.createElement("div");
     card.className = "pcard";
     card.innerHTML =
@@ -377,38 +494,16 @@ function render() {
       '<span class="tf ' + tfv(p.last_4h_color) + '">4H ' + (p.last_4h_color || "—") + "</span>" +
       '<span class="tf ' + tfv(p.last_15m_color) + '">15M ' + (p.last_15m_color || "—") + "</span>" +
       '<span class="tf ' + tfv(p.last_1m_color) + '">1M ' + (p.last_1m_color || "—") + "</span>" +
-      '<span class="dim">tick ' + ago(p.last_tick_at) + " ago</span>" +
+      rg + w +
       "</div>" +
       '<div class="wl">' +
       '<span class="grn">W ' + (p.wins || 0) + "</span><span class='red'>L " + (p.losses || 0) + "</span>" +
       '<span class="mut">' + (p.total_trades || 0) + " trades</span>" +
       (p.position_open ? '<span class="open-tag">' + (p.side || "").toUpperCase() + " OPEN</span>" : "") +
+      '<span class="dim" style="margin-left:auto">tick ' + ago(p.last_tick_at) + "</span>" +
       "</div>";
     pc.appendChild(card);
   }
-
-  const by = {};
-  for (const t of trades) {
-    by[t.reason] = by[t.reason] || { n: 0, pnl: 0 };
-    by[t.reason].n++; by[t.reason].pnl += +t.net_pnl || 0;
-  }
-  const et = document.querySelector("#exits tbody");
-  et.innerHTML = "";
-  const reasons = Object.entries(by).sort((a, b) => b[1].n - a[1].n);
-  for (const [r, v] of reasons) {
-    const tr = document.createElement("tr");
-    tr.innerHTML = '<td><span class="b ' + cls(r) + '">' + r + "</span></td>" +
-      '<td class="num">' + v.n + "</td>" +
-      '<td class="num" style="color:' + (v.pnl >= 0 ? "var(--grn)" : "var(--red)") + '">' + fmt(v.pnl, 4) + "</td>" +
-      '<td class="num">' + fmt(v.pnl / v.n, 4) + "</td>";
-    et.appendChild(tr);
-  }
-  if (!reasons.length) et.innerHTML = '<tr><td colspan="4" class="empty">No exits yet</td></tr>';
-
-  const pts = [start, ...trades.map(t => +t.balance_after || start).filter(x => !isNaN(x))];
-  drawEq(pts);
-  document.getElementById("eq-delta").textContent =
-    pts.length > 1 ? fmt(pts[pts.length-1] - pts[0], 4) + " since start" : "awaiting first trade";
 
   const lt = document.querySelector("#led tbody");
   lt.innerHTML = "";
@@ -427,31 +522,45 @@ function render() {
       '<td class="num">' + (t.minutes_held != null ? t.minutes_held + "m" : "—") + "</td>";
     lt.appendChild(tr);
   }
+
+  const pts = [start, ...trades.map(t => +t.balance_after || start).filter(x => !isNaN(x))];
+  drawEq(pts);
 }
 
 function drawEq(pts) {
   const svg = document.getElementById("eq");
-  if (pts.length < 2) { svg.innerHTML = '<text x="300" y="75" text-anchor="middle" fill="#55607a" font-size="10">awaiting trade history…</text>'; return; }
-  const W = 600, H = 140, P = 6;
+  if (pts.length < 2) {
+    svg.innerHTML = '<text x="300" y="60" text-anchor="middle" fill="#525d78" font-size="10">awaiting session trade history…</text>';
+    return;
+  }
+  const W = 600, H = 118, P = 8;
   const mn = Math.min(...pts), mx = Math.max(...pts);
   const span = Math.max(mx - mn, 0.05);
   const X = i => P + i * (W - 2*P) / (pts.length - 1);
   const Y = v => H - P - (v - mn) * (H - 2*P) / span;
   const path = pts.map((v, i) => (i ? "L" : "M") + X(i).toFixed(1) + " " + Y(v).toFixed(1)).join(" ");
   const up = pts[pts.length-1] >= pts[0];
-  const col = up ? "#22c55e" : "#f0435c";
+  const col = up ? "#2dd471" : "#f2435c";
   const zeroY = Y(Math.max(mn, Math.min(mx, pts[0])));
-  svg.innerHTML =
-    '<line x1="0" x2="' + W + '" y1="' + zeroY + '" y2="' + zeroY + '" stroke="#1b2232" stroke-dasharray="3 4"/>' +
-    '<path d="' + path + " L " + X(pts.length-1) + " " + (H-P) + " L " + X(0) + " " + (H-P) + ' Z" fill="' + col + '" opacity="0.07" stroke="none"/>' +
-    '<path d="' + path + '" fill="none" stroke="' + col + '" stroke-width="1.5"/>' +
-    '<circle cx="' + X(pts.length-1) + '" cy="' + Y(pts[pts.length-1]) + '" r="2.5" fill="' + col + '">' +
-    "<title>bal " + pts[pts.length-1].toFixed(4) + "</title></circle>";
+  let grid = "";
+  for (let g = 1; g <= 3; g++) {
+    const gy = (H - 2*P) * g / 4 + P;
+    grid += '<line x1="0" x2="' + W + '" y1="' + gy + '" y2="' + gy + '" stroke="#141b2e" stroke-width="1"/>';
+  }
+  svg.innerHTML = grid +
+    '<line x1="0" x2="' + W + '" y1="' + zeroY + '" y2="' + zeroY + '" stroke="#2a3550" stroke-dasharray="3 4"/>' +
+    '<path d="' + path + " L " + X(pts.length-1) + " " + (H-P) + " L " + X(0) + " " + (H-P) + ' Z" fill="' + col + '" opacity="0.08" stroke="none"/>' +
+    '<path d="' + path + '" fill="none" stroke="' + col + '" stroke-width="1.6"/>' +
+    '<circle cx="' + X(pts.length-1) + '" cy="' + Y(pts[pts.length-1]) + '" r="2.6" fill="' + col + '">' +
+    "<title>bal " + pts[pts.length-1].toFixed(4) + "</title></circle>" +
+    '<text x="6" y="14" fill="#525d78" font-size="9">' + fmt(pts[0],2) + "</text>" +
+    '<text x="' + (W-6) + '" y="14" text-anchor="end" fill="#525d78" font-size="9">' + fmt(pts[pts.length-1],2) + "</text>";
 }
 
 async function refresh() {
-  document.getElementById("v-lifetime").onclick = () => { VIEW = "lifetime"; render(); };
+  document.getElementById("v-session").onclick = () => { VIEW = "session"; render(); };
   document.getElementById("v-clean").onclick = () => { VIEW = "clean"; render(); };
+  document.getElementById("v-lifetime").onclick = () => { VIEW = "lifetime"; render(); };
   try { await loadState(); tick(); } catch (e) {
     document.getElementById("status").className = "pill stale";
     document.getElementById("status-txt").textContent = "FEED " + (e.message || "ERR");
