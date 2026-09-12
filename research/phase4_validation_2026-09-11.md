@@ -300,3 +300,41 @@ all other pairs = 0.04 (explicit, global default, structure rollout pattern).
 MAE_CEIL_FRAC)` instead of the raw global constant — this parameter was
 DEFINED with per-pair intent but never actually wired through pair_param()
 until now; it was a global-only constant in practice for every pair.
+
+
+---
+
+# NEAR PER-PAIR SLOT CAP — 2026-09-12 (owner-authorized, "yes pls" to cap + dig)
+
+**Concurrency reconstruction** of NEAR's 138-trade ledger (open-interval sweep:
+at each entry, count how many NEAR positions were already open):
+
+| concurrent slots at entry | n | net | WR | MAE_KILLs |
+|---|---|---|---|---|
+| 1 | 11 | -0.4287 | 82% | 2 |
+| 2 | 14 | -0.2719 | 93% | 1 |
+| 3 | 18 | **+0.2473** | **100%** | **0** |
+| 4+ | 95 | -0.5197 | 88% | **11** |
+
+The engine's most active pair spent most of its life deeply stacked, and the
+4+ bucket carries 11 of 14 lifetime kills. Stacked same-direction slots die
+together on one correlated adverse move — both evening kills on 2026-09-11
+were stacked longs ~40min apart.
+
+**Lock:** per_pair.MAX_SLOTS_PER_PAIR — NEAR=3 (the best bucket's ceiling),
+other pairs = 8 (global default, behavior identical; they get their own cap
+only when their own data justifies one, per the standing per-pair rule).
+Global budget (8 slots, 80% margin) still enforced independently — this is a
+tightening, never a loosening. `can_open` now checks
+`len(still_open) < pair_param("MAX_SLOTS_PER_PAIR", symbol, MAX_POSITIONS)`.
+
+**Hour-of-day drift (the chop question, part 1):** NEAR by entry hour UTC —
+08:00-11:59 is green across 36 trades (+$0.37, ZERO kills); 12:00-16:00 bleeds
+(-$0.60, 11 kills); the two large evening kills were stacked-long casualties.
+The morning trend regime pays this strategy; the midday chop kills it. The
+regime classifier already blocks runaway counter-trend and spikes, but NEAR's
+midday entries pass the current gates and still lose — the classifier's "chop"
+state is NOT yet gating entries. That is the next refinement target and needs
+its own study before any lock (data: bucket midday entries by regime at entry
+— requires recording rg at entry time in the trade record, which the engine
+does not yet do — flagged as engine gap for the next iteration).

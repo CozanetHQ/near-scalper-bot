@@ -223,6 +223,38 @@
     "locked_by": "structure rollout (defaults = global, behavior identical)",
     "rationale": "Default = global locked value 0.04 until a pair-specific override is owner-authorized (structure rollout, behavior identical to global for this pair)."
    }
+  },
+  "MAX_SLOTS_PER_PAIR": {
+   "NEARUSDT": {
+    "value": 3,
+    "locked_at": "2026-09-12T05:11:28.813089+00:00",
+    "locked_by": "owner-authorized empirical lock (concurrency study 2026-09-12)",
+    "rationale": "Concurrency reconstruction of NEAR's 138-trade ledger: 95 trades were entered with 4+ slots already stacked \u2014 that bucket carries 11 of 14 lifetime MAE_KILLs and net -$0.52. Buckets 1-3: 43 trades, 3 kills, and the 3-slot bucket is NEAR's best (+0.2473, 100% WR, 0 kills). Cap at 3 keeps every profitable bucket and eliminates the deep-stack bleed: stacked same-direction slots die together on one correlated adverse move (both 2026-09-11 evening kills were stacked longs ~40min apart). Counterfactual: removing the 4+ bucket moves NEAR's lifetime net from -$0.97 to roughly -$0.45 before the 2.5% wall cut. Global budget (8 slots + 80% margin) still enforced independently."
+   },
+   "BTCUSDT": {
+    "value": 8,
+    "locked_at": "2026-09-12T05:11:28.813089+00:00",
+    "locked_by": "structure rollout (default = MAX_POSITIONS, behavior identical)",
+    "rationale": "Default = global slot budget until that pair's own concurrency evidence justifies a per-pair value (owner standing rule: rules lock PER PAIR, never globally)."
+   },
+   "ETHUSDT": {
+    "value": 8,
+    "locked_at": "2026-09-12T05:11:28.813089+00:00",
+    "locked_by": "structure rollout (default = MAX_POSITIONS, behavior identical)",
+    "rationale": "Default = global slot budget until that pair's own concurrency evidence justifies a per-pair value (owner standing rule: rules lock PER PAIR, never globally)."
+   },
+   "SOLUSDT": {
+    "value": 8,
+    "locked_at": "2026-09-12T05:11:28.813089+00:00",
+    "locked_by": "structure rollout (default = MAX_POSITIONS, behavior identical)",
+    "rationale": "Default = global slot budget until that pair's own concurrency evidence justifies a per-pair value (owner standing rule: rules lock PER PAIR, never globally)."
+   },
+   "XRPUSDT": {
+    "value": 8,
+    "locked_at": "2026-09-12T05:11:28.813089+00:00",
+    "locked_by": "structure rollout (default = MAX_POSITIONS, behavior identical)",
+    "rationale": "Default = global slot budget until that pair's own concurrency evidence justifies a per-pair value (owner standing rule: rules lock PER PAIR, never globally)."
+   }
   }
  }
 }

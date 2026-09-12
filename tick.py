@@ -952,9 +952,11 @@ def process_tick(state):
                 want = None
                 wait_reason = f"regime:spike — 1m range {spike:.1f}x ATR (manipulation/liquidation cascade risk)"
         opened_this_tick = False
+        _slots_cap = pair_param("MAX_SLOTS_PER_PAIR", symbol, MAX_POSITIONS)
         can_open = (
             want is not None
             and entry_cooldown_ok
+            and len(still_open) < _slots_cap
             and len(still_open) + int(state.get("_other_open") or 0) < MAX_POSITIONS
             and not daily_risk_off
         )
