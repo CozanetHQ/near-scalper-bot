@@ -246,6 +246,18 @@ PROTECT_FLOOR_FRAC = float(os.environ.get("PROTECT_FLOOR_FRAC", "0.55"))
 START_BALANCE = 3.0
 FEE_RATE = 0.0006
 BE_BUFFER_FRAC = 2 * FEE_RATE + 2 * SLIP_ASSUMED_PCT + 0.0005   # P2: BE_STOP exit covers round-trip costs + crumb
+
+# ── MAKER-EXIT FEE MODEL (owner paper authorization 2026-09-13, audit §22-23) ──
+# TP and PROTECTED exits are calm resting-limit fills -> maker fee 0.02%/leg.
+# BE_STOP / MAE_KILL / HARD_SL / SL / MAX_AGE / EOD are urgent risk exits ->
+# taker 0.06%/leg (guaranteed fill). ENTRY leg stays taker market order (owner:
+# enter that second; post_only entry fills measured to miss the immediate
+# winners — adverse selection, lab §23). Paper-validated: blended model flips
+# act70_r15 expectancy -0.0086% -> +0.0731%/trade (§22). MAKER_EXITS=0 restores
+# pure taker everywhere.
+MAKER_EXITS = os.environ.get("MAKER_EXITS", "1") == "1"
+MAKER_FEE_RATE = 0.0002
+MAKER_EXIT_REASONS = {"TP", "PROTECTED"}
 POLL_INTERVAL = 15
 MAX_RUNTIME = int(os.environ.get('MAX_RUNTIME', 240))  # ~4 min loop; next run chains immediately
 
@@ -631,7 +643,10 @@ def close_position(pos, exit_price, reason, now, balance):
     entry = pos["entry_price"]
     diff = (exit_price - entry) if is_long else (entry - exit_price)
     gross = diff * (notional / entry)
-    fees = notional * FEE_RATE * 2
+    # §22 fee model: taker entry leg always; exit leg maker on TP/PROTECTED
+    # (resting limit), taker on all urgent/risk exits.
+    exit_fee_rate = MAKER_FEE_RATE if (MAKER_EXITS and reason in MAKER_EXIT_REASONS) else FEE_RATE
+    fees = notional * (FEE_RATE + exit_fee_rate)
     net = gross - fees - (notional * SLIP_PCT * 2)  # stress: slippage both sides
     new_balance = balance + net
     # Owner spec 2026-09-11, principle 2: trade failure (immediately wrong) and

@@ -299,5 +299,17 @@
         "rationale": "Owner rule 1, 2026-09-13: pair proven bad in all time zones -> 5x everywhere. 30d audit: -0.207%/trade, CI [-0.400%,-0.030%]."
       }
     }
+  },
+  "maker_exit_fee_model": {
+    "locked": "2026-09-13",
+    "basis": "audit \u00a722-23; owner paper authorization",
+    "MAKER_EXITS": true,
+    "MAKER_FEE_RATE": 0.0002,
+    "MAKER_EXIT_REASONS": [
+      "TP",
+      "PROTECTED"
+    ],
+    "entry_leg": "taker 0.0006 (market order, unchanged per owner)",
+    "risk_exits": "taker 0.0006 (guaranteed fill)"
   }
 }
