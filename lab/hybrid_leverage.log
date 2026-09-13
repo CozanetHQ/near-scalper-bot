@@ -1,0 +1,23 @@
+=== TIER TABLE (assigned from days 1-20, locked before the hold-out run) ===
+pair verdicts: {'BTCUSDT': 'mixed', 'ETHUSDT': 'mixed', 'SOLUSDT': 'mixed', 'XRPUSDT': 'mixed', 'NEARUSDT': 'BAD-EVERYWHERE'}
+BTCUSDT   00-02h:10x | 03-05h:10x | 06-08h:10x | 09-11h:10x | 12-14h:10x | 15-17h:10x | 18-20h:10x | 21-23h:10x
+ETHUSDT   00-02h:10x | 03-05h:10x | 06-08h:10x | 09-11h:10x | 12-14h:10x | 15-17h:10x | 18-20h:10x | 21-23h:10x
+SOLUSDT   00-02h:10x | 03-05h:10x | 06-08h:10x | 09-11h:10x | 12-14h:10x | 15-17h:10x | 18-20h:10x | 21-23h:10x
+XRPUSDT   00-02h:10x | 03-05h:10x | 06-08h:10x | 09-11h:10x | 12-14h:10x | 15-17h:10x | 18-20h:10x | 21-23h:10x
+NEARUSDT  00-02h:5x | 03-05h:5x | 06-08h:5x | 09-11h:5x | 12-14h:5x | 15-17h:5x | 18-20h:5x | 21-23h:5x
+tier usage across 40 cells: {5: np.int64(8), 10: np.int64(32)}
+
+=== HOLD-OUT EVALUATION (days 21-30, out-of-sample) ===
+flat 10x   n= 117  mean -0.0892%/trade  CI [-0.279%, +0.077%]  sum -10.43%
+HYBRID     n= 117  mean -0.0947%/trade  CI [-0.279%, +0.065%]  sum -11.08%
+hybrid minus flat (per trade): -0.0056%
+hybrid full-run: final $7.56, maxDD 33.1%   (flat-10x full-run reference: $6.52, 40.7%)
+
+hold-out exit mix:
+           count     mean      sum
+exit_type                         
+BE_STOP       65  0.00050  0.03267
+EOD            8 -0.00837 -0.06697
+MAE_KILL       5 -0.03800 -0.18998
+MAX_AGE        3 -0.01565 -0.04696
+TP            36  0.00446  0.16041
