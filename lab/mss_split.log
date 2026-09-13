@@ -1,0 +1,17 @@
+role          dir     n      best    exp%   CIlo% pairs+ folds+  ret30%  ret240%
+CONTINUATION   -1   874 t1.0_s1.0  -0.147  -0.160 0/5   0/3    -0.003   -0.281
+CONTINUATION   +1   866 t1.0_s1.5  -0.118  -0.135 0/5   0/3    +0.058   +0.258
+REVERSAL       -1   866 t1.0_s1.5  -0.135  -0.147 0/5   0/3    -0.058   -0.258
+REVERSAL       +1   874 t0.6_s1.0  -0.102  -0.128 0/5   0/3    +0.003   +0.281
+
+beta baseline (mean 240-bar close-to-close return, all bars):
+Traceback (most recent call last):
+  File "<stdin>", line 55, in <module>
+ValueError: operands could not be broadcast together with shapes (42660,) (42900,) 
+beta baseline (mean 240-bar close-to-close return, all bars):
+  BTCUSDT: mean240=+0.110%  (30d change +20.4%)
+  ETHUSDT: mean240=+0.153%  (30d change +28.7%)
+  SOLUSDT: mean240=+0.158%  (30d change +29.8%)
+  XRPUSDT: mean240=+0.170%  (30d change +30.3%)
+  NEARUSDT: mean240=+0.250%  (30d change +47.8%)
+  ALL pairs pooled: mean240=+0.168%

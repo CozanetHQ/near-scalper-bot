@@ -1,0 +1,12 @@
+collapsed: 5296
+premise variant         dir     n      best    exp%   CIlo% pairs+ folds+ dropmax%   mfe%   mae%  ret30%  ret240%
+MSS     M1_break_close   -1  1344 t1.0_s1.5  -0.147  -0.156 0/5   0/3     -0.152   1.36   1.60  -0.032   -0.256
+MSS     M1_break_close   +1  1344 t0.6_s1.0  -0.114  -0.132 0/5   0/3     -0.120   1.60   1.36  +0.032   +0.256
+MSS     M2_retest        -1  1304 t1.6_s1.0  -0.137  -0.148 0/5   0/3     -0.141   1.32   1.55  -0.018   -0.244
+MSS     M2_retest        +1  1304 t0.6_s1.0  -0.131  -0.141 0/5   0/3     -0.133   1.55   1.32  +0.018   +0.244
+
+travel test by premise x dir:
+MSS     M1_break_close dir=-1 n= 1344 ret30=-0.032 (CIlo -0.068) ret240=-0.256
+MSS     M1_break_close dir=+1 n= 1344 ret30=+0.032 (CIlo -0.005) ret240=+0.256
+MSS     M2_retest      dir=-1 n= 1304 ret30=-0.018 (CIlo -0.054) ret240=-0.244
+MSS     M2_retest      dir=+1 n= 1304 ret30=+0.018 (CIlo -0.020) ret240=+0.244
