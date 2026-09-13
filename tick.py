@@ -219,6 +219,21 @@ RSI_LONG_ENTRY = 50    # GRID SEARCH WINNER: loose gate — more entries, more e
 RSI_SHORT_ENTRY = 50
 RSI_EARLY_VELOCITY = 3  # early entry: RSI still below/above gate but swinging this fast
 LEVERAGE = 10
+# ── HYBRID LEVERAGE SYSTEM (owner design, authorized 2026-09-13) ──────────
+# Per-position leverage: zone table (eight 3h UTC buckets) > per-pair registry
+# override > global. Tiers 5/10/15/20x. Promotion needs PROOF (bootstrap CI>0
+# on trailing data, see compute_leverage_zones); a pair proven bad in ALL
+# zones drops to 5x everywhere (owner rule 1). HARD_SL scales with leverage so
+# the exchange can never liquidate before our own stop (0.63x-liq rule, the
+# 2026-09-10 lock rationale generalized).
+HARD_SL_BY_LEV = {5: 0.12, 10: 0.06, 15: 0.04, 20: 0.03}
+# ── 60/40 FLOOR (owner 2026-09-13): once MFE >= 60% of the TP distance, the
+# protective floor locks at entry + 40% of the TP distance. A retrace exits
+# THERE (FLOOR40) instead of scraping back to the fee-buffer BE — attacks the
+# BE_STOP plague directly: rescues pay ~0.4xTP instead of +costs.
+DYN_FLOOR = os.environ.get("DYN_FLOOR", "0")  # 60/40 floor: code shipped, live OFF — lab 2026-09-13 (audit §17) shows it is net-negative (-0.063%/trade, CI entirely below zero). One flag flips it on with owner authorization.
+FLOOR_ARM_FRAC = float(os.environ.get("FLOOR_ARM_FRAC", "0.60"))
+FLOOR_LVL_FRAC = float(os.environ.get("FLOOR_LVL_FRAC", "0.40"))
 START_BALANCE = 3.0
 FEE_RATE = 0.0006
 BE_BUFFER_FRAC = 2 * FEE_RATE + 2 * SLIP_ASSUMED_PCT + 0.0005   # P2: BE_STOP exit covers round-trip costs + crumb
@@ -366,6 +381,99 @@ def send_telegram(text):
     except Exception as e:
         log(f"Telegram send failed: {e}")
 
+
+# zone table loaded from the LOCKED registry (params.LEVERAGE_ZONES.value)
+_LEVERAGE_ZONES = {}
+try:
+    with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "param_registry.json")) as _f:
+        _LEVERAGE_ZONES = (json.load(_f).get("params", {}).get("LEVERAGE_ZONES", {}) or {}).get("value") or {}
+except Exception:
+    _LEVERAGE_ZONES = {}
+_RUN_LEV_ZONES = {}   # rolling re-tier, recomputed fresh each run (no state storage)
+
+def _boot_ci(vals, n_boot=2000, seed=17):
+    """Tiny pure-python bootstrap 95% CI (no numpy in the live runner)."""
+    import random as _random
+    rng = _random.Random(seed)
+    n = len(vals)
+    if n < 5:
+        return None
+    means = []
+    for _ in range(n_boot):
+        s = 0.0
+        for _i in range(n):
+            s += vals[rng.randrange(n)]
+        means.append(s / n)
+    means.sort()
+    return means[int(0.025 * n_boot)], means[int(0.975 * n_boot)]
+
+def compute_leverage_zones():
+    """Rolling re-tier (owner 2026-09-13): evidence from the trailing 14 days
+    of closed trades, recomputed fresh each run (state storage is impossible —
+    the sync whitelist drops unknown keys). Only CONCLUSIVE cells override the
+    locked registry table: pair proven bad in ALL zones (pooled CI<0, n>=30)
+    -> 5x everywhere; a zone with n>=25 and CI<0 -> 5x; CI>0 -> 15x (20x if
+    mean >= +0.10%/trade). Cells without conclusive evidence keep the registry
+    tier / per-pair override / global. Result capped 5..20x."""
+    zones = {}
+    try:
+        cutoff = datetime.now(timezone.utc).timestamp() - 14 * 86400
+        per = {}
+        with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "trades.jsonl")) as f:
+            for line in f:
+                line = line.strip()
+                if not line.startswith("{"):
+                    continue
+                try:
+                    t = json.loads(line)
+                    ca = (t.get("closed_at") or "").replace("Z", "+00:00")
+                    if not ca or datetime.fromisoformat(ca).timestamp() < cutoff:
+                        continue
+                    r = (t.get("net_pnl") or 0.0) / max(t.get("balance_after") or 1.0, 1e-9)
+                    per.setdefault(t.get("pair") or "", []).append((ca, r))
+                except Exception:
+                    continue
+    except Exception:
+        return zones
+    for pair, rows in per.items():
+        vals = [r for _, r in rows]
+        ci = _boot_ci(vals) if len(vals) >= 30 else None
+        pair_bad = bool(ci and ci[1] < 0)
+        row_zones = []
+        for b in range(8):
+            tier = None
+            if pair_bad:
+                tier = 5
+            else:
+                bv = [r for ca, r in rows if datetime.fromisoformat(ca).hour // 3 == b]
+                if len(bv) >= 25:
+                    ci = _boot_ci(bv)
+                    if ci:
+                        if ci[1] < 0:
+                            tier = 5
+                        elif ci[0] > 0:
+                            tier = 20 if (sum(bv) / len(bv)) >= 0.0010 else 15
+            row_zones.append(tier)
+        zones[pair] = row_zones
+    return zones
+
+def position_leverage(symbol, now_iso):
+    """Per-position leverage: computed zone (conclusive cells only) > registry
+    LEVERAGE_ZONES > per-pair LEVERAGE override > global. Capped 5..20x."""
+    try:
+        bucket = datetime.fromisoformat(now_iso).astimezone(timezone.utc).hour // 3
+    except Exception:
+        bucket = None
+    for source in (_RUN_LEV_ZONES.get(symbol), _LEVERAGE_ZONES.get(symbol)):
+        if isinstance(source, list) and len(source) == 8 and bucket is not None:
+            v = source[bucket]
+            if isinstance(v, int) and 5 <= v <= 20:
+                return v
+    try:
+        lv = int(pair_param("LEVERAGE", symbol, LEVERAGE))
+    except Exception:
+        lv = LEVERAGE
+    return max(5, min(20, lv))
 
 def load_master():
     """The engine's single source of truth: state/state.json, committed to git
@@ -540,6 +648,8 @@ def close_position(pos, exit_price, reason, now, balance):
         "exit_price": exit_price,
         "notional": notional,
         "margin": pos["margin"],
+        "leverage": pos.get("leverage") or LEVERAGE,
+        "hard_sl": pos.get("hard_sl") or HARD_SL_FRAC,
         "gross_pnl": round(gross, 6),
         "fees": round(fees, 6),
         "net_pnl": round(net, 6),
@@ -570,6 +680,8 @@ def registry_check():
             "EV_PRIOR_WINRATE": EV_PRIOR_WINRATE,
             "EV_MARGIN_REQ": EV_MARGIN_REQ,
             "SLIP_ASSUMED_PCT": SLIP_ASSUMED_PCT,
+            "FLOOR_ARM_FRAC": FLOOR_ARM_FRAC,
+            "FLOOR_LVL_FRAC": FLOOR_LVL_FRAC,
             "TREND_RUNAWAY_CANDLES": TREND_RUNAWAY_CANDLES,
             "SPIKE_RANGE_MULT": SPIKE_RANGE_MULT,
             "MIN_TP_DIST_FRAC": MIN_TP_DIST_FRAC,
@@ -739,7 +851,7 @@ def process_tick(state):
         # the slot before any TP could matter.
         if LIQ_MODEL == "1" and pos.get("margin") and pos["margin"] > 0:
             adverse = (pos["entry_price"] - price) / pos["entry_price"] if pos["side"] == "long" else (price - pos["entry_price"]) / pos["entry_price"]
-            liq_frac = (1.0 / LEVERAGE) - 0.005  # maintenance buffer
+            liq_frac = (1.0 / float(pos.get("leverage") or LEVERAGE)) - 0.005  # maintenance buffer
             if adverse >= liq_frac:
                 liq_price = pos["entry_price"] * (1 - liq_frac) if pos["side"] == "long" else pos["entry_price"] * (1 + liq_frac)
                 trade, balance = close_position(pos, liq_price, "LIQ", now, balance)
@@ -754,12 +866,13 @@ def process_tick(state):
         # Fires before liquidation math would, and independent of TP/TP-aging.
         hs_side = pos["side"]
         hs_adverse = (pos["entry_price"] - price) / pos["entry_price"] if hs_side == "long" else (price - pos["entry_price"]) / pos["entry_price"]
-        if HARD_SL_FRAC > 0 and hs_adverse >= HARD_SL_FRAC:
+        _hs = float(pos.get("hard_sl") or HARD_SL_FRAC)
+        if _hs > 0 and hs_adverse >= _hs:
             trade, balance = close_position(pos, price, "HARD_SL", now, balance)
             closed_any.append(trade)
             _pt(
                 f"\U0001F6D1 *HARD_SL — {pos['side'].upper()} force-closed*\n"
-                f"Entry ${pos['entry_price']:.4f} → ${price:.4f} (adverse {hs_adverse*100:.1f}% >= locked {HARD_SL_FRAC*100:.0f}%)\n"
+                f"Entry ${pos['entry_price']:.4f} → ${price:.4f} (adverse {hs_adverse*100:.1f}% >= locked {_hs*100:.0f}% @ {pos.get('leverage') or LEVERAGE}x)\n"
                 f"PnL ${trade['net_pnl']:.4f} | Balance ${balance:.4f}"
             )
             continue
@@ -783,6 +896,32 @@ def process_tick(state):
         if DYN_SL == "1" and tp > 0:
             _tp_frac = abs(tp - pos["entry_price"]) / pos["entry_price"]
             _mfe = pos.get("mfe_frac") or 0.0
+            # 60/40 FLOOR (owner 2026-09-13): armed at 60% of TP distance,
+            # floor sits at 40% — above the BE buffer, so it fires first on
+            # a retrace. Rescues pay ~0.4xTP instead of scraping to BE.
+            if DYN_FLOOR == "1" and _tp_frac > 0 and _mfe >= FLOOR_ARM_FRAC * _tp_frac:
+                if is_long:
+                    _floor = pos["entry_price"] * (1 + FLOOR_LVL_FRAC * _tp_frac)
+                    if price <= _floor:
+                        trade, balance = close_position(pos, _floor, "FLOOR40", now, balance)
+                        closed_any.append(trade)
+                        _pt(
+                            f"\U0001F9F1 *FLOOR40 — {pos['side'].upper()} protected at the 40% floor*\n"
+                            f"MFE {_mfe*100:.2f}% armed the floor; exit at entry+{FLOOR_LVL_FRAC*100:.0f}% of TP dist\n"
+                            f"PnL ${trade['net_pnl']:.4f} | Balance ${balance:.4f}"
+                        )
+                        continue
+                else:
+                    _floor = pos["entry_price"] * (1 - FLOOR_LVL_FRAC * _tp_frac)
+                    if price >= _floor:
+                        trade, balance = close_position(pos, _floor, "FLOOR40", now, balance)
+                        closed_any.append(trade)
+                        _pt(
+                            f"\U0001F9F1 *FLOOR40 — {pos['side'].upper()} protected at the 40% floor*\n"
+                            f"MFE {_mfe*100:.2f}% armed the floor; exit at entry-{FLOOR_LVL_FRAC*100:.0f}% of TP dist\n"
+                            f"PnL ${trade['net_pnl']:.4f} | Balance ${balance:.4f}"
+                        )
+                        continue
             if _tp_frac > 0 and _mfe >= BE_TRIGGER_FRAC * _tp_frac:
                 if is_long:
                     _be = pos["entry_price"] * (1 + BE_BUFFER_FRAC)
@@ -992,7 +1131,8 @@ def process_tick(state):
             # per-slot cap: 8 slots x balance notional = exactly the 80% margin
             # budget at 10x — a single trade can never hog the whole budget and
             # freeze the bot (the 2026-09-06 wedge lesson).
-            slot_cap = balance * MARGIN_BUDGET * LEVERAGE / MAX_POSITIONS
+            _lev = position_leverage(symbol, now)
+            slot_cap = balance * MARGIN_BUDGET * _lev / MAX_POSITIONS
             if safe_on:
                 # OWNER 2026-09-11 recovery sizing: 1/4 slots below the wall,
                 # floored at the dust minimum so the account keeps trading.
@@ -1006,9 +1146,9 @@ def process_tick(state):
                     # single position gets the entire remaining budget; TP still
                     # >= 1.6x ATR (or the 0.6% fee-survival floor), whichever
                     # the market allows (math_spec §6).
-                    notional = min(slot_cap, margin_left * LEVERAGE, 40.0)
+                    notional = min(slot_cap, margin_left * _lev, 40.0)
                 else:
-                    notional = min(target / per_unit, slot_cap, margin_left * LEVERAGE, 40.0)
+                    notional = min(target / per_unit, slot_cap, margin_left * _lev, 40.0)
                 if notional >= 1.0:  # don't open dust positions
                     # Phase 5 advisory: Second Engine scores on every entry.
                     # Logged for live out-of-sample accumulation — NEVER gates.
@@ -1019,12 +1159,13 @@ def process_tick(state):
                                                 abs(forming_1m["high"] - forming_1m["low"]))
                     except Exception:
                         advisory = None
-                    margin = notional / LEVERAGE
+                    margin = notional / _lev
                     entry = price
                     tp = entry + entry_tp_dist if want == "long" else entry - entry_tp_dist
                     still_open.append({
                         "side": want, "entry_price": entry, "tp_price": tp,
                         "notional": notional, "margin": margin, "opened_at": now,
+                        "leverage": _lev, "hard_sl": HARD_SL_BY_LEV.get(_lev, HARD_SL_FRAC),
                         # Position telemetry (owner spec 2026-09-11: the empirical
                         # MFE/MAE/duration record every management decision reads).
                         "mfe_frac": 0.0, "mae_frac": 0.0,
@@ -1136,6 +1277,10 @@ def process_tick(state):
 
 
 def main():
+    global _RUN_LEV_ZONES
+    _RUN_LEV_ZONES = compute_leverage_zones()
+    if _RUN_LEV_ZONES:
+        log("hybrid leverage zones (trailing 14d evidence): " + json.dumps(_RUN_LEV_ZONES))
     start = time.time()
     ticks = 0
     trades = 0
