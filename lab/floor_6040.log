@@ -1,0 +1,23 @@
+
+=== CURRENT (no floor, live today) ===
+n=1219 WR=91.2% net=-0.0417%/trade CI[-0.098%,+0.014%] final=$6.52 maxDD=40.7%
+folds: f1:+0.002% f2:-0.057% f3:-0.071%
+           count     mean      sum
+exit_type                         
+BE_STOP      607  0.00050  0.30350
+EOD            8 -0.00788 -0.06303
+MAE_KILL      74 -0.03654 -2.70360
+MAX_AGE       26 -0.01737 -0.45174
+TP           504  0.00477  2.40597
+
+=== 60/40 FLOOR (owner spec) ===
+n=1202 WR=90.8% net=-0.0633%/trade CI[-0.123%,-0.007%] final=$6.10 maxDD=45.8%
+folds: f1:-0.022% f2:-0.131% f3:-0.037%
+           count     mean      sum
+exit_type                         
+BE_STOP      211  0.00050  0.10550
+EOD            8 -0.01465 -0.11722
+FLOOR40      466  0.00106  0.49528
+MAE_KILL      70 -0.03733 -2.61300
+MAX_AGE       32 -0.01850 -0.59207
+TP           415  0.00472  1.96063
