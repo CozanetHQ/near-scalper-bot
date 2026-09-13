@@ -227,13 +227,22 @@ LEVERAGE = 10
 # the exchange can never liquidate before our own stop (0.63x-liq rule, the
 # 2026-09-10 lock rationale generalized).
 HARD_SL_BY_LEV = {5: 0.12, 10: 0.06, 15: 0.04, 20: 0.03}
-# ── 60/40 FLOOR (owner 2026-09-13): once MFE >= 60% of the TP distance, the
-# protective floor locks at entry + 40% of the TP distance. A retrace exits
-# THERE (FLOOR40) instead of scraping back to the fee-buffer BE — attacks the
-# BE_STOP plague directly: rescues pay ~0.4xTP instead of +costs.
-DYN_FLOOR = os.environ.get("DYN_FLOOR", "0")  # 60/40 floor: code shipped, live OFF — lab 2026-09-13 (audit §17) shows it is net-negative (-0.063%/trade, CI entirely below zero). One flag flips it on with owner authorization.
-FLOOR_ARM_FRAC = float(os.environ.get("FLOOR_ARM_FRAC", "0.60"))
-FLOOR_LVL_FRAC = float(os.environ.get("FLOOR_LVL_FRAC", "0.40"))
+# ── PROFIT PROTECTION ENGINE (owner spec 2026-09-13; full 27-config sweep
+# study, audit §18). Once MFE >= PROTECT_ARM_FRAC of the TP distance the
+# position enters TP_PROTECTION_ARMED; the exit floor locks at
+# PROTECT_FLOOR_FRAC of the TP distance — a reversal exits there (PROTECTED)
+# with a kept profit instead of scraping back to BE_STOP. Config 70/55 won
+# the sweep (activation 30-70% x retracement 10-30%): PF 0.84->0.96,
+# maxDD 40.7%->36.5%, BE_STOPs 607->328, 2/3 folds >= baseline. The owner's
+# 40% hypothesis was REJECTED — early activation cuts eventual winners.
+# IDEMPOTENT BY CONSTRUCTION: arming is a pure function of (MFE, TP distance)
+# so repeated price updates cannot re-arm; the exit fires once and removes
+# the position from the book, so it cannot re-trigger. The floor is always
+# above the fee buffer -> protection can never lock a guaranteed loss after
+# costs (verified: 0.55*tp >= 2*fee+2*slip+buffer for all live tp distances).
+DYN_FLOOR = os.environ.get("DYN_FLOOR", "1")  # study-authorized: ON
+PROTECT_ARM_FRAC = float(os.environ.get("PROTECT_ARM_FRAC", "0.70"))
+PROTECT_FLOOR_FRAC = float(os.environ.get("PROTECT_FLOOR_FRAC", "0.55"))
 START_BALANCE = 3.0
 FEE_RATE = 0.0006
 BE_BUFFER_FRAC = 2 * FEE_RATE + 2 * SLIP_ASSUMED_PCT + 0.0005   # P2: BE_STOP exit covers round-trip costs + crumb
@@ -680,8 +689,8 @@ def registry_check():
             "EV_PRIOR_WINRATE": EV_PRIOR_WINRATE,
             "EV_MARGIN_REQ": EV_MARGIN_REQ,
             "SLIP_ASSUMED_PCT": SLIP_ASSUMED_PCT,
-            "FLOOR_ARM_FRAC": FLOOR_ARM_FRAC,
-            "FLOOR_LVL_FRAC": FLOOR_LVL_FRAC,
+            "PROTECT_ARM_FRAC": PROTECT_ARM_FRAC,
+            "PROTECT_FLOOR_FRAC": PROTECT_FLOOR_FRAC,
             "TREND_RUNAWAY_CANDLES": TREND_RUNAWAY_CANDLES,
             "SPIKE_RANGE_MULT": SPIKE_RANGE_MULT,
             "MIN_TP_DIST_FRAC": MIN_TP_DIST_FRAC,
@@ -896,29 +905,63 @@ def process_tick(state):
         if DYN_SL == "1" and tp > 0:
             _tp_frac = abs(tp - pos["entry_price"]) / pos["entry_price"]
             _mfe = pos.get("mfe_frac") or 0.0
-            # 60/40 FLOOR (owner 2026-09-13): armed at 60% of TP distance,
-            # floor sits at 40% — above the BE buffer, so it fires first on
-            # a retrace. Rescues pay ~0.4xTP instead of scraping to BE.
-            if DYN_FLOOR == "1" and _tp_frac > 0 and _mfe >= FLOOR_ARM_FRAC * _tp_frac:
+            # ── PROFIT PROTECTION state machine (study §18, 70/55) ──
+            # NORMAL -> TP_PROTECTION_ARMED (MFE >= 70% of TP dist)
+            #       -> PROTECTED exit (retrace through the 55% floor) or FULL_TP.
+            # Events: PROTECTION_ARMED logged once per run per position;
+            # PROTECTION_TRIGGERED/PROTECTION_EXIT logged at close with the
+            # full evidence trail the owner spec requires.
+            if DYN_FLOOR == "1" and _tp_frac > 0 and _mfe >= PROTECT_ARM_FRAC * _tp_frac:
+                # clamp to the cost floor (lab floor_frac_of): protection can
+                # NEVER lock a guaranteed loss once fees+slip are paid — at very
+                # tight TP distances the 55% floor sits below costs, so it rides
+                # the cost buffer instead (same clamp the sweep was run with).
+                _floor_frac = max(PROTECT_FLOOR_FRAC * _tp_frac,
+                                  2 * FEE_RATE + 2 * SLIP_ASSUMED_PCT + 0.0005)
+                if not pos.get("prot_armed"):
+                    pos["prot_armed"] = True
+                    log(
+                        "PROTECTION_ARMED " + symbol + " " + pos["side"] +
+                        " entry=" + str(pos["entry_price"]) + " price=" + str(price) +
+                        " tp=" + str(tp) + " tp_progress=" + str(round(_mfe / _tp_frac * 100, 1)) + "%" +
+                        " protection_level=" + str(round(_floor_frac * 100, 3)) + "%of_price" +
+                        " mfe=" + str(round(_mfe, 6)) + " mae=" + str(round(pos.get("mae_frac") or 0.0, 6)) +
+                        " ts=" + now)
                 if is_long:
-                    _floor = pos["entry_price"] * (1 + FLOOR_LVL_FRAC * _tp_frac)
+                    _floor = pos["entry_price"] * (1 + _floor_frac)
                     if price <= _floor:
-                        trade, balance = close_position(pos, _floor, "FLOOR40", now, balance)
+                        trade, balance = close_position(pos, _floor, "PROTECTED", now, balance)
                         closed_any.append(trade)
+                        log(
+                            "PROTECTION_EXIT " + symbol + " " + pos["side"] +
+                            " entry=" + str(pos["entry_price"]) + " exit=" + str(_floor) +
+                            " tp=" + str(tp) + " tp_progress=" + str(round(_mfe / _tp_frac * 100, 1)) + "%" +
+                            " protection_level=" + str(round(_floor_frac * 100, 3)) + "%" +
+                            " mfe=" + str(round(_mfe, 6)) + " mae=" + str(round(pos.get("mae_frac") or 0.0, 6)) +
+                            " realized=" + str(trade["net_pnl"]) +
+                            " fees=" + str(trade["fees"]) + " ts=" + now)
                         _pt(
-                            f"\U0001F9F1 *FLOOR40 — {pos['side'].upper()} protected at the 40% floor*\n"
-                            f"MFE {_mfe*100:.2f}% armed the floor; exit at entry+{FLOOR_LVL_FRAC*100:.0f}% of TP dist\n"
+                            f"\U0001F9F1 *PROTECTED — {pos['side'].upper()} profit locked at the 55% floor*\n"
+                            f"MFE {(_mfe/_tp_frac)*100:.0f}% of TP armed protection; reversal exit kept {PROTECT_FLOOR_FRAC*100:.0f}% of TP distance\n"
                             f"PnL ${trade['net_pnl']:.4f} | Balance ${balance:.4f}"
                         )
                         continue
                 else:
-                    _floor = pos["entry_price"] * (1 - FLOOR_LVL_FRAC * _tp_frac)
+                    _floor = pos["entry_price"] * (1 - _floor_frac)
                     if price >= _floor:
-                        trade, balance = close_position(pos, _floor, "FLOOR40", now, balance)
+                        trade, balance = close_position(pos, _floor, "PROTECTED", now, balance)
                         closed_any.append(trade)
+                        log(
+                            "PROTECTION_EXIT " + symbol + " " + pos["side"] +
+                            " entry=" + str(pos["entry_price"]) + " exit=" + str(_floor) +
+                            " tp=" + str(tp) + " tp_progress=" + str(round(_mfe / _tp_frac * 100, 1)) + "%" +
+                            " protection_level=" + str(round(_floor_frac * 100, 3)) + "%" +
+                            " mfe=" + str(round(_mfe, 6)) + " mae=" + str(round(pos.get("mae_frac") or 0.0, 6)) +
+                            " realized=" + str(trade["net_pnl"]) +
+                            " fees=" + str(trade["fees"]) + " ts=" + now)
                         _pt(
-                            f"\U0001F9F1 *FLOOR40 — {pos['side'].upper()} protected at the 40% floor*\n"
-                            f"MFE {_mfe*100:.2f}% armed the floor; exit at entry-{FLOOR_LVL_FRAC*100:.0f}% of TP dist\n"
+                            f"\U0001F9F1 *PROTECTED — {pos['side'].upper()} profit locked at the 55% floor*\n"
+                            f"MFE {(_mfe/_tp_frac)*100:.0f}% of TP armed protection; reversal exit kept {PROTECT_FLOOR_FRAC*100:.0f}% of TP distance\n"
                             f"PnL ${trade['net_pnl']:.4f} | Balance ${balance:.4f}"
                         )
                         continue

@@ -1,0 +1,2305 @@
+{
+ "BASELINE": {
+  "name": "BASELINE",
+  "m": {
+   "n": 1219,
+   "tp": 504,
+   "tp_rate": 0.41345365053322397,
+   "protected": 0,
+   "protected_rate": 0.0,
+   "be": 607,
+   "maekill": 74,
+   "armed": 0,
+   "armed_then_tp_pct": null,
+   "wr": 0.9122231337161608,
+   "gross_profit": 2.8789,
+   "gross_loss": -3.4196,
+   "net": -0.5407,
+   "pf": 0.842,
+   "exp_trade": -0.000417,
+   "exp_trade_ci": [
+    -0.000983,
+    0.000142
+   ],
+   "avg_mfe": 0.005403,
+   "avg_mae": 0.007392,
+   "avg_hold": 274.7,
+   "maxdd": 0.4066,
+   "final": 6.519,
+   "fees_paid": 1.8133,
+   "post_arm_dd_mean": null,
+   "exp_f1": 0.000166,
+   "exp_f2": -0.000679,
+   "exp_f3": -0.000887
+  },
+  "cohorts": {
+   "TP": {
+    "n": 504,
+    "mean_mfe_tp_progress": 1.23,
+    "p75_mfe_progress": 1.284,
+    "armed_pct": 0.0,
+    "net": 2.5563
+   },
+   "BE_STOP": {
+    "n": 607,
+    "mean_mfe_tp_progress": 0.697,
+    "p75_mfe_progress": 0.807,
+    "armed_pct": 0.0,
+    "net": 0.3225
+   },
+   "MAE_KILL": {
+    "n": 74,
+    "mean_mfe_tp_progress": 0.226,
+    "p75_mfe_progress": 0.347,
+    "armed_pct": 0.0,
+    "net": -2.8726
+   },
+   "regime_TREND": {
+    "n": 404,
+    "exp": -0.000453
+   },
+   "regime_CHOP": {
+    "n": 784,
+    "exp": -0.000391
+   },
+   "atr_lo": {
+    "n": 402,
+    "exp": -0.000888
+   },
+   "atr_mid": {
+    "n": 415,
+    "exp": -0.000605
+   },
+   "atr_hi": {
+    "n": 402,
+    "exp": 0.000246
+   }
+  }
+ },
+ "act30_r10": {
+  "name": "act30_r10",
+  "m": {
+   "n": 1755,
+   "tp": 340,
+   "tp_rate": 0.19373219373219372,
+   "protected": 1314,
+   "protected_rate": 0.7487179487179487,
+   "be": 0,
+   "maekill": 65,
+   "armed": 1654,
+   "armed_then_tp_pct": 0.20556227327690446,
+   "wr": 0.9424501424501425,
+   "gross_profit": 2.4282,
+   "gross_loss": -3.3944,
+   "net": -0.9662,
+   "pf": 0.715,
+   "exp_trade": -0.000518,
+   "exp_trade_ci": [
+    -0.00092,
+    -0.000136
+   ],
+   "avg_mfe": 0.003693,
+   "avg_mae": 0.005505,
+   "avg_hold": 192.5,
+   "maxdd": 0.3944,
+   "final": 6.414,
+   "fees_paid": 2.6106,
+   "post_arm_dd_mean": 0.001137,
+   "exp_f1": -0.000586,
+   "exp_f2": -0.000345,
+   "exp_f3": -0.000621
+  },
+  "cohorts": {
+   "TP": {
+    "n": 340,
+    "mean_mfe_tp_progress": 1.227,
+    "p75_mfe_progress": 1.274,
+    "armed_pct": 1.0,
+    "net": 1.7198
+   },
+   "MAE_KILL": {
+    "n": 65,
+    "mean_mfe_tp_progress": 0.143,
+    "p75_mfe_progress": 0.22,
+    "armed_pct": 0.0,
+    "net": -2.7157
+   },
+   "PROTECTED": {
+    "n": 1314,
+    "mean_mfe_tp_progress": 0.478,
+    "p75_mfe_progress": 0.58,
+    "armed_pct": 1.0,
+    "net": 0.7084
+   },
+   "regime_TREND": {
+    "n": 539,
+    "exp": -0.000372
+   },
+   "regime_CHOP": {
+    "n": 1168,
+    "exp": -0.000577
+   },
+   "atr_lo": {
+    "n": 579,
+    "exp": -0.00127
+   },
+   "atr_mid": {
+    "n": 597,
+    "exp": -0.000664
+   },
+   "atr_hi": {
+    "n": 579,
+    "exp": 0.000383
+   }
+  }
+ },
+ "act30_r15": {
+  "name": "act30_r15",
+  "m": {
+   "n": 1755,
+   "tp": 340,
+   "tp_rate": 0.19373219373219372,
+   "protected": 1314,
+   "protected_rate": 0.7487179487179487,
+   "be": 0,
+   "maekill": 65,
+   "armed": 1654,
+   "armed_then_tp_pct": 0.20556227327690446,
+   "wr": 0.9424501424501425,
+   "gross_profit": 2.423,
+   "gross_loss": -3.3944,
+   "net": -0.9713,
+   "pf": 0.714,
+   "exp_trade": -0.000521,
+   "exp_trade_ci": [
+    -0.000923,
+    -0.00014
+   ],
+   "avg_mfe": 0.003693,
+   "avg_mae": 0.005506,
+   "avg_hold": 192.5,
+   "maxdd": 0.3952,
+   "final": 6.405,
+   "fees_paid": 2.6106,
+   "post_arm_dd_mean": 0.001137,
+   "exp_f1": -0.000593,
+   "exp_f2": -0.000346,
+   "exp_f3": -0.000621
+  },
+  "cohorts": {
+   "TP": {
+    "n": 340,
+    "mean_mfe_tp_progress": 1.227,
+    "p75_mfe_progress": 1.274,
+    "armed_pct": 1.0,
+    "net": 1.7198
+   },
+   "MAE_KILL": {
+    "n": 65,
+    "mean_mfe_tp_progress": 0.143,
+    "p75_mfe_progress": 0.22,
+    "armed_pct": 0.0,
+    "net": -2.7157
+   },
+   "PROTECTED": {
+    "n": 1314,
+    "mean_mfe_tp_progress": 0.478,
+    "p75_mfe_progress": 0.58,
+    "armed_pct": 1.0,
+    "net": 0.7032
+   },
+   "regime_TREND": {
+    "n": 539,
+    "exp": -0.000372
+   },
+   "regime_CHOP": {
+    "n": 1168,
+    "exp": -0.000581
+   },
+   "atr_lo": {
+    "n": 579,
+    "exp": -0.00127
+   },
+   "atr_mid": {
+    "n": 597,
+    "exp": -0.000664
+   },
+   "atr_hi": {
+    "n": 579,
+    "exp": 0.000375
+   }
+  }
+ },
+ "act30_r20": {
+  "name": "act30_r20",
+  "m": {
+   "n": 1755,
+   "tp": 340,
+   "tp_rate": 0.19373219373219372,
+   "protected": 1314,
+   "protected_rate": 0.7487179487179487,
+   "be": 0,
+   "maekill": 65,
+   "armed": 1654,
+   "armed_then_tp_pct": 0.20556227327690446,
+   "wr": 0.9424501424501425,
+   "gross_profit": 2.4199,
+   "gross_loss": -3.3944,
+   "net": -0.9745,
+   "pf": 0.713,
+   "exp_trade": -0.000523,
+   "exp_trade_ci": [
+    -0.000925,
+    -0.000141
+   ],
+   "avg_mfe": 0.003693,
+   "avg_mae": 0.005506,
+   "avg_hold": 192.5,
+   "maxdd": 0.3957,
+   "final": 6.4,
+   "fees_paid": 2.6106,
+   "post_arm_dd_mean": 0.001137,
+   "exp_f1": -0.000598,
+   "exp_f2": -0.000346,
+   "exp_f3": -0.000621
+  },
+  "cohorts": {
+   "TP": {
+    "n": 340,
+    "mean_mfe_tp_progress": 1.227,
+    "p75_mfe_progress": 1.274,
+    "armed_pct": 1.0,
+    "net": 1.7198
+   },
+   "MAE_KILL": {
+    "n": 65,
+    "mean_mfe_tp_progress": 0.143,
+    "p75_mfe_progress": 0.22,
+    "armed_pct": 0.0,
+    "net": -2.7157
+   },
+   "PROTECTED": {
+    "n": 1314,
+    "mean_mfe_tp_progress": 0.478,
+    "p75_mfe_progress": 0.58,
+    "armed_pct": 1.0,
+    "net": 0.7
+   },
+   "regime_TREND": {
+    "n": 539,
+    "exp": -0.000372
+   },
+   "regime_CHOP": {
+    "n": 1168,
+    "exp": -0.000584
+   },
+   "atr_lo": {
+    "n": 579,
+    "exp": -0.00127
+   },
+   "atr_mid": {
+    "n": 597,
+    "exp": -0.000664
+   },
+   "atr_hi": {
+    "n": 579,
+    "exp": 0.00037
+   }
+  }
+ },
+ "act30_r25": {
+  "name": "act30_r25",
+  "m": {
+   "n": 1755,
+   "tp": 340,
+   "tp_rate": 0.19373219373219372,
+   "protected": 1314,
+   "protected_rate": 0.7487179487179487,
+   "be": 0,
+   "maekill": 65,
+   "armed": 1654,
+   "armed_then_tp_pct": 0.20556227327690446,
+   "wr": 0.9424501424501425,
+   "gross_profit": 2.4179,
+   "gross_loss": -3.3944,
+   "net": -0.9765,
+   "pf": 0.712,
+   "exp_trade": -0.000524,
+   "exp_trade_ci": [
+    -0.000927,
+    -0.000141
+   ],
+   "avg_mfe": 0.003693,
+   "avg_mae": 0.005507,
+   "avg_hold": 192.5,
+   "maxdd": 0.396,
+   "final": 6.397,
+   "fees_paid": 2.6106,
+   "post_arm_dd_mean": 0.001137,
+   "exp_f1": -0.000601,
+   "exp_f2": -0.000346,
+   "exp_f3": -0.000621
+  },
+  "cohorts": {
+   "TP": {
+    "n": 340,
+    "mean_mfe_tp_progress": 1.227,
+    "p75_mfe_progress": 1.274,
+    "armed_pct": 1.0,
+    "net": 1.7198
+   },
+   "MAE_KILL": {
+    "n": 65,
+    "mean_mfe_tp_progress": 0.143,
+    "p75_mfe_progress": 0.22,
+    "armed_pct": 0.0,
+    "net": -2.7157
+   },
+   "PROTECTED": {
+    "n": 1314,
+    "mean_mfe_tp_progress": 0.478,
+    "p75_mfe_progress": 0.58,
+    "armed_pct": 1.0,
+    "net": 0.6981
+   },
+   "regime_TREND": {
+    "n": 539,
+    "exp": -0.000372
+   },
+   "regime_CHOP": {
+    "n": 1168,
+    "exp": -0.000585
+   },
+   "atr_lo": {
+    "n": 579,
+    "exp": -0.00127
+   },
+   "atr_mid": {
+    "n": 597,
+    "exp": -0.000664
+   },
+   "atr_hi": {
+    "n": 579,
+    "exp": 0.000367
+   }
+  }
+ },
+ "act30_r30": {
+  "name": "act30_r30",
+  "m": {
+   "n": 1755,
+   "tp": 340,
+   "tp_rate": 0.19373219373219372,
+   "protected": 1314,
+   "protected_rate": 0.7487179487179487,
+   "be": 0,
+   "maekill": 65,
+   "armed": 1654,
+   "armed_then_tp_pct": 0.20556227327690446,
+   "wr": 0.9424501424501425,
+   "gross_profit": 2.4179,
+   "gross_loss": -3.3944,
+   "net": -0.9765,
+   "pf": 0.712,
+   "exp_trade": -0.000524,
+   "exp_trade_ci": [
+    -0.000927,
+    -0.000141
+   ],
+   "avg_mfe": 0.003693,
+   "avg_mae": 0.005507,
+   "avg_hold": 192.5,
+   "maxdd": 0.396,
+   "final": 6.397,
+   "fees_paid": 2.6106,
+   "post_arm_dd_mean": 0.001137,
+   "exp_f1": -0.000601,
+   "exp_f2": -0.000346,
+   "exp_f3": -0.000621
+  },
+  "cohorts": {
+   "TP": {
+    "n": 340,
+    "mean_mfe_tp_progress": 1.227,
+    "p75_mfe_progress": 1.274,
+    "armed_pct": 1.0,
+    "net": 1.7198
+   },
+   "MAE_KILL": {
+    "n": 65,
+    "mean_mfe_tp_progress": 0.143,
+    "p75_mfe_progress": 0.22,
+    "armed_pct": 0.0,
+    "net": -2.7157
+   },
+   "PROTECTED": {
+    "n": 1314,
+    "mean_mfe_tp_progress": 0.478,
+    "p75_mfe_progress": 0.58,
+    "armed_pct": 1.0,
+    "net": 0.6981
+   },
+   "regime_TREND": {
+    "n": 539,
+    "exp": -0.000372
+   },
+   "regime_CHOP": {
+    "n": 1168,
+    "exp": -0.000585
+   },
+   "atr_lo": {
+    "n": 579,
+    "exp": -0.00127
+   },
+   "atr_mid": {
+    "n": 597,
+    "exp": -0.000664
+   },
+   "atr_hi": {
+    "n": 579,
+    "exp": 0.000367
+   }
+  }
+ },
+ "act40_r10": {
+  "name": "act40_r10",
+  "m": {
+   "n": 1398,
+   "tp": 406,
+   "tp_rate": 0.290414878397711,
+   "protected": 890,
+   "protected_rate": 0.6366237482117311,
+   "be": 0,
+   "maekill": 68,
+   "armed": 1296,
+   "armed_then_tp_pct": 0.3132716049382716,
+   "wr": 0.927038626609442,
+   "gross_profit": 2.5359,
+   "gross_loss": -3.3074,
+   "net": -0.7715,
+   "pf": 0.767,
+   "exp_trade": -0.000519,
+   "exp_trade_ci": [
+    -0.001024,
+    -4.2e-05
+   ],
+   "avg_mfe": 0.004569,
+   "avg_mae": 0.006245,
+   "avg_hold": 234.6,
+   "maxdd": 0.4538,
+   "final": 6.126,
+   "fees_paid": 2.0795,
+   "post_arm_dd_mean": 0.001416,
+   "exp_f1": -0.000774,
+   "exp_f2": -0.000694,
+   "exp_f3": -5.4e-05
+  },
+  "cohorts": {
+   "TP": {
+    "n": 406,
+    "mean_mfe_tp_progress": 1.222,
+    "p75_mfe_progress": 1.261,
+    "armed_pct": 1.0,
+    "net": 2.0409
+   },
+   "MAE_KILL": {
+    "n": 68,
+    "mean_mfe_tp_progress": 0.179,
+    "p75_mfe_progress": 0.264,
+    "armed_pct": 0.0,
+    "net": -2.7361
+   },
+   "PROTECTED": {
+    "n": 890,
+    "mean_mfe_tp_progress": 0.597,
+    "p75_mfe_progress": 0.699,
+    "armed_pct": 1.0,
+    "net": 0.4951
+   },
+   "regime_TREND": {
+    "n": 364,
+    "exp": -0.00059
+   },
+   "regime_CHOP": {
+    "n": 995,
+    "exp": -0.000517
+   },
+   "atr_lo": {
+    "n": 462,
+    "exp": -0.000792
+   },
+   "atr_mid": {
+    "n": 474,
+    "exp": -0.000372
+   },
+   "atr_hi": {
+    "n": 462,
+    "exp": -0.000398
+   }
+  }
+ },
+ "act40_r15": {
+  "name": "act40_r15",
+  "m": {
+   "n": 1404,
+   "tp": 408,
+   "tp_rate": 0.2905982905982906,
+   "protected": 894,
+   "protected_rate": 0.6367521367521367,
+   "be": 0,
+   "maekill": 68,
+   "armed": 1302,
+   "armed_then_tp_pct": 0.31336405529953915,
+   "wr": 0.9273504273504274,
+   "gross_profit": 2.5381,
+   "gross_loss": -3.3074,
+   "net": -0.7693,
+   "pf": 0.767,
+   "exp_trade": -0.000516,
+   "exp_trade_ci": [
+    -0.00102,
+    -6.1e-05
+   ],
+   "avg_mfe": 0.00457,
+   "avg_mae": 0.006234,
+   "avg_hold": 233.6,
+   "maxdd": 0.4536,
+   "final": 6.128,
+   "fees_paid": 2.0884,
+   "post_arm_dd_mean": 0.001416,
+   "exp_f1": -0.000779,
+   "exp_f2": -0.000674,
+   "exp_f3": -5.7e-05
+  },
+  "cohorts": {
+   "TP": {
+    "n": 408,
+    "mean_mfe_tp_progress": 1.22,
+    "p75_mfe_progress": 1.26,
+    "armed_pct": 1.0,
+    "net": 2.0506
+   },
+   "MAE_KILL": {
+    "n": 68,
+    "mean_mfe_tp_progress": 0.179,
+    "p75_mfe_progress": 0.264,
+    "armed_pct": 0.0,
+    "net": -2.7361
+   },
+   "PROTECTED": {
+    "n": 894,
+    "mean_mfe_tp_progress": 0.597,
+    "p75_mfe_progress": 0.702,
+    "armed_pct": 1.0,
+    "net": 0.4875
+   },
+   "regime_TREND": {
+    "n": 365,
+    "exp": -0.000579
+   },
+   "regime_CHOP": {
+    "n": 1000,
+    "exp": -0.000515
+   },
+   "atr_lo": {
+    "n": 463,
+    "exp": -0.00078
+   },
+   "atr_mid": {
+    "n": 478,
+    "exp": -0.000518
+   },
+   "atr_hi": {
+    "n": 463,
+    "exp": -0.00025
+   }
+  }
+ },
+ "act40_r20": {
+  "name": "act40_r20",
+  "m": {
+   "n": 1404,
+   "tp": 408,
+   "tp_rate": 0.2905982905982906,
+   "protected": 894,
+   "protected_rate": 0.6367521367521367,
+   "be": 0,
+   "maekill": 68,
+   "armed": 1302,
+   "armed_then_tp_pct": 0.31336405529953915,
+   "wr": 0.9273504273504274,
+   "gross_profit": 2.5323,
+   "gross_loss": -3.3074,
+   "net": -0.7751,
+   "pf": 0.766,
+   "exp_trade": -0.00052,
+   "exp_trade_ci": [
+    -0.001024,
+    -6.4e-05
+   ],
+   "avg_mfe": 0.00457,
+   "avg_mae": 0.006236,
+   "avg_hold": 233.6,
+   "maxdd": 0.4544,
+   "final": 6.119,
+   "fees_paid": 2.0884,
+   "post_arm_dd_mean": 0.001416,
+   "exp_f1": -0.000787,
+   "exp_f2": -0.000675,
+   "exp_f3": -6e-05
+  },
+  "cohorts": {
+   "TP": {
+    "n": 408,
+    "mean_mfe_tp_progress": 1.22,
+    "p75_mfe_progress": 1.26,
+    "armed_pct": 1.0,
+    "net": 2.0506
+   },
+   "MAE_KILL": {
+    "n": 68,
+    "mean_mfe_tp_progress": 0.179,
+    "p75_mfe_progress": 0.264,
+    "armed_pct": 0.0,
+    "net": -2.7361
+   },
+   "PROTECTED": {
+    "n": 894,
+    "mean_mfe_tp_progress": 0.597,
+    "p75_mfe_progress": 0.702,
+    "armed_pct": 1.0,
+    "net": 0.4817
+   },
+   "regime_TREND": {
+    "n": 365,
+    "exp": -0.00058
+   },
+   "regime_CHOP": {
+    "n": 1000,
+    "exp": -0.00052
+   },
+   "atr_lo": {
+    "n": 463,
+    "exp": -0.00078
+   },
+   "atr_mid": {
+    "n": 478,
+    "exp": -0.000518
+   },
+   "atr_hi": {
+    "n": 463,
+    "exp": -0.000261
+   }
+  }
+ },
+ "act40_r25": {
+  "name": "act40_r25",
+  "m": {
+   "n": 1404,
+   "tp": 408,
+   "tp_rate": 0.2905982905982906,
+   "protected": 894,
+   "protected_rate": 0.6367521367521367,
+   "be": 0,
+   "maekill": 68,
+   "armed": 1302,
+   "armed_then_tp_pct": 0.31336405529953915,
+   "wr": 0.9273504273504274,
+   "gross_profit": 2.5294,
+   "gross_loss": -3.3074,
+   "net": -0.7781,
+   "pf": 0.765,
+   "exp_trade": -0.000522,
+   "exp_trade_ci": [
+    -0.001026,
+    -6.6e-05
+   ],
+   "avg_mfe": 0.00457,
+   "avg_mae": 0.006237,
+   "avg_hold": 233.6,
+   "maxdd": 0.4548,
+   "final": 6.115,
+   "fees_paid": 2.0884,
+   "post_arm_dd_mean": 0.001416,
+   "exp_f1": -0.000793,
+   "exp_f2": -0.000675,
+   "exp_f3": -6e-05
+  },
+  "cohorts": {
+   "TP": {
+    "n": 408,
+    "mean_mfe_tp_progress": 1.22,
+    "p75_mfe_progress": 1.26,
+    "armed_pct": 1.0,
+    "net": 2.0506
+   },
+   "MAE_KILL": {
+    "n": 68,
+    "mean_mfe_tp_progress": 0.179,
+    "p75_mfe_progress": 0.264,
+    "armed_pct": 0.0,
+    "net": -2.7361
+   },
+   "PROTECTED": {
+    "n": 894,
+    "mean_mfe_tp_progress": 0.597,
+    "p75_mfe_progress": 0.702,
+    "armed_pct": 1.0,
+    "net": 0.4787
+   },
+   "regime_TREND": {
+    "n": 365,
+    "exp": -0.00058
+   },
+   "regime_CHOP": {
+    "n": 1000,
+    "exp": -0.000523
+   },
+   "atr_lo": {
+    "n": 463,
+    "exp": -0.00078
+   },
+   "atr_mid": {
+    "n": 478,
+    "exp": -0.000518
+   },
+   "atr_hi": {
+    "n": 463,
+    "exp": -0.000267
+   }
+  }
+ },
+ "RATCHET_REF": {
+  "name": "RATCHET_REF",
+  "m": {
+   "n": 1231,
+   "tp": 447,
+   "tp_rate": 0.36311941510966694,
+   "protected": 677,
+   "protected_rate": 0.5499593826157595,
+   "be": 0,
+   "maekill": 68,
+   "armed": 1124,
+   "armed_then_tp_pct": 0.39768683274021355,
+   "wr": 0.9130787977254264,
+   "gross_profit": 2.8299,
+   "gross_loss": -3.3576,
+   "net": -0.5277,
+   "pf": 0.843,
+   "exp_trade": -0.000403,
+   "exp_trade_ci": [
+    -0.000975,
+    0.00012
+   ],
+   "avg_mfe": 0.005258,
+   "avg_mae": 0.007167,
+   "avg_hold": 269.6,
+   "maxdd": 0.3566,
+   "final": 6.966,
+   "fees_paid": 1.8311,
+   "post_arm_dd_mean": 0.001442,
+   "exp_f1": -0.00027,
+   "exp_f2": -0.000391,
+   "exp_f3": -0.0006
+  },
+  "cohorts": {
+   "TP": {
+    "n": 447,
+    "mean_mfe_tp_progress": 1.25,
+    "p75_mfe_progress": 1.293,
+    "armed_pct": 1.0,
+    "net": 2.2415
+   },
+   "MAE_KILL": {
+    "n": 68,
+    "mean_mfe_tp_progress": 0.236,
+    "p75_mfe_progress": 0.365,
+    "armed_pct": 0.0,
+    "net": -2.6883
+   },
+   "PROTECTED": {
+    "n": 677,
+    "mean_mfe_tp_progress": 0.699,
+    "p75_mfe_progress": 0.804,
+    "armed_pct": 1.0,
+    "net": 0.5884
+   },
+   "regime_TREND": {
+    "n": 390,
+    "exp": -0.000275
+   },
+   "regime_CHOP": {
+    "n": 808,
+    "exp": -0.000458
+   },
+   "atr_lo": {
+    "n": 406,
+    "exp": -0.000737
+   },
+   "atr_mid": {
+    "n": 419,
+    "exp": -0.000496
+   },
+   "atr_hi": {
+    "n": 406,
+    "exp": 2.6e-05
+   }
+  }
+ },
+ "act40_r30": {
+  "name": "act40_r30",
+  "m": {
+   "n": 1404,
+   "tp": 408,
+   "tp_rate": 0.2905982905982906,
+   "protected": 894,
+   "protected_rate": 0.6367521367521367,
+   "be": 0,
+   "maekill": 68,
+   "armed": 1302,
+   "armed_then_tp_pct": 0.31336405529953915,
+   "wr": 0.9273504273504274,
+   "gross_profit": 2.5274,
+   "gross_loss": -3.3074,
+   "net": -0.7801,
+   "pf": 0.764,
+   "exp_trade": -0.000523,
+   "exp_trade_ci": [
+    -0.001027,
+    -6.7e-05
+   ],
+   "avg_mfe": 0.00457,
+   "avg_mae": 0.006237,
+   "avg_hold": 233.6,
+   "maxdd": 0.4551,
+   "final": 6.112,
+   "fees_paid": 2.0884,
+   "post_arm_dd_mean": 0.001416,
+   "exp_f1": -0.000797,
+   "exp_f2": -0.000675,
+   "exp_f3": -6e-05
+  },
+  "cohorts": {
+   "TP": {
+    "n": 408,
+    "mean_mfe_tp_progress": 1.22,
+    "p75_mfe_progress": 1.26,
+    "armed_pct": 1.0,
+    "net": 2.0506
+   },
+   "MAE_KILL": {
+    "n": 68,
+    "mean_mfe_tp_progress": 0.179,
+    "p75_mfe_progress": 0.264,
+    "armed_pct": 0.0,
+    "net": -2.7361
+   },
+   "PROTECTED": {
+    "n": 894,
+    "mean_mfe_tp_progress": 0.597,
+    "p75_mfe_progress": 0.702,
+    "armed_pct": 1.0,
+    "net": 0.4768
+   },
+   "regime_TREND": {
+    "n": 365,
+    "exp": -0.00058
+   },
+   "regime_CHOP": {
+    "n": 1000,
+    "exp": -0.000525
+   },
+   "atr_lo": {
+    "n": 463,
+    "exp": -0.00078
+   },
+   "atr_mid": {
+    "n": 478,
+    "exp": -0.000518
+   },
+   "atr_hi": {
+    "n": 463,
+    "exp": -0.000271
+   }
+  }
+ },
+ "act50_r10": {
+  "name": "act50_r10",
+  "m": {
+   "n": 1088,
+   "tp": 391,
+   "tp_rate": 0.359375,
+   "protected": 592,
+   "protected_rate": 0.5441176470588235,
+   "be": 0,
+   "maekill": 64,
+   "armed": 983,
+   "armed_then_tp_pct": 0.3977619532044761,
+   "wr": 0.9034926470588235,
+   "gross_profit": 2.6557,
+   "gross_loss": -3.434,
+   "net": -0.7783,
+   "pf": 0.773,
+   "exp_trade": -0.000673,
+   "exp_trade_ci": [
+    -0.001336,
+    -4.2e-05
+   ],
+   "avg_mfe": 0.005226,
+   "avg_mae": 0.007635,
+   "avg_hold": 309.9,
+   "maxdd": 0.3878,
+   "final": 6.428,
+   "fees_paid": 1.6184,
+   "post_arm_dd_mean": 0.001397,
+   "exp_f1": -5.1e-05,
+   "exp_f2": -0.001788,
+   "exp_f3": -0.000426
+  },
+  "cohorts": {
+   "TP": {
+    "n": 391,
+    "mean_mfe_tp_progress": 1.246,
+    "p75_mfe_progress": 1.283,
+    "armed_pct": 1.0,
+    "net": 1.9798
+   },
+   "MAE_KILL": {
+    "n": 64,
+    "mean_mfe_tp_progress": 0.23,
+    "p75_mfe_progress": 0.367,
+    "armed_pct": 0.0,
+    "net": -2.608
+   },
+   "PROTECTED": {
+    "n": 592,
+    "mean_mfe_tp_progress": 0.69,
+    "p75_mfe_progress": 0.787,
+    "armed_pct": 1.0,
+    "net": 0.6759
+   },
+   "regime_TREND": {
+    "n": 370,
+    "exp": -0.000516
+   },
+   "regime_CHOP": {
+    "n": 682,
+    "exp": -0.000776
+   },
+   "atr_lo": {
+    "n": 359,
+    "exp": -0.00162
+   },
+   "atr_mid": {
+    "n": 370,
+    "exp": -0.001149
+   },
+   "atr_hi": {
+    "n": 359,
+    "exp": 0.000765
+   }
+  }
+ },
+ "act50_r15": {
+  "name": "act50_r15",
+  "m": {
+   "n": 1166,
+   "tp": 442,
+   "tp_rate": 0.379073756432247,
+   "protected": 613,
+   "protected_rate": 0.5257289879931389,
+   "be": 0,
+   "maekill": 72,
+   "armed": 1055,
+   "armed_then_tp_pct": 0.418957345971564,
+   "wr": 0.9048027444253859,
+   "gross_profit": 2.7102,
+   "gross_loss": -3.6614,
+   "net": -0.9511,
+   "pf": 0.74,
+   "exp_trade": -0.000768,
+   "exp_trade_ci": [
+    -0.001387,
+    -0.000168
+   ],
+   "avg_mfe": 0.005262,
+   "avg_mae": 0.007673,
+   "avg_hold": 292.8,
+   "maxdd": 0.4432,
+   "final": 5.923,
+   "fees_paid": 1.7344,
+   "post_arm_dd_mean": 0.001501,
+   "exp_f1": -6.5e-05,
+   "exp_f2": -0.001084,
+   "exp_f3": -0.001502
+  },
+  "cohorts": {
+   "TP": {
+    "n": 442,
+    "mean_mfe_tp_progress": 1.243,
+    "p75_mfe_progress": 1.309,
+    "armed_pct": 1.0,
+    "net": 2.2196
+   },
+   "MAE_KILL": {
+    "n": 72,
+    "mean_mfe_tp_progress": 0.226,
+    "p75_mfe_progress": 0.355,
+    "armed_pct": 0.0,
+    "net": -2.944
+   },
+   "PROTECTED": {
+    "n": 613,
+    "mean_mfe_tp_progress": 0.689,
+    "p75_mfe_progress": 0.783,
+    "armed_pct": 1.0,
+    "net": 0.4907
+   },
+   "regime_TREND": {
+    "n": 397,
+    "exp": -0.000781
+   },
+   "regime_CHOP": {
+    "n": 735,
+    "exp": -0.000782
+   },
+   "atr_lo": {
+    "n": 385,
+    "exp": -0.002015
+   },
+   "atr_mid": {
+    "n": 396,
+    "exp": -0.000777
+   },
+   "atr_hi": {
+    "n": 385,
+    "exp": 0.00049
+   }
+  }
+ },
+ "act50_r20": {
+  "name": "act50_r20",
+  "m": {
+   "n": 1232,
+   "tp": 511,
+   "tp_rate": 0.4147727272727273,
+   "protected": 614,
+   "protected_rate": 0.49837662337662336,
+   "be": 0,
+   "maekill": 73,
+   "armed": 1125,
+   "armed_then_tp_pct": 0.45422222222222225,
+   "wr": 0.913961038961039,
+   "gross_profit": 2.9419,
+   "gross_loss": -3.3916,
+   "net": -0.4496,
+   "pf": 0.867,
+   "exp_trade": -0.000344,
+   "exp_trade_ci": [
+    -0.00092,
+    0.000198
+   ],
+   "avg_mfe": 0.005402,
+   "avg_mae": 0.007332,
+   "avg_hold": 271.8,
+   "maxdd": 0.3464,
+   "final": 7.522,
+   "fees_paid": 1.8326,
+   "post_arm_dd_mean": 0.001571,
+   "exp_f1": 0.000301,
+   "exp_f2": -0.000618,
+   "exp_f3": -0.000879
+  },
+  "cohorts": {
+   "TP": {
+    "n": 511,
+    "mean_mfe_tp_progress": 1.23,
+    "p75_mfe_progress": 1.284,
+    "armed_pct": 1.0,
+    "net": 2.5906
+   },
+   "MAE_KILL": {
+    "n": 73,
+    "mean_mfe_tp_progress": 0.225,
+    "p75_mfe_progress": 0.348,
+    "armed_pct": 0.0,
+    "net": -2.8445
+   },
+   "PROTECTED": {
+    "n": 614,
+    "mean_mfe_tp_progress": 0.695,
+    "p75_mfe_progress": 0.804,
+    "armed_pct": 1.0,
+    "net": 0.3513
+   },
+   "regime_TREND": {
+    "n": 405,
+    "exp": -0.000404
+   },
+   "regime_CHOP": {
+    "n": 796,
+    "exp": -0.000302
+   },
+   "atr_lo": {
+    "n": 407,
+    "exp": -0.000871
+   },
+   "atr_mid": {
+    "n": 418,
+    "exp": -0.000468
+   },
+   "atr_hi": {
+    "n": 407,
+    "exp": 0.000311
+   }
+  }
+ },
+ "act50_r25": {
+  "name": "act50_r25",
+  "m": {
+   "n": 1232,
+   "tp": 511,
+   "tp_rate": 0.4147727272727273,
+   "protected": 614,
+   "protected_rate": 0.49837662337662336,
+   "be": 0,
+   "maekill": 73,
+   "armed": 1125,
+   "armed_then_tp_pct": 0.45422222222222225,
+   "wr": 0.913961038961039,
+   "gross_profit": 2.931,
+   "gross_loss": -3.3916,
+   "net": -0.4606,
+   "pf": 0.864,
+   "exp_trade": -0.000352,
+   "exp_trade_ci": [
+    -0.00093,
+    0.000191
+   ],
+   "avg_mfe": 0.005403,
+   "avg_mae": 0.007332,
+   "avg_hold": 271.8,
+   "maxdd": 0.3479,
+   "final": 7.449,
+   "fees_paid": 1.8326,
+   "post_arm_dd_mean": 0.001573,
+   "exp_f1": 0.000285,
+   "exp_f2": -0.000622,
+   "exp_f3": -0.000883
+  },
+  "cohorts": {
+   "TP": {
+    "n": 511,
+    "mean_mfe_tp_progress": 1.23,
+    "p75_mfe_progress": 1.284,
+    "armed_pct": 1.0,
+    "net": 2.5906
+   },
+   "MAE_KILL": {
+    "n": 73,
+    "mean_mfe_tp_progress": 0.225,
+    "p75_mfe_progress": 0.348,
+    "armed_pct": 0.0,
+    "net": -2.8445
+   },
+   "PROTECTED": {
+    "n": 614,
+    "mean_mfe_tp_progress": 0.695,
+    "p75_mfe_progress": 0.804,
+    "armed_pct": 1.0,
+    "net": 0.3404
+   },
+   "regime_TREND": {
+    "n": 405,
+    "exp": -0.000413
+   },
+   "regime_CHOP": {
+    "n": 796,
+    "exp": -0.00031
+   },
+   "atr_lo": {
+    "n": 407,
+    "exp": -0.000871
+   },
+   "atr_mid": {
+    "n": 418,
+    "exp": -0.000468
+   },
+   "atr_hi": {
+    "n": 407,
+    "exp": 0.000286
+   }
+  }
+ },
+ "act50_r30": {
+  "name": "act50_r30",
+  "m": {
+   "n": 1226,
+   "tp": 506,
+   "tp_rate": 0.41272430668841764,
+   "protected": 612,
+   "protected_rate": 0.499184339314845,
+   "be": 0,
+   "maekill": 74,
+   "armed": 1118,
+   "armed_then_tp_pct": 0.4525939177101968,
+   "wr": 0.9127243066884176,
+   "gross_profit": 2.8988,
+   "gross_loss": -3.4196,
+   "net": -0.5208,
+   "pf": 0.848,
+   "exp_trade": -0.0004,
+   "exp_trade_ci": [
+    -0.000977,
+    0.000162
+   ],
+   "avg_mfe": 0.005396,
+   "avg_mae": 0.007377,
+   "avg_hold": 273.2,
+   "maxdd": 0.3727,
+   "final": 6.891,
+   "fees_paid": 1.8237,
+   "post_arm_dd_mean": 0.001563,
+   "exp_f1": 0.000181,
+   "exp_f2": -0.000642,
+   "exp_f3": -0.000887
+  },
+  "cohorts": {
+   "TP": {
+    "n": 506,
+    "mean_mfe_tp_progress": 1.23,
+    "p75_mfe_progress": 1.286,
+    "armed_pct": 1.0,
+    "net": 2.5661
+   },
+   "MAE_KILL": {
+    "n": 74,
+    "mean_mfe_tp_progress": 0.226,
+    "p75_mfe_progress": 0.347,
+    "armed_pct": 0.0,
+    "net": -2.8726
+   },
+   "PROTECTED": {
+    "n": 612,
+    "mean_mfe_tp_progress": 0.696,
+    "p75_mfe_progress": 0.806,
+    "armed_pct": 1.0,
+    "net": 0.3326
+   },
+   "regime_TREND": {
+    "n": 404,
+    "exp": -0.000451
+   },
+   "regime_CHOP": {
+    "n": 791,
+    "exp": -0.000365
+   },
+   "atr_lo": {
+    "n": 405,
+    "exp": -0.000877
+   },
+   "atr_mid": {
+    "n": 416,
+    "exp": -0.000593
+   },
+   "atr_hi": {
+    "n": 405,
+    "exp": 0.000276
+   }
+  }
+ },
+ "act60_r10": {
+  "name": "act60_r10",
+  "m": {
+   "n": 1183,
+   "tp": 356,
+   "tp_rate": 0.30092983939137785,
+   "protected": 516,
+   "protected_rate": 0.4361792054099746,
+   "be": 198,
+   "maekill": 70,
+   "armed": 872,
+   "armed_then_tp_pct": 0.40825688073394495,
+   "wr": 0.904480135249366,
+   "gross_profit": 2.8027,
+   "gross_loss": -3.6275,
+   "net": -0.8249,
+   "pf": 0.773,
+   "exp_trade": -0.000656,
+   "exp_trade_ci": [
+    -0.001267,
+    -7.4e-05
+   ],
+   "avg_mfe": 0.005037,
+   "avg_mae": 0.007498,
+   "avg_hold": 286.1,
+   "maxdd": 0.4203,
+   "final": 6.189,
+   "fees_paid": 1.7597,
+   "post_arm_dd_mean": 0.001011,
+   "exp_f1": -0.000293,
+   "exp_f2": -0.001083,
+   "exp_f3": -0.000649
+  },
+  "cohorts": {
+   "TP": {
+    "n": 356,
+    "mean_mfe_tp_progress": 1.255,
+    "p75_mfe_progress": 1.307,
+    "armed_pct": 1.0,
+    "net": 1.7816
+   },
+   "BE_STOP": {
+    "n": 198,
+    "mean_mfe_tp_progress": 0.549,
+    "p75_mfe_progress": 0.577,
+    "armed_pct": 0.0,
+    "net": 0.1052
+   },
+   "MAE_KILL": {
+    "n": 70,
+    "mean_mfe_tp_progress": 0.247,
+    "p75_mfe_progress": 0.363,
+    "armed_pct": 0.0,
+    "net": -2.8241
+   },
+   "PROTECTED": {
+    "n": 516,
+    "mean_mfe_tp_progress": 0.756,
+    "p75_mfe_progress": 0.848,
+    "armed_pct": 1.0,
+    "net": 0.9159
+   },
+   "regime_TREND": {
+    "n": 388,
+    "exp": -0.001131
+   },
+   "regime_CHOP": {
+    "n": 763,
+    "exp": -0.000429
+   },
+   "atr_lo": {
+    "n": 391,
+    "exp": -0.001201
+   },
+   "atr_mid": {
+    "n": 401,
+    "exp": -0.000778
+   },
+   "atr_hi": {
+    "n": 391,
+    "exp": 1.3e-05
+   }
+  }
+ },
+ "act60_r15": {
+  "name": "act60_r15",
+  "m": {
+   "n": 1223,
+   "tp": 402,
+   "tp_rate": 0.3286999182338512,
+   "protected": 518,
+   "protected_rate": 0.42354865085854454,
+   "be": 194,
+   "maekill": 71,
+   "armed": 920,
+   "armed_then_tp_pct": 0.4369565217391304,
+   "wr": 0.910874897792314,
+   "gross_profit": 2.8722,
+   "gross_loss": -3.5057,
+   "net": -0.6335,
+   "pf": 0.819,
+   "exp_trade": -0.000488,
+   "exp_trade_ci": [
+    -0.001064,
+    7.9e-05
+   ],
+   "avg_mfe": 0.005159,
+   "avg_mae": 0.007459,
+   "avg_hold": 276.7,
+   "maxdd": 0.3618,
+   "final": 6.688,
+   "fees_paid": 1.8192,
+   "post_arm_dd_mean": 0.001101,
+   "exp_f1": -0.000318,
+   "exp_f2": -0.000814,
+   "exp_f3": -0.000367
+  },
+  "cohorts": {
+   "TP": {
+    "n": 402,
+    "mean_mfe_tp_progress": 1.252,
+    "p75_mfe_progress": 1.293,
+    "armed_pct": 1.0,
+    "net": 2.0149
+   },
+   "BE_STOP": {
+    "n": 194,
+    "mean_mfe_tp_progress": 0.548,
+    "p75_mfe_progress": 0.572,
+    "armed_pct": 0.0,
+    "net": 0.1031
+   },
+   "MAE_KILL": {
+    "n": 71,
+    "mean_mfe_tp_progress": 0.233,
+    "p75_mfe_progress": 0.353,
+    "armed_pct": 0.0,
+    "net": -2.8203
+   },
+   "PROTECTED": {
+    "n": 518,
+    "mean_mfe_tp_progress": 0.761,
+    "p75_mfe_progress": 0.851,
+    "armed_pct": 1.0,
+    "net": 0.7542
+   },
+   "regime_TREND": {
+    "n": 393,
+    "exp": -0.000841
+   },
+   "regime_CHOP": {
+    "n": 797,
+    "exp": -0.000313
+   },
+   "atr_lo": {
+    "n": 404,
+    "exp": -0.000795
+   },
+   "atr_mid": {
+    "n": 415,
+    "exp": -0.000521
+   },
+   "atr_hi": {
+    "n": 404,
+    "exp": -0.000146
+   }
+  }
+ },
+ "act60_r20": {
+  "name": "act60_r20",
+  "m": {
+   "n": 1202,
+   "tp": 415,
+   "tp_rate": 0.3452579034941764,
+   "protected": 466,
+   "protected_rate": 0.3876871880199667,
+   "be": 211,
+   "maekill": 70,
+   "armed": 881,
+   "armed_then_tp_pct": 0.47105561861521,
+   "wr": 0.908485856905158,
+   "gross_profit": 2.7215,
+   "gross_loss": -3.5299,
+   "net": -0.8084,
+   "pf": 0.771,
+   "exp_trade": -0.000633,
+   "exp_trade_ci": [
+    -0.001229,
+    -7.3e-05
+   ],
+   "avg_mfe": 0.005104,
+   "avg_mae": 0.007377,
+   "avg_hold": 274.4,
+   "maxdd": 0.4577,
+   "final": 6.1,
+   "fees_paid": 1.788,
+   "post_arm_dd_mean": 0.001126,
+   "exp_f1": 0.000118,
+   "exp_f2": -0.002208,
+   "exp_f3": -0.000366
+  },
+  "cohorts": {
+   "TP": {
+    "n": 415,
+    "mean_mfe_tp_progress": 1.221,
+    "p75_mfe_progress": 1.283,
+    "armed_pct": 1.0,
+    "net": 2.0832
+   },
+   "BE_STOP": {
+    "n": 211,
+    "mean_mfe_tp_progress": 0.547,
+    "p75_mfe_progress": 0.567,
+    "armed_pct": 0.0,
+    "net": 0.1121
+   },
+   "MAE_KILL": {
+    "n": 70,
+    "mean_mfe_tp_progress": 0.225,
+    "p75_mfe_progress": 0.342,
+    "armed_pct": 0.0,
+    "net": -2.7763
+   },
+   "PROTECTED": {
+    "n": 466,
+    "mean_mfe_tp_progress": 0.754,
+    "p75_mfe_progress": 0.837,
+    "armed_pct": 1.0,
+    "net": 0.5262
+   },
+   "regime_TREND": {
+    "n": 351,
+    "exp": -0.00035
+   },
+   "regime_CHOP": {
+    "n": 818,
+    "exp": -0.000751
+   },
+   "atr_lo": {
+    "n": 397,
+    "exp": -0.001339
+   },
+   "atr_mid": {
+    "n": 408,
+    "exp": -0.000653
+   },
+   "atr_hi": {
+    "n": 397,
+    "exp": 9.3e-05
+   }
+  }
+ },
+ "act60_r25": {
+  "name": "act60_r25",
+  "m": {
+   "n": 1203,
+   "tp": 447,
+   "tp_rate": 0.371571072319202,
+   "protected": 438,
+   "protected_rate": 0.3640897755610973,
+   "be": 198,
+   "maekill": 80,
+   "armed": 885,
+   "armed_then_tp_pct": 0.5050847457627119,
+   "wr": 0.9002493765586035,
+   "gross_profit": 2.6901,
+   "gross_loss": -3.9764,
+   "net": -1.2862,
+   "pf": 0.677,
+   "exp_trade": -0.001006,
+   "exp_trade_ci": [
+    -0.001642,
+    -0.000388
+   ],
+   "avg_mfe": 0.005186,
+   "avg_mae": 0.007643,
+   "avg_hold": 281.5,
+   "maxdd": 0.4495,
+   "final": 5.7,
+   "fees_paid": 1.7895,
+   "post_arm_dd_mean": 0.001251,
+   "exp_f1": -0.000489,
+   "exp_f2": -0.001461,
+   "exp_f3": -0.001195
+  },
+  "cohorts": {
+   "TP": {
+    "n": 447,
+    "mean_mfe_tp_progress": 1.229,
+    "p75_mfe_progress": 1.273,
+    "armed_pct": 1.0,
+    "net": 2.2307
+   },
+   "BE_STOP": {
+    "n": 198,
+    "mean_mfe_tp_progress": 0.548,
+    "p75_mfe_progress": 0.571,
+    "armed_pct": 0.0,
+    "net": 0.1052
+   },
+   "MAE_KILL": {
+    "n": 80,
+    "mean_mfe_tp_progress": 0.229,
+    "p75_mfe_progress": 0.355,
+    "armed_pct": 0.0,
+    "net": -3.2481
+   },
+   "PROTECTED": {
+    "n": 438,
+    "mean_mfe_tp_progress": 0.762,
+    "p75_mfe_progress": 0.853,
+    "armed_pct": 1.0,
+    "net": 0.3542
+   },
+   "regime_TREND": {
+    "n": 369,
+    "exp": -0.001038
+   },
+   "regime_CHOP": {
+    "n": 802,
+    "exp": -0.001006
+   },
+   "atr_lo": {
+    "n": 397,
+    "exp": -0.001672
+   },
+   "atr_mid": {
+    "n": 409,
+    "exp": -0.001195
+   },
+   "atr_hi": {
+    "n": 397,
+    "exp": -0.000146
+   }
+  }
+ },
+ "act60_r30": {
+  "name": "act60_r30",
+  "m": {
+   "n": 1232,
+   "tp": 511,
+   "tp_rate": 0.4147727272727273,
+   "protected": 424,
+   "protected_rate": 0.34415584415584416,
+   "be": 190,
+   "maekill": 73,
+   "armed": 935,
+   "armed_then_tp_pct": 0.546524064171123,
+   "wr": 0.913961038961039,
+   "gross_profit": 2.9392,
+   "gross_loss": -3.3916,
+   "net": -0.4524,
+   "pf": 0.867,
+   "exp_trade": -0.000346,
+   "exp_trade_ci": [
+    -0.000923,
+    0.000196
+   ],
+   "avg_mfe": 0.005402,
+   "avg_mae": 0.007332,
+   "avg_hold": 271.8,
+   "maxdd": 0.3471,
+   "final": 7.502,
+   "fees_paid": 1.8326,
+   "post_arm_dd_mean": 0.001381,
+   "exp_f1": 0.000297,
+   "exp_f2": -0.00062,
+   "exp_f3": -0.000879
+  },
+  "cohorts": {
+   "TP": {
+    "n": 511,
+    "mean_mfe_tp_progress": 1.23,
+    "p75_mfe_progress": 1.284,
+    "armed_pct": 1.0,
+    "net": 2.5906
+   },
+   "BE_STOP": {
+    "n": 190,
+    "mean_mfe_tp_progress": 0.547,
+    "p75_mfe_progress": 0.571,
+    "armed_pct": 0.0,
+    "net": 0.1009
+   },
+   "MAE_KILL": {
+    "n": 73,
+    "mean_mfe_tp_progress": 0.225,
+    "p75_mfe_progress": 0.348,
+    "armed_pct": 0.0,
+    "net": -2.8445
+   },
+   "PROTECTED": {
+    "n": 424,
+    "mean_mfe_tp_progress": 0.762,
+    "p75_mfe_progress": 0.862,
+    "armed_pct": 1.0,
+    "net": 0.2476
+   },
+   "regime_TREND": {
+    "n": 405,
+    "exp": -0.000408
+   },
+   "regime_CHOP": {
+    "n": 796,
+    "exp": -0.000303
+   },
+   "atr_lo": {
+    "n": 407,
+    "exp": -0.000871
+   },
+   "atr_mid": {
+    "n": 418,
+    "exp": -0.000468
+   },
+   "atr_hi": {
+    "n": 407,
+    "exp": 0.000305
+   }
+  }
+ },
+ "act70_r10": {
+  "name": "act70_r10",
+  "m": {
+   "n": 1117,
+   "tp": 386,
+   "tp_rate": 0.3455684870188004,
+   "protected": 331,
+   "protected_rate": 0.2963294538943599,
+   "be": 294,
+   "maekill": 62,
+   "armed": 717,
+   "armed_then_tp_pct": 0.5383542538354253,
+   "wr": 0.9059982094897046,
+   "gross_profit": 2.9382,
+   "gross_loss": -3.2614,
+   "net": -0.3232,
+   "pf": 0.901,
+   "exp_trade": -0.000272,
+   "exp_trade_ci": [
+    -0.000905,
+    0.000308
+   ],
+   "avg_mfe": 0.005304,
+   "avg_mae": 0.007617,
+   "avg_hold": 294.8,
+   "maxdd": 0.4221,
+   "final": 8.889,
+   "fees_paid": 1.6615,
+   "post_arm_dd_mean": 0.000928,
+   "exp_f1": 0.000894,
+   "exp_f2": -0.00166,
+   "exp_f3": -0.000554
+  },
+  "cohorts": {
+   "TP": {
+    "n": 386,
+    "mean_mfe_tp_progress": 1.258,
+    "p75_mfe_progress": 1.299,
+    "armed_pct": 1.0,
+    "net": 1.964
+   },
+   "BE_STOP": {
+    "n": 294,
+    "mean_mfe_tp_progress": 0.589,
+    "p75_mfe_progress": 0.635,
+    "armed_pct": 0.0,
+    "net": 0.1562
+   },
+   "MAE_KILL": {
+    "n": 62,
+    "mean_mfe_tp_progress": 0.207,
+    "p75_mfe_progress": 0.331,
+    "armed_pct": 0.0,
+    "net": -2.4882
+   },
+   "PROTECTED": {
+    "n": 331,
+    "mean_mfe_tp_progress": 0.832,
+    "p75_mfe_progress": 0.905,
+    "armed_pct": 1.0,
+    "net": 0.8176
+   },
+   "regime_TREND": {
+    "n": 362,
+    "exp": -5.2e-05
+   },
+   "regime_CHOP": {
+    "n": 722,
+    "exp": -0.000388
+   },
+   "atr_lo": {
+    "n": 369,
+    "exp": -0.000961
+   },
+   "atr_mid": {
+    "n": 379,
+    "exp": -0.000711
+   },
+   "atr_hi": {
+    "n": 369,
+    "exp": 0.000868
+   }
+  }
+ },
+ "act70_r15": {
+  "name": "act70_r15",
+  "m": {
+   "n": 1178,
+   "tp": 423,
+   "tp_rate": 0.35908319185059423,
+   "protected": 325,
+   "protected_rate": 0.2758913412563667,
+   "be": 328,
+   "maekill": 60,
+   "armed": 748,
+   "armed_then_tp_pct": 0.5655080213903744,
+   "wr": 0.9142614601018676,
+   "gross_profit": 3.0183,
+   "gross_loss": -3.1265,
+   "net": -0.1082,
+   "pf": 0.965,
+   "exp_trade": -8.6e-05,
+   "exp_trade_ci": [
+    -0.000663,
+    0.000473
+   ],
+   "avg_mfe": 0.005362,
+   "avg_mae": 0.007281,
+   "avg_hold": 278.9,
+   "maxdd": 0.3647,
+   "final": 9.364,
+   "fees_paid": 1.7523,
+   "post_arm_dd_mean": 0.00099,
+   "exp_f1": 0.000802,
+   "exp_f2": -0.000472,
+   "exp_f3": -0.000962
+  },
+  "cohorts": {
+   "TP": {
+    "n": 423,
+    "mean_mfe_tp_progress": 1.257,
+    "p75_mfe_progress": 1.305,
+    "armed_pct": 1.0,
+    "net": 2.1451
+   },
+   "BE_STOP": {
+    "n": 328,
+    "mean_mfe_tp_progress": 0.591,
+    "p75_mfe_progress": 0.643,
+    "armed_pct": 0.0,
+    "net": 0.1743
+   },
+   "MAE_KILL": {
+    "n": 60,
+    "mean_mfe_tp_progress": 0.229,
+    "p75_mfe_progress": 0.346,
+    "armed_pct": 0.0,
+    "net": -2.3842
+   },
+   "PROTECTED": {
+    "n": 325,
+    "mean_mfe_tp_progress": 0.835,
+    "p75_mfe_progress": 0.912,
+    "armed_pct": 1.0,
+    "net": 0.6985
+   },
+   "regime_TREND": {
+    "n": 380,
+    "exp": 0.000516
+   },
+   "regime_CHOP": {
+    "n": 765,
+    "exp": -0.000371
+   },
+   "atr_lo": {
+    "n": 389,
+    "exp": -0.000854
+   },
+   "atr_mid": {
+    "n": 400,
+    "exp": -0.000261
+   },
+   "atr_hi": {
+    "n": 389,
+    "exp": 0.000861
+   }
+  }
+ },
+ "act70_r20": {
+  "name": "act70_r20",
+  "m": {
+   "n": 1144,
+   "tp": 407,
+   "tp_rate": 0.3557692307692308,
+   "protected": 309,
+   "protected_rate": 0.2701048951048951,
+   "be": 321,
+   "maekill": 66,
+   "armed": 716,
+   "armed_then_tp_pct": 0.5684357541899442,
+   "wr": 0.9073426573426573,
+   "gross_profit": 2.8079,
+   "gross_loss": -3.44,
+   "net": -0.6321,
+   "pf": 0.816,
+   "exp_trade": -0.00052,
+   "exp_trade_ci": [
+    -0.001134,
+    7.2e-05
+   ],
+   "avg_mfe": 0.00535,
+   "avg_mae": 0.007575,
+   "avg_hold": 292.9,
+   "maxdd": 0.3831,
+   "final": 7.709,
+   "fees_paid": 1.7017,
+   "post_arm_dd_mean": 0.001029,
+   "exp_f1": 0.000448,
+   "exp_f2": -0.001736,
+   "exp_f3": -0.000702
+  },
+  "cohorts": {
+   "TP": {
+    "n": 407,
+    "mean_mfe_tp_progress": 1.259,
+    "p75_mfe_progress": 1.299,
+    "armed_pct": 1.0,
+    "net": 2.0737
+   },
+   "BE_STOP": {
+    "n": 321,
+    "mean_mfe_tp_progress": 0.593,
+    "p75_mfe_progress": 0.643,
+    "armed_pct": 0.0,
+    "net": 0.1705
+   },
+   "MAE_KILL": {
+    "n": 66,
+    "mean_mfe_tp_progress": 0.23,
+    "p75_mfe_progress": 0.347,
+    "armed_pct": 0.0,
+    "net": -2.6482
+   },
+   "PROTECTED": {
+    "n": 309,
+    "mean_mfe_tp_progress": 0.84,
+    "p75_mfe_progress": 0.914,
+    "armed_pct": 1.0,
+    "net": 0.5632
+   },
+   "regime_TREND": {
+    "n": 398,
+    "exp": -2.4e-05
+   },
+   "regime_CHOP": {
+    "n": 714,
+    "exp": -0.0008
+   },
+   "atr_lo": {
+    "n": 378,
+    "exp": -0.001443
+   },
+   "atr_mid": {
+    "n": 388,
+    "exp": -0.000668
+   },
+   "atr_hi": {
+    "n": 378,
+    "exp": 0.000555
+   }
+  }
+ },
+ "act70_r25": {
+  "name": "act70_r25",
+  "m": {
+   "n": 1239,
+   "tp": 451,
+   "tp_rate": 0.3640032284100081,
+   "protected": 304,
+   "protected_rate": 0.2453591606133979,
+   "be": 379,
+   "maekill": 65,
+   "armed": 755,
+   "armed_then_tp_pct": 0.5973509933774834,
+   "wr": 0.9160613397901534,
+   "gross_profit": 2.9439,
+   "gross_loss": -3.1779,
+   "net": -0.234,
+   "pf": 0.926,
+   "exp_trade": -0.000178,
+   "exp_trade_ci": [
+    -0.00073,
+    0.000344
+   ],
+   "avg_mfe": 0.005291,
+   "avg_mae": 0.007081,
+   "avg_hold": 265.2,
+   "maxdd": 0.3356,
+   "final": 8.791,
+   "fees_paid": 1.843,
+   "post_arm_dd_mean": 0.001026,
+   "exp_f1": 0.000548,
+   "exp_f2": -0.000518,
+   "exp_f3": -0.000759
+  },
+  "cohorts": {
+   "TP": {
+    "n": 451,
+    "mean_mfe_tp_progress": 1.234,
+    "p75_mfe_progress": 1.284,
+    "armed_pct": 1.0,
+    "net": 2.2895
+   },
+   "BE_STOP": {
+    "n": 379,
+    "mean_mfe_tp_progress": 0.592,
+    "p75_mfe_progress": 0.643,
+    "armed_pct": 0.0,
+    "net": 0.2013
+   },
+   "MAE_KILL": {
+    "n": 65,
+    "mean_mfe_tp_progress": 0.231,
+    "p75_mfe_progress": 0.351,
+    "armed_pct": 0.0,
+    "net": -2.5404
+   },
+   "PROTECTED": {
+    "n": 304,
+    "mean_mfe_tp_progress": 0.835,
+    "p75_mfe_progress": 0.912,
+    "armed_pct": 1.0,
+    "net": 0.453
+   },
+   "regime_TREND": {
+    "n": 389,
+    "exp": 0.000328
+   },
+   "regime_CHOP": {
+    "n": 817,
+    "exp": -0.000402
+   },
+   "atr_lo": {
+    "n": 409,
+    "exp": -0.000639
+   },
+   "atr_mid": {
+    "n": 421,
+    "exp": -0.000332
+   },
+   "atr_hi": {
+    "n": 409,
+    "exp": 0.000442
+   }
+  }
+ },
+ "act70_r30": {
+  "name": "act70_r30",
+  "m": {
+   "n": 1212,
+   "tp": 482,
+   "tp_rate": 0.3976897689768977,
+   "protected": 269,
+   "protected_rate": 0.22194719471947194,
+   "be": 353,
+   "maekill": 69,
+   "armed": 751,
+   "armed_then_tp_pct": 0.6418109187749668,
+   "wr": 0.9117161716171617,
+   "gross_profit": 2.937,
+   "gross_loss": -3.467,
+   "net": -0.53,
+   "pf": 0.847,
+   "exp_trade": -0.000412,
+   "exp_trade_ci": [
+    -0.001014,
+    0.000162
+   ],
+   "avg_mfe": 0.005365,
+   "avg_mae": 0.007329,
+   "avg_hold": 277.3,
+   "maxdd": 0.3985,
+   "final": 7.608,
+   "fees_paid": 1.8029,
+   "post_arm_dd_mean": 0.001086,
+   "exp_f1": 0.000466,
+   "exp_f2": -0.001081,
+   "exp_f3": -0.000915
+  },
+  "cohorts": {
+   "TP": {
+    "n": 482,
+    "mean_mfe_tp_progress": 1.233,
+    "p75_mfe_progress": 1.284,
+    "armed_pct": 1.0,
+    "net": 2.4353
+   },
+   "BE_STOP": {
+    "n": 353,
+    "mean_mfe_tp_progress": 0.592,
+    "p75_mfe_progress": 0.637,
+    "armed_pct": 0.0,
+    "net": 0.1875
+   },
+   "MAE_KILL": {
+    "n": 69,
+    "mean_mfe_tp_progress": 0.227,
+    "p75_mfe_progress": 0.348,
+    "armed_pct": 0.0,
+    "net": -2.7642
+   },
+   "PROTECTED": {
+    "n": 269,
+    "mean_mfe_tp_progress": 0.839,
+    "p75_mfe_progress": 0.916,
+    "armed_pct": 1.0,
+    "net": 0.314
+   },
+   "regime_TREND": {
+    "n": 398,
+    "exp": 0.00012
+   },
+   "regime_CHOP": {
+    "n": 781,
+    "exp": -0.000677
+   },
+   "atr_lo": {
+    "n": 400,
+    "exp": -0.001187
+   },
+   "atr_mid": {
+    "n": 412,
+    "exp": -0.000485
+   },
+   "atr_hi": {
+    "n": 400,
+    "exp": 0.00044
+   }
+  }
+ },
+ "2stage40_r15": {
+  "name": "2stage40_r15",
+  "m": {
+   "n": 1562,
+   "tp": 413,
+   "tp_rate": 0.264404609475032,
+   "protected": 1042,
+   "protected_rate": 0.6670934699103713,
+   "be": 0,
+   "maekill": 70,
+   "armed": 1455,
+   "armed_then_tp_pct": 0.2838487972508591,
+   "wr": 0.9314980793854033,
+   "gross_profit": 3.0619,
+   "gross_loss": -3.3673,
+   "net": -0.3054,
+   "pf": 0.909,
+   "exp_trade": -0.000184,
+   "exp_trade_ci": [
+    -0.000626,
+    0.000242
+   ],
+   "avg_mfe": 0.004544,
+   "avg_mae": 0.006189,
+   "avg_hold": 216.1,
+   "maxdd": 0.3886,
+   "final": 6.75,
+   "fees_paid": 2.3235,
+   "post_arm_dd_mean": 0.001362,
+   "exp_f1": -0.000537,
+   "exp_f2": -8e-06,
+   "exp_f3": 2.3e-05
+  },
+  "cohorts": {
+   "TP": {
+    "n": 413,
+    "mean_mfe_tp_progress": 1.228,
+    "p75_mfe_progress": 1.272,
+    "armed_pct": 1.0,
+    "net": 2.0615
+   },
+   "MAE_KILL": {
+    "n": 70,
+    "mean_mfe_tp_progress": 0.175,
+    "p75_mfe_progress": 0.276,
+    "armed_pct": 0.0,
+    "net": -2.7126
+   },
+   "PROTECTED": {
+    "n": 1042,
+    "mean_mfe_tp_progress": 0.611,
+    "p75_mfe_progress": 0.722,
+    "armed_pct": 1.0,
+    "net": 1.0004
+   },
+   "regime_TREND": {
+    "n": 472,
+    "exp": -0.000253
+   },
+   "regime_CHOP": {
+    "n": 1049,
+    "exp": -0.000147
+   },
+   "atr_lo": {
+    "n": 516,
+    "exp": -0.000618
+   },
+   "atr_mid": {
+    "n": 530,
+    "exp": -0.000236
+   },
+   "atr_hi": {
+    "n": 516,
+    "exp": 0.000304
+   }
+  }
+ },
+ "2stage40_r25": {
+  "name": "2stage40_r25",
+  "m": {
+   "n": 1506,
+   "tp": 424,
+   "tp_rate": 0.2815405046480744,
+   "protected": 979,
+   "protected_rate": 0.650066401062417,
+   "be": 0,
+   "maekill": 67,
+   "armed": 1403,
+   "armed_then_tp_pct": 0.3022095509622238,
+   "wr": 0.9316069057104913,
+   "gross_profit": 2.7445,
+   "gross_loss": -3.3632,
+   "net": -0.6187,
+   "pf": 0.816,
+   "exp_trade": -0.000387,
+   "exp_trade_ci": [
+    -0.000851,
+    5.7e-05
+   ],
+   "avg_mfe": 0.004578,
+   "avg_mae": 0.006261,
+   "avg_hold": 224.5,
+   "maxdd": 0.3622,
+   "final": 6.943,
+   "fees_paid": 2.2402,
+   "post_arm_dd_mean": 0.001444,
+   "exp_f1": -0.000203,
+   "exp_f2": -0.000785,
+   "exp_f3": -0.000159
+  },
+  "cohorts": {
+   "TP": {
+    "n": 424,
+    "mean_mfe_tp_progress": 1.226,
+    "p75_mfe_progress": 1.263,
+    "armed_pct": 1.0,
+    "net": 2.1126
+   },
+   "MAE_KILL": {
+    "n": 67,
+    "mean_mfe_tp_progress": 0.172,
+    "p75_mfe_progress": 0.267,
+    "armed_pct": 0.0,
+    "net": -2.6922
+   },
+   "PROTECTED": {
+    "n": 979,
+    "mean_mfe_tp_progress": 0.606,
+    "p75_mfe_progress": 0.712,
+    "armed_pct": 1.0,
+    "net": 0.6319
+   },
+   "regime_TREND": {
+    "n": 424,
+    "exp": -0.000457
+   },
+   "regime_CHOP": {
+    "n": 1044,
+    "exp": -0.000351
+   },
+   "atr_lo": {
+    "n": 497,
+    "exp": -0.000717
+   },
+   "atr_mid": {
+    "n": 512,
+    "exp": -0.000708
+   },
+   "atr_hi": {
+    "n": 497,
+    "exp": 0.000275
+   }
+  }
+ }
+}

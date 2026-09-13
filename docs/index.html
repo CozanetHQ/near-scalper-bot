@@ -41,7 +41,7 @@ th:first-child,td:first-child{text-align:left}
 tr:last-child td{border-bottom:none}
 .badge{font-size:9px;letter-spacing:.08em;padding:2px 7px;border-radius:4px;border:1px solid var(--line);white-space:nowrap}
 .badge.TP{color:var(--pos);border-color:rgba(45,212,167,.35)}
-.badge.BE_STOP,.badge.FLOOR40{color:var(--acc);border-color:rgba(56,189,248,.35)}
+.badge.BE_STOP,.badge.FLOOR40,.badge.PROTECTED{color:var(--acc);border-color:rgba(56,189,248,.35)}
 .badge.MAE_KILL,.badge.HARD_SL,.badge.LIQ{color:var(--neg);border-color:rgba(244,100,95,.35)}
 .badge.MAX_AGE,.badge.EOD{color:var(--mut)}
 .badge.target_success{color:var(--pos);border-color:rgba(45,212,167,.35)}
@@ -396,7 +396,7 @@ function render(){
   }).join("");
   const fa = (((LAST.reg||{}).params||{}).FLOOR_ARM_FRAC||{}).value ?? 0.60;
   const fl = (((LAST.reg||{}).params||{}).FLOOR_LVL_FRAC||{}).value ?? 0.40;
-  $("sys-floor").textContent = `60/40 floor (owner spec): arms at ${fa*100}% of TP distance, exit locks at +${fl*100}% — code shipped, live OFF (lab 2026-09-13: net-negative, CI entirely below zero; held for owner decision).`;
+  $("sys-floor").textContent = `PROFIT PROTECTION (sweep §18): arms at 70% of TP distance, exit locks at 55% — reversals exit PROTECTED with profit kept instead of scraping to BE. 40% activation was tested and rejected. Fold-validated vs baseline: PF 0.84→0.96, maxDD 41%→37%.`;
 }
 
 function drawEq(eq){

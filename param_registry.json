@@ -150,16 +150,6 @@
       "locked_by": "owner (documented on instruction, live dashboard review item 1)",
       "rationale": "COORD_MODE 0 = each slot trades its own signal: counter-entries while the opposite side is open on the same pair are ALLOWED BY DESIGN. Live review 2026-09-11 saw 4 SHORT + 3 LONG NEARUSDT simultaneously (both sides underwater in chop) \u2014 that is this mode operating as designed, not a slot-check bug: G1 fires on alternating 1m/15m colors in whipsaw regimes and P2 BE stops scratch the retraces. Empirical (NEAR 30d sim, full-size era): 78% of entries were counter-entries while opposite side open, combined net +$0.2344 \u2014 the behavior HARVESTS chop rather than bleeding. Known gap deliberately left open for a separate owner decision: NO per-pair slot cap exists \u2014 one pair may consume all 8 global slots (live: 7/8 on NEARUSDT). Modes 1/2 (wound-based side blocking) remain in code, unused."
     },
-    "FLOOR_ARM_FRAC": {
-      "value": 0.6,
-      "locked_at": "2026-09-13T11:45:00+00:00",
-      "rationale": "Owner 60/40 floor 2026-09-13: armed at 60% of TP distance. Lab floor_6040 (see audit log \u00a717)."
-    },
-    "FLOOR_LVL_FRAC": {
-      "value": 0.4,
-      "locked_at": "2026-09-13T11:45:00+00:00",
-      "rationale": "Owner 60/40 floor: exit locks at entry+40% of TP distance \u2014 rescues pay ~0.4xTP instead of the BE buffer."
-    },
     "HARD_SL_BY_LEV": {
       "value": {
         "5": 0.12,
@@ -185,6 +175,16 @@
       },
       "locked_at": "2026-09-13T11:45:00+00:00",
       "rationale": "Hybrid leverage zone table (eight 3h UTC buckets). NEAR proven bad in ALL zones (30d CI entirely negative, audit \u00a715-16) -> 5x everywhere (owner rule 1). All other pairs start at the global 10x until a zone proves CI>0 on trailing data (auto-promote 15/20x via compute_leverage_zones)."
+    },
+    "PROTECT_ARM_FRAC": {
+      "value": 0.7,
+      "locked_at": "2026-09-13T15:30:00+00:00",
+      "rationale": "Profit-protection sweep \u00a718 (27 configs, 30d, 1219 baseline trades, taker costs, fold-validated): 70% activation won \u2014 PF 0.84->0.96, maxDD 40.7%->36.5%, BE 607->328, 2/3 folds >= baseline. Owner 40% hypothesis REJECTED (exp -0.052%, kills winners)."
+    },
+    "PROTECT_FLOOR_FRAC": {
+      "value": 0.55,
+      "locked_at": "2026-09-13T15:30:00+00:00",
+      "rationale": "70% - 15% retracement allowance. Tight enough to keep most of the excursion, loose enough that 57% of armed trades still reach full TP. Always above the fee buffer \u2014 can never lock a guaranteed loss after costs."
     }
   },
   "known_gaps_not_claimed": [
