@@ -1,0 +1,27 @@
+collapsed events: 13533
+
+variant      hyp              n  best combo    exp%   CIlo% pairs+ folds+ dropmax%  maker%   mfe%   mae%  ret30%  ret240% GATE
+A_sweeponly  CONTINUATION  2001   t1.6_s2.0  -0.129  -0.140 0/5   0/3      -0.136  -0.049   1.46   1.40  +0.022   +0.017 fail
+A_sweeponly  REVERSAL      2001   t0.6_s1.0  -0.131  -0.146 0/5   0/3      -0.135  -0.051   1.40   1.46  -0.022   -0.017 fail
+B_samebar    CONTINUATION  1698   t0.6_s2.0  -0.136  -0.146 0/5   0/3      -0.144  -0.056   1.49   1.42  +0.002   +0.033 fail
+B_samebar    REVERSAL      1698   t1.6_s1.0  -0.136  -0.146 0/5   0/3      -0.140  -0.056   1.42   1.49  -0.002   -0.033 fail
+C_2bar       CONTINUATION  1904   t0.6_s2.0  -0.132  -0.142 0/5   0/3      -0.141  -0.052   1.46   1.40  +0.002   +0.025 fail
+C_2bar       REVERSAL      1904   t1.0_s1.0  -0.137  -0.145 0/5   0/3      -0.140  -0.057   1.40   1.46  -0.002   -0.025 fail
+D_displ      CONTINUATION   536   t1.0_s1.0  -0.138  -0.164 0/5   0/3      -0.154  -0.058   1.48   1.59  -0.077   -0.058 fail
+D_displ      REVERSAL       534   t1.6_s1.0  -0.146  -0.169 0/5   0/3      -0.148  -0.066   1.58   1.48  -0.009   +0.095 fail
+E_mss        CONTINUATION  1093   t1.0_s1.0  -0.132  -0.146 0/5   0/3      -0.139  -0.052   1.52   1.54  -0.039   +0.011 fail
+E_mss        REVERSAL       164   t0.6_s2.0  -0.107  -0.128 0/5   0/3      -0.132  -0.027   1.76   1.40  -0.010   +0.322 fail
+
+=== travel test: mean signed return by horizon (does price go the hypothesis way?) ===
+A_sweeponly  CONTINUATION n= 2001 ret30=+0.022% (CIlo -0.003) ret60=-0.016% ret240=+0.017%
+A_sweeponly  REVERSAL     n= 2001 ret30=-0.022% (CIlo -0.048) ret60=+0.016% ret240=-0.017%
+B_samebar    CONTINUATION n= 1698 ret30=+0.002% (CIlo -0.027) ret60=-0.030% ret240=+0.033%
+B_samebar    REVERSAL     n= 1698 ret30=-0.002% (CIlo -0.032) ret60=+0.030% ret240=-0.033%
+C_2bar       CONTINUATION n= 1904 ret30=+0.002% (CIlo -0.024) ret60=-0.026% ret240=+0.025%
+C_2bar       REVERSAL     n= 1904 ret30=-0.002% (CIlo -0.029) ret60=+0.026% ret240=-0.025%
+D_displ      CONTINUATION n=  536 ret30=-0.077% (CIlo -0.134) ret60=-0.120% ret240=-0.058%
+D_displ      REVERSAL     n=  534 ret30=-0.009% (CIlo -0.065) ret60=+0.020% ret240=+0.095%
+E_mss        CONTINUATION n= 1093 ret30=-0.039% (CIlo -0.077) ret60=-0.073% ret240=+0.011%
+E_mss        REVERSAL     n=  164 ret30=-0.010% (CIlo -0.125) ret60=-0.133% ret240=+0.322%
+
+saved sweep_reclaim_gates.csv
