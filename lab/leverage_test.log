@@ -1,0 +1,13 @@
+ LEV    SL  notional     n     WR  acct/trade    CI low   CI high  final$  maxDD
+  10    6%    1.062x  1219  91.2%    -0.0444%   -0.104%   +0.015%   6.519  40.7%
+      folds acct%/trade: f1: +0.002%  f2: -0.060%  f3: -0.075%
+  15    4%    1.594x  1213  90.9%    -0.0790%   -0.171%   +0.011%   6.433  44.0%
+      folds acct%/trade: f1: +0.016%  f2: -0.116%  f3: -0.137%
+  20    3%    2.125x  1399  89.0%    -0.2175%   -0.328%   -0.109%   3.044  74.7%
+      folds acct%/trade: f1: -0.125%  f2: -0.141%  f3: -0.387%
+
+Risk anatomy per bad event (account % at $10):
+ 10x: NEAR wall kill -2.7% | 6% SL -6.4% | avg TP win +0.5%
+ 15x: NEAR wall kill -4.0% | 4% SL -6.4% | avg TP win +0.8%
+ 20x: NEAR wall kill -5.3% | 3% SL -6.4% | avg TP win +1.1%
+Daily 12% limit: ~2 stops at 20x trip it (vs ~3 at 10x).
