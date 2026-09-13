@@ -1,0 +1,8 @@
+events usable: 2760
+fill rate V2 (delta=0,K=3):  100.0%
+fill rate V3 (delta=5bp,K=15): 85.9%
+v2: filled n=2760 exp t1.6_s1.0=-0.0588% best-grid=+0.0885%
+v3: filled n=2370 exp t1.6_s1.0=-0.0765% best-grid=+0.0779%
+adverse selection: market-exp of FILLED subset  = -0.1111%
+                   market-exp of MISSED subset  = +nan%
+                   (full set taker exp          = -0.1111%)
