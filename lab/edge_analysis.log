@@ -1,0 +1,127 @@
+after run-collapse (>=60-bar gap): 5294 independent signal events
+  BTCUSDT: 1136
+  ETHUSDT: 1132
+  NEARUSDT: 1066
+  SOLUSDT: 1124
+  XRPUSDT: 836
+
+UNCONDITIONAL expectancy (all signals, tp1.6/sl2.0, taker costs): -0.135%/trade  n=5294
+
+=== TIME — session buckets ===
+                  bucket     n   p_tp    exp%   CIlo%   mfe%   mae% folds
+                 OVERLAP   895    37%  -0.131  -0.148   1.28   1.19 0/3
+                  LONDON  1061    23%  -0.132  -0.144   1.10   1.06 0/3
+                      NY  1118    28%  -0.134  -0.145   1.05   0.97 0/3
+                    ASIA  1566    25%  -0.137  -0.149   1.06   1.12 0/3
+                    LATE   654    23%  -0.142  -0.157   1.00   1.01 0/3
+
+=== STRUCTURE — 15m regime ===
+                  bucket     n   p_tp    exp%   CIlo%   mfe%   mae% folds
+                    CHOP  4463    26%  -0.134  -0.140   1.04   1.02 0/3
+                   TREND   799    35%  -0.143  -0.166   1.41   1.41 0/3
+
+=== LOCATION — position in 24h range ===
+                  bucket     n   p_tp    exp%   CIlo%   mfe%   mae% folds
+             Q4 range-hi  1324    35%  -0.127  -0.140   1.51   1.45 0/3
+                      Q3  1323    25%  -0.131  -0.142   1.03   1.02 0/3
+                      Q2  1323    24%  -0.141  -0.154   0.97   0.96 0/3
+             Q1 range-lo  1324    25%  -0.142  -0.152   0.88   0.86 0/3
+
+=== LOCATION — 8h VWAP deviation (ATR units) ===
+                  bucket     n   p_tp    exp%   CIlo%   mfe%   mae% folds
+                    prem  1323    29%  -0.132  -0.144   1.12   1.13 0/3
+               deep disc  1324    25%  -0.132  -0.142   0.91   0.91 0/3
+               deep prem  1324    27%  -0.135  -0.147   1.36   1.29 0/3
+                    disc  1323    28%  -0.141  -0.155   1.00   0.97 0/3
+
+=== LIQUIDITY — bullish sweep of 1h low present ===
+                  bucket     n   p_tp    exp%   CIlo%   mfe%   mae% folds
+                   False  5062    27%  -0.133  -0.139   1.10   1.08 0/3
+                    True   232    27%  -0.182  -0.236   0.98   1.10 0/3
+
+=== LIQUIDITY — bearish sweep of 1h high present ===
+                  bucket     n   p_tp    exp%   CIlo%   mfe%   mae% folds
+                   False  5004    27%  -0.135  -0.141   1.08   1.06 0/3
+                    True   290    29%  -0.144  -0.170   1.34   1.30 0/3
+
+=== LIQUIDITY — failed breakout present ===
+                  bucket     n   p_tp    exp%   CIlo%   mfe%   mae% folds
+                   False  5294    27%  -0.135  -0.141   1.10   1.08 0/3
+
+=== STRUCTURE — MSS with displacement in last 5 bars ===
+                  bucket     n   p_tp    exp%   CIlo%   mfe%   mae% folds
+                    True  1142    25%  -0.129  -0.143   1.17   1.00 0/3
+                   False  4152    28%  -0.137  -0.143   1.08   1.10 0/3
+
+=== VOLATILITY — ATR compression (atr/atr1h < 0.8) ===
+                  bucket     n   p_tp    exp%   CIlo%   mfe%   mae% folds
+                   False  4048    30%  -0.135  -0.142   1.12   1.11 0/3
+                    True  1246    19%  -0.136  -0.145   1.01   0.97 0/3
+
+=== STRUCTURE — signal-bar displacement ===
+                  bucket     n   p_tp    exp%   CIlo%   mfe%   mae% folds
+              large body  1765    27%  -0.126  -0.135   1.11   1.05 0/3
+              small body  1765    26%  -0.137  -0.149   1.03   1.06 0/3
+                     mid  1764    28%  -0.143  -0.153   1.16   1.12 0/3
+
+=== MOMENTUM — 5-bar impulse vs trend ===
+                  bucket     n   p_tp    exp%   CIlo%   mfe%   mae% folds
+              with-trend  1323    30%  -0.132  -0.144   1.14   1.07 0/3
+                    flat  1323    29%  -0.135  -0.147   1.12   1.09 0/3
+       with-trend strong  1324    26%  -0.136  -0.147   1.14   1.00 0/3
+             rev5 strong  1324    24%  -0.138  -0.151   0.98   1.15 0/3
+
+=== MOMENTUM — 15-bar ROC (ATR units) ===
+                  bucket     n   p_tp    exp%   CIlo%   mfe%   mae% folds
+
+=== MOMENTUM — same-color run length at signal (exhaustion) ===
+                  bucket     n   p_tp    exp%   CIlo%   mfe%   mae% folds
+                      -1  2819    28%  -0.129  -0.137   1.15   1.02 0/3
+                       3   144    28%  -0.130  -0.166   0.94   1.09 0/3
+                       2  2285    26%  -0.144  -0.153   1.03   1.14 0/3
+
+=== MICROSTRUCTURE — volume vs 1h median ===
+                  bucket     n   p_tp    exp%   CIlo%   mfe%   mae% folds
+                 low vol  1765    27%  -0.128  -0.137   1.10   1.03 0/3
+               vol surge  1765    27%  -0.138  -0.149   1.06   1.06 0/3
+                 mid vol  1764    28%  -0.139  -0.150   1.13   1.14 0/3
+
+=== MICROSTRUCTURE — wick bias ===
+                  bucket     n   p_tp    exp%   CIlo%   mfe%   mae% folds
+                 neutral  1759    26%  -0.132  -0.141   1.06   1.03 0/3
+              upper wick  1759    29%  -0.133  -0.142   1.10   1.10 0/3
+              lower wick  1760    27%  -0.141  -0.153   1.14   1.11 0/3
+
+=== VOLATILITY — ATR 24h percentile ===
+                  bucket     n   p_tp    exp%   CIlo%   mfe%   mae% folds
+
+=== SIDE ===
+                  bucket     n   p_tp    exp%   CIlo%   mfe%   mae% folds
+                    long  2660    28%  -0.129  -0.138   1.18   1.03 0/3
+                   short  2634    26%  -0.141  -0.150   1.01   1.13 0/3
+
+=== PAIR ===
+                  bucket     n   p_tp    exp%   CIlo%   mfe%   mae% folds
+                NEARUSDT  1066    49%  -0.115  -0.133   1.79   1.77 0/3
+                 SOLUSDT  1124    27%  -0.136  -0.146   1.00   0.98 0/3
+                 ETHUSDT  1132    16%  -0.139  -0.147   0.78   0.74 0/3
+                 BTCUSDT  1136     9%  -0.141  -0.147   0.58   0.57 0/3
+                 XRPUSDT   836    39%  -0.146  -0.169   1.46   1.46 0/3
+
+=== grid scan on the strongest buckets (all 9 tp/sl combos, CI lo) ===
+sweep_lo == True           n=  232 best=exp_t0.6_s2.0  exp=-0.145% CIlo=-0.168% no
+sweep_hi == True           n=  290 best=exp_t1.6_s1.0  exp=-0.119% CIlo=-0.138% no
+mss == True                n= 1142 best=exp_t0.6_s2.0  exp=-0.128% CIlo=-0.140% no
+session == OVERLAP         n=  895 best=exp_t0.6_s1.5  exp=-0.123% CIlo=-0.136% no
+regime == TREND            n=  799 best=exp_t1.0_s1.0  exp=-0.136% CIlo=-0.150% no
+
+=== 2-way interactions ===
+
+=== per-pair strongest feature check ===
+BTCUSDT: best bucket loc_q=Q3 n=288 exp=-0.124% CIlo=-0.135%
+ETHUSDT: best bucket loc_q=Q1 range-lo n=237 exp=-0.123% CIlo=-0.140%
+NEARUSDT: best bucket loc_q=Q4 range-hi n=304 exp=-0.082% CIlo=-0.122%
+SOLUSDT: best bucket session=OVERLAP n=183 exp=-0.116% CIlo=-0.148%
+XRPUSDT: best bucket loc_q=Q4 range-hi n=167 exp=-0.104% CIlo=-0.158%
+
+saved signal_edge_events.csv (run-collapsed universe with features + outcomes)
