@@ -106,4 +106,4 @@ Falsification: if no variant passes, premise rejected; next premise = MSS-displa
 
 ## 7. RAW NUMBERS
 See tables in §3 and §4. Audit artifacts in repo `lab/`: `signal_edge_lab.py`, `signal_edge_analysis.py`, `signal_edge_events.csv` (5,294 events × 19 features + outcomes), `edge_analysis.log`, `protection_sweep.py`, `protection_results_all.json` (27 configs, cohorts, folds), `prot_baseline_trades.csv` (1,219 rows), `PROFIT_PROTECTION_STUDY.md`. Live ledger: `data/trades.jsonl` (238 trades). Parameters: `param_registry.json`.
-Sim constants: spike filter rejects bars with range > SPIKE_RANGE_MULT = UNKNOWN × ATR; TP distance floor MIN_TP_DIST_FRAC = UNKNOWN (tp_frac = max(1.6×ATR/price, floor)).
+Sim constants: spike filter rejects bars with range > SPIKE_RANGE_MULT = 3.0 × ATR; TP distance floor MIN_TP_DIST_FRAC = 0.006 (tp_frac = max(1.6×ATR/price, floor)).
