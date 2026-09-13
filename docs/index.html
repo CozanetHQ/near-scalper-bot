@@ -12,14 +12,13 @@
 *{box-sizing:border-box;margin:0;padding:0}
 html{background:var(--bg)}
 body{font-family:ui-monospace,'SF Mono',SFMono-Regular,Menlo,Consolas,monospace;
-  color:var(--txt);background:var(--bg);line-height:1.45;padding:0 16px 60px;max-width:1180px;margin:0 auto;
+  color:var(--txt);background:var(--bg);line-height:1.45;padding:0 16px 70px;max-width:1180px;margin:0 auto;
   font-variant-numeric:tabular-nums}
 a{color:var(--acc);text-decoration:none}
 .lbl{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--mut)}
 h2{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--mut);font-weight:600;margin:34px 0 12px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:18px 20px}
-.grid{display:grid;gap:12px}
-/* top bar */
+.pos{color:var(--pos)} .neg{color:var(--neg)}
 .top{display:flex;flex-wrap:wrap;align-items:baseline;gap:14px;padding:26px 0 6px}
 .top h1{font-size:17px;letter-spacing:.18em;font-weight:600}
 .pill{font-size:10px;letter-spacing:.12em;padding:4px 10px;border-radius:99px;border:1px solid var(--line)}
@@ -28,40 +27,49 @@ h2{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--mut)
 .tabs{margin-left:auto;display:flex;gap:6px}
 .tab{font-size:10px;letter-spacing:.12em;padding:6px 14px;border-radius:6px;border:1px solid var(--line);cursor:pointer;color:var(--mut)}
 .tab.on{color:var(--txt);background:var(--card2);border-color:rgba(255,255,255,.16)}
-/* hero */
-.hero{display:grid;grid-template-columns:minmax(240px,1.4fr) 1fr 1fr 1fr;gap:12px;margin-top:16px}
-.balance{font-size:44px;font-weight:700;letter-spacing:-.01em}
+.hero{display:grid;grid-template-columns:minmax(240px,1.5fr) 1fr 1fr 1fr;gap:12px;margin-top:16px}
+.balance{font-size:46px;font-weight:700;letter-spacing:-.01em}
 .sub{font-size:12px;color:var(--mut);margin-top:6px}
-.pos{color:var(--pos)} .neg{color:var(--neg)}
-.kpi-row{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-top:12px}
+.kpi-row{display:grid;grid-template-columns:repeat(6,1fr);gap:12px}
 .kpi .v{font-size:20px;font-weight:600;margin-top:6px}
 .kpi .d{font-size:10px;color:var(--mut);margin-top:2px}
-/* chart */
 #eq{width:100%;height:220px;display:block}
-/* tables */
 table{width:100%;border-collapse:collapse;font-size:12px}
 th{text-align:right;font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--mut);font-weight:600;padding:8px 10px;border-bottom:1px solid var(--line)}
 td{text-align:right;padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.035)}
 th:first-child,td:first-child{text-align:left}
 tr:last-child td{border-bottom:none}
-.badge{font-size:9px;letter-spacing:.08em;padding:2px 7px;border-radius:4px;border:1px solid var(--line)}
+.badge{font-size:9px;letter-spacing:.08em;padding:2px 7px;border-radius:4px;border:1px solid var(--line);white-space:nowrap}
 .badge.TP{color:var(--pos);border-color:rgba(45,212,167,.35)}
 .badge.BE_STOP,.badge.FLOOR40{color:var(--acc);border-color:rgba(56,189,248,.35)}
 .badge.MAE_KILL,.badge.HARD_SL,.badge.LIQ{color:var(--neg);border-color:rgba(244,100,95,.35)}
 .badge.MAX_AGE,.badge.EOD{color:var(--mut)}
-/* exit mix */
+.badge.target_success{color:var(--pos);border-color:rgba(45,212,167,.35)}
+.badge.target_failure{color:var(--acc);border-color:rgba(56,189,248,.35)}
+.badge.trade_failure{color:var(--neg);border-color:rgba(244,100,95,.35)}
 .exits{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-.exit-row{display:grid;grid-template-columns:92px 1fr 74px 74px;gap:8px;align-items:center;font-size:11px}
+.exit-row{display:grid;grid-template-columns:100px 1fr 76px 46px;gap:8px;align-items:center;font-size:11px}
 .bar{height:8px;border-radius:4px;background:var(--card2);overflow:hidden}
 .bar i{display:block;height:100%;border-radius:4px}
 .empty{color:var(--mut);font-size:12px;padding:14px 0}
 .note{font-size:10px;color:var(--mut);margin-top:10px}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.days{display:grid;grid-template-columns:repeat(14,1fr);gap:5px;margin-top:12px}
+.day{border-radius:5px;border:1px solid var(--line);background:var(--card2);padding:6px 2px 5px;text-align:center}
+.day b{display:block;font-size:11px}
+.day span{font-size:8px;color:var(--mut);letter-spacing:.05em}
+.hour-grid{display:grid;grid-template-columns:repeat(8,1fr);gap:6px;margin-top:12px}
+.hour{border-radius:5px;border:1px solid var(--line);padding:7px 3px;text-align:center}
+.hour b{display:block;font-size:12px}
+.hour span{font-size:8px;color:var(--mut)}
+.conf-bar{display:inline-block;width:70px;height:6px;border-radius:3px;background:var(--card2);vertical-align:middle;margin-right:6px}
+.conf-bar i{display:block;height:100%;border-radius:3px;background:var(--acc)}
 .zonetable{display:grid;grid-template-columns:repeat(8,1fr);gap:4px;margin-top:8px}
 .zone{font-size:10px;text-align:center;padding:5px 2px;border-radius:4px;background:var(--card2);border:1px solid var(--line)}
 .zone b{display:block;font-size:11px}
 .zone span{color:var(--mut);font-size:8px;letter-spacing:.05em}
 footer{margin-top:44px;padding-top:18px;border-top:1px solid var(--line);font-size:10px;color:var(--mut);display:flex;flex-wrap:wrap;gap:10px}
-@media(max-width:860px){.hero{grid-template-columns:1fr 1fr}.kpi-row{grid-template-columns:repeat(3,1fr)}.exits{grid-template-columns:1fr}.hide-m{display:none}}
+@media(max-width:860px){.hero{grid-template-columns:1fr 1fr}.kpi-row{grid-template-columns:repeat(3,1fr)}.exits{grid-template-columns:1fr}.two-col{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -82,27 +90,57 @@ footer{margin-top:44px;padding-top:18px;border-top:1px solid var(--line);font-si
   <div class="card">
     <div class="lbl">account balance</div>
     <div class="balance" id="k-bal">—</div>
-    <div class="sub" id="k-sess">—</div>
+    <div class="sub" id="k-dd">—</div>
   </div>
   <div class="card"><div class="lbl">net P&amp;L (view)</div><div class="v" style="font-size:24px;font-weight:600;margin-top:8px" id="k-net">—</div><div class="sub" id="k-netpct">—</div></div>
-  <div class="card"><div class="lbl">peak balance</div><div class="v" style="font-size:24px;font-weight:600;margin-top:8px" id="k-peak">—</div><div class="sub" id="k-dd">—</div></div>
+  <div class="card"><div class="lbl">today</div><div class="v" style="font-size:24px;font-weight:600;margin-top:8px" id="k-today">—</div><div class="sub" id="k-today-sub">—</div></div>
   <div class="card"><div class="lbl">open slots</div><div class="v" style="font-size:24px;font-weight:600;margin-top:8px" id="k-pos">—</div><div class="sub" id="k-margin">—</div></div>
 </div>
+
+<h2>Key metrics (view)</h2>
+<div class="card"><div class="kpi-row" id="kpis"></div></div>
 
 <h2>Equity curve</h2>
 <div class="card"><svg id="eq" preserveAspectRatio="none"></svg></div>
 
-<h2>Key metrics</h2>
-<div class="card"><div class="kpi-row grid" style="gap:0" id="kpis"></div></div>
+<h2>Daily P&amp;L — last 14 days (all ledger)</h2>
+<div class="card"><div class="days" id="days"></div></div>
 
-<h2>Exit mix — where trades end (view)</h2>
-<div class="card"><div class="exits grid" id="exits"></div></div>
+<h2>Exit mix (view)</h2>
+<div class="card"><div class="exits" id="exits"></div></div>
 
-<h2>Per-pair performance (view)</h2>
+<div class="two-col">
+  <div>
+    <h2>Trade anatomy — exit efficiency (view)</h2>
+    <div class="card" style="overflow-x:auto"><table id="anatomy"><thead><tr>
+      <th>exit</th><th>n</th><th>avg MFE</th><th>avg MAE</th><th>avg hold</th><th>net</th>
+    </tr></thead><tbody></tbody></table>
+    <div class="note">MFE = best favorable excursion reached (% of price); MAE = worst adverse. Shows how far each exit class traveled before closing.</div></div>
+  </div>
+  <div>
+    <h2>Signal quality — classification (view)</h2>
+    <div class="card" style="overflow-x:auto"><table id="tstate"><thead><tr>
+      <th>class</th><th>n</th><th>net</th><th>share</th>
+    </tr></thead><tbody></tbody></table>
+    <div class="note">target_success = hit TP · target_failure = traveled ≥50% toward TP, never hit · trade_failure = never moved (&lt;25% of TP dist). Failure vs target failure are managed differently by design.</div></div>
+  </div>
+</div>
+
+<h2>Hourly performance — 3h UTC zones (view)</h2>
+<div class="card"><div class="hour-grid" id="hours"></div>
+<div class="note">Same buckets the hybrid leverage engine re-tiers on trailing evidence. Lagos = UTC+1.</div></div>
+
+<h2>Per-pair performance &amp; EV confidence (view)</h2>
 <div class="card" style="overflow-x:auto"><table id="pairs"><thead><tr>
   <th>pair</th><th>trades</th><th>net</th><th>win rate</th><th>avg/trade</th>
-  <th>open</th><th>confidence</th><th>leverage</th>
+  <th>open</th><th>W / L (live)</th><th>confidence</th><th>EV gate</th><th>leverage</th>
 </tr></thead><tbody></tbody></table></div>
+
+<h2>Regime at entry → outcome (view)</h2>
+<div class="card" style="overflow-x:auto"><table id="regimes"><thead><tr>
+  <th>regime</th><th>n</th><th>net</th><th>win rate</th><th>avg/trade</th>
+</tr></thead><tbody></tbody></table>
+<div class="note">Classifier label recorded at entry — which market regimes the current signal pays in.</div></div>
 
 <h2>Open positions — live</h2>
 <div class="card" style="overflow-x:auto">
@@ -114,14 +152,15 @@ footer{margin-top:44px;padding-top:18px;border-top:1px solid var(--line);font-si
 
 <h2>Recent trades</h2>
 <div class="card" style="overflow-x:auto"><table id="ledger"><thead><tr>
-  <th>closed</th><th>pair</th><th>side</th><th>lev</th><th>exit</th><th>net P&amp;L</th><th>balance</th>
+  <th>closed</th><th>pair</th><th>side</th><th>lev</th><th>exit</th><th>mfe</th><th>net P&amp;L</th><th>balance</th>
 </tr></thead><tbody></tbody></table></div>
 
-<h2>System — hybrid leverage (owner design 2026-09-13)</h2>
+<h2>System — hybrid leverage &amp; risk stack (owner design 2026-09-13)</h2>
 <div class="card">
   <div id="sys-lev"></div>
-  <div class="note">Zone table: eight 3-hour UTC buckets. Tiers 5/10/15/20x — promotion requires proof (trailing CI &gt; 0); a pair proven bad in all zones drops to 5x. Re-evaluated every run on trailing 14-day evidence.</div>
+  <div class="note">Zone table: eight 3h UTC buckets, tiers 5/10/15/20x — promotion requires proof (trailing CI &gt; 0); a pair proven bad in all zones drops to 5x. Re-evaluated every run on trailing 14-day evidence. HARD_SL scales with leverage so the exchange never liquidates first: 5x→12% · 10x→6% · 15x→4% · 20x→3%.</div>
   <div class="note" id="sys-floor"></div>
+  <div class="note">Risk stack live: per-pair MAE walls (NEAR 2.5% / others 4%) · 12% daily loss limit · drawdown wall with ¼-size recovery sizing · no averaging down, ever · EV gate p_win prior 0.85 (weight 20) vs breakeven p ≈ 0.81.</div>
 </div>
 
 <footer>
@@ -137,6 +176,7 @@ const $ = id => document.getElementById(id);
 const fmt = (v,d=2) => (v==null||isNaN(v)) ? "—" : "$"+Number(v).toFixed(d);
 const pct = (v,d=1) => (v==null||isNaN(v)) ? "—" : (v>=0?"+":"")+ (v*100).toFixed(d) + "%";
 const esc = s => String(s??"").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const tOf = ts => Date.parse(String(ts||"").replace("Z",""));
 let MODE = "session";
 let LAST = {state:null, trades:[], reg:null};
 
@@ -154,54 +194,57 @@ async function loadAll(){
 }
 
 function viewTrades(){
-  const s = LAST.state, acct = s.account || {};
+  const acct = (LAST.state||{}).account || {};
   if(MODE === "all") return LAST.trades.slice();
-  const cut = Date.parse(acct.session_start_at || 0) || 0;
-  return LAST.trades.filter(t => Date.parse((t.closed_at||"").replace("Z","")) >= cut);
+  const cut = tOf(acct.session_start_at) || 0;
+  return LAST.trades.filter(t => tOf(t.closed_at) >= cut);
 }
-
 function pairLeverage(pair){
-  const reg = LAST.reg || {};
-  const pp = (reg.per_pair || {}).LEVERAGE || {};
+  const pp = ((LAST.reg||{}).per_pair || {}).LEVERAGE || {};
   if(pp[pair] && pp[pair].value != null) return pp[pair].value;
-  const g = ((reg.params || {}).LEVERAGE || {}).value;
+  const g = (((LAST.reg||{}).params||{}).LEVERAGE || {}).value;
   return (g != null) ? g : 10;
 }
 function zonesFor(pair){
-  const v = (((LAST.reg || {}).params || {}).LEVERAGE_ZONES || {}).value;
+  const v = (((LAST.reg||{}).params || {}).LEVERAGE_ZONES || {}).value;
   return (v && Array.isArray(v[pair]) && v[pair].length === 8) ? v[pair] : null;
 }
 function conf(pair){
-  const p = ((LAST.state || {}).pairs || {})[pair] || {};
-  const w = p.wins || 0, l = p.losses || 0;
-  return (20 * 0.85 + w) / (20 + w + l);
+  const p = ((LAST.state||{}).pairs || {})[pair] || {};
+  return (20 * 0.85 + (p.wins||0)) / (20 + (p.wins||0) + (p.losses||0));
 }
 
 function render(){
-  const s = LAST.state, acct = s.account || {};
-  const pairs = s.pairs || {};
+  const s = LAST.state, acct = s.account || {}, pairs = s.pairs || {};
   const T = viewTrades();
   const sessBal = Number(acct.session_start_balance) || 10;
+  const bal = Number(acct.balance) || 0;
 
-  // status pill
-  const tickAge = acct.last_tick_at ? (Date.now() - Date.parse(acct.last_tick_at.replace("Z",""))) / 60000 : Infinity;
+  const tickAge = acct.last_tick_at ? (Date.now() - tOf(acct.last_tick_at)) / 60000 : Infinity;
   const live = tickAge < 12;
   const pill = $("status");
   pill.textContent = live ? "LIVE" : "STALE " + Math.round(tickAge) + "m";
   pill.className = "pill " + (live ? "live" : "stale");
   $("foot-refresh").textContent = "auto-refresh 60s · last build " + new Date().toISOString().slice(11,19) + " UTC";
 
-  // hero
-  const bal = Number(acct.balance) || 0;
   $("k-bal").textContent = fmt(bal);
   const net = T.reduce((a,t) => a + (t.net_pnl||0), 0);
   const base = MODE === "session" ? sessBal : (T.length ? (T[0].balance_after - (T[0].net_pnl||0)) : bal);
   $("k-net").textContent = (net>=0?"+":"-") + "$" + Math.abs(net).toFixed(2);
   $("k-net").className = "v " + (net>=0 ? "pos" : "neg");
-  $("k-netpct").textContent = pct(base ? net/base : 0) + " vs " + (MODE==="session" ? "session start" : "ledger start");
-  $("k-sess").textContent = acct.session_note || ("session since " + (acct.session_start_at||"").slice(0,16) + "Z");
-  $("k-peak").textContent = fmt(Number(acct.peak_balance) || bal);
-  // slots from live state
+  $("k-netpct").textContent = pct(base ? net/base : 0) + (MODE==="session" ? " vs session start" : " vs ledger start");
+  const peakBal = Number(acct.peak_balance) || bal;
+  $("k-dd").textContent = "peak " + fmt(peakBal) + " · drawdown " + pct(peakBal ? (peakBal-bal)/peakBal : 0);
+
+  // today
+  const todayKey = new Date().toISOString().slice(0,10);
+  const today = LAST.trades.filter(t => (t.closed_at||"").slice(0,10) === todayKey);
+  const tnet = today.reduce((a,t)=>a+(t.net_pnl||0),0);
+  const tKills = today.filter(t=>t.reason==="MAE_KILL"||t.reason==="HARD_SL").length;
+  $("k-today").textContent = (tnet>=0?"+":"-") + "$" + Math.abs(tnet).toFixed(2);
+  $("k-today").className = "v " + (tnet>=0 ? "pos" : "neg");
+  $("k-today-sub").textContent = today.length + " trades · " + tKills + " kills";
+
   let positions = [];
   for(const [sym, p] of Object.entries(pairs)){
     const raw = p.last_error;
@@ -210,17 +253,16 @@ function render(){
     }
   }
   $("k-pos").textContent = positions.length + " / " + (Number(acct.max_positions) || 8);
-  const mUsed = positions.reduce((a,q) => a + (q.m||0), 0);
-  $("k-margin").textContent = "margin in use " + fmt(mUsed);
+  $("k-margin").textContent = "margin in use " + fmt(positions.reduce((a,q) => a + (q.m||0), 0));
 
-  // equity curve
+  // equity
   let eq;
   if(MODE === "all" && T.length){
-    eq = T.map(t => ({x: Date.parse((t.closed_at||"").replace("Z","")), y: Number(t.balance_after)||0}));
+    eq = T.map(t => ({x: tOf(t.closed_at), y: Number(t.balance_after)||0}));
   } else {
     let run = sessBal;
-    eq = [{x: Date.parse((acct.session_start_at||"").replace("Z","")), y: run}];
-    T.forEach(t => { run += (t.net_pnl||0); eq.push({x: Date.parse((t.closed_at||"").replace("Z","")), y: run}); });
+    eq = [{x: tOf(acct.session_start_at), y: run}];
+    T.forEach(t => { run += (t.net_pnl||0); eq.push({x: tOf(t.closed_at), y: run}); });
     eq.push({x: Date.now(), y: bal});
   }
   drawEq(eq);
@@ -229,7 +271,7 @@ function render(){
   const wins = T.filter(t => (t.net_pnl||0) > 0), losses = T.filter(t => (t.net_pnl||0) <= 0);
   const gw = wins.reduce((a,t)=>a+t.net_pnl,0), gl = Math.abs(losses.reduce((a,t)=>a+t.net_pnl,0));
   const holds = T.map(t => t.minutes_held).filter(v => v!=null);
-  let peak = -Infinity, trough = Infinity, mdd = 0, cur = -Infinity;
+  let cur = -Infinity, mdd = 0;
   eq.forEach(p => { cur = Math.max(cur, p.y); if(cur>0) mdd = Math.max(mdd, (cur - p.y)/cur); });
   const kpi = [
     ["trades", T.length, ""],
@@ -242,6 +284,16 @@ function render(){
   $("kpis").innerHTML = kpi.map(([l,v,d]) =>
     `<div class="kpi"><div class="lbl">${l}</div><div class="v">${v}</div><div class="d">${d}</div></div>`).join("");
 
+  // daily P&L (14 days, full ledger regardless of view)
+  const byDay = {};
+  LAST.trades.forEach(t => { const d=(t.closed_at||"").slice(0,10); byDay[d]=(byDay[d]||0)+(t.net_pnl||0); });
+  const days = Object.keys(byDay).sort().slice(-14);
+  const maxAbs = Math.max(0.01, ...days.map(d => Math.abs(byDay[d])));
+  $("days").innerHTML = days.map(d => {
+    const v = byDay[d];
+    return `<div class="day"><b class="${v>=0?'pos':'neg'}">${(v>=0?"+":"-")+Math.abs(v).toFixed(2)}</b><span>${d.slice(5)}</span></div>`;
+  }).join("");
+
   // exit mix
   const byReason = {};
   T.forEach(t => { const r = t.reason||"??"; (byReason[r] = byReason[r]||{n:0,net:0}); byReason[r].n++; byReason[r].net += t.net_pnl||0; });
@@ -252,29 +304,72 @@ function render(){
       <span><span class="badge ${esc(r)}">${esc(r)}</span></span>
       <span class="bar"><i style="width:${(d.n/maxN*100).toFixed(0)}%;background:${d.net>=0?'var(--pos)':'var(--neg)'}"></i></span>
       <span class="${d.net>=0?'pos':'neg'}">${(d.net>=0?"+":"-")+"$"+Math.abs(d.net).toFixed(2)}</span>
-      <span class="lbl">${d.n}x</span>
+      <span class="lbl">${d.n}×</span>
     </div>`).join("") || `<div class="empty">No closed trades in this view yet.</div>`;
 
-  // per-pair table
+  // trade anatomy
+  const anat = {};
+  T.forEach(t => { const r=t.reason||"??"; (anat[r]=anat[r]||{n:0,mfe:0,mae:0,hold:0,net:0});
+    anat[r].n++; anat[r].mfe+=(t.mfe_frac||0); anat[r].mae+=(t.mae_frac||0); anat[r].hold+=(t.minutes_held||0); anat[r].net+=t.net_pnl||0; });
+  $("anatomy").querySelector("tbody").innerHTML = Object.entries(anat).sort((a,b)=>b[1].n-a[1].n).map(([r,d]) =>
+    `<tr><td><span class="badge ${esc(r)}">${esc(r)}</span></td><td>${d.n}</td>
+     <td class="pos">${pct(d.mfe/d.n,2)}</td><td class="neg">${pct(d.mae/d.n,2)}</td>
+     <td>${d.n?Math.round(d.hold/d.n)+"m":"—"}</td>
+     <td class="${d.net>=0?'pos':'neg'}">${(d.net>=0?"+":"-")+"$"+Math.abs(d.net).toFixed(2)}</td></tr>`).join("")
+    || `<tr><td colspan="6" class="empty">—</td></tr>`;
+
+  // trade-state classification
+  const st = {};
+  T.forEach(t => { const c=t.trade_state||"mixed"; (st[c]=st[c]||{n:0,net:0}); st[c].n++; st[c].net+=t.net_pnl||0; });
+  const stOrder = ["target_success","target_failure","trade_failure","mixed"];
+  $("tstate").querySelector("tbody").innerHTML = stOrder.filter(c=>st[c]).map(c =>
+    `<tr><td><span class="badge ${esc(c)}">${esc(c)}</span></td><td>${st[c].n}</td>
+     <td class="${st[c].net>=0?'pos':'neg'}">${(st[c].net>=0?"+":"-")+"$"+Math.abs(st[c].net).toFixed(2)}</td>
+     <td>${pct(st[c].n/T.length,0)}</td></tr>`).join("")
+    || `<tr><td colspan="4" class="empty">—</td></tr>`;
+
+  // hourly zones
+  const byHour = Array.from({length:8},()=>({n:0,net:0}));
+  T.forEach(t => { const h=new Date(tOf(t.closed_at)).getUTCHours(); byHour[h>>1===0?h/3|0:Math.floor(h/3)][0]!==undefined; });
+  byHour.length = 8;
+  const byB = Array.from({length:8},()=>({n:0,net:0}));
+  T.forEach(t => { const b=Math.floor(new Date(tOf(t.closed_at)).getUTCHours()/3); byB[b].n++; byB[b].net+=t.net_pnl||0; });
+  const maxHN = Math.max(1,...byB.map(b=>b.n));
+  $("hours").innerHTML = byB.map((b,i) =>
+    `<div class="hour"><b class="${b.net>=0?'pos':'neg'}">${(b.net>=0?"+":"-")+"$"+Math.abs(b.net).toFixed(2)}</b>
+     <span>${String(i*3).padStart(2,"0")}-${String(i*3+2).padStart(2,"0")}h · ${b.n} trades</span></div>`).join("");
+
+  // per-pair + EV gate
   const byPair = {};
   T.forEach(t => (byPair[t.pair] = byPair[t.pair]||[]).push(t));
-  const rows = Object.entries(byPair).sort((a,b) => b[1].length - a[1].length);
-  $("pairs").querySelector("tbody").innerHTML = rows.map(([p, list]) => {
-    const n = list.length, w = list.filter(t=>(t.net_pnl||0)>0).length;
-    const np = list.reduce((a,t)=>a+(t.net_pnl||0),0);
-    const st = pairs[p] || {};
-    const lev = pairLeverage(p);
-    const zones = zonesFor(p);
-    const levTxt = zones ? `${lev}x base (zones ${zones[0]}–${zones[7]}x)` : `${lev}x`;
+  $("pairs").querySelector("tbody").innerHTML = Object.entries(byPair).sort((a,b)=>b[1].length-a[1].length).map(([p, list]) => {
+    const n=list.length, w=list.filter(t=>(t.net_pnl||0)>0).length;
+    const np=list.reduce((a,t)=>a+(t.net_pnl||0),0);
+    const stp = pairs[p]||{};
+    const c = conf(p), lev = pairLeverage(p), zones = zonesFor(p);
+    const evOK = c >= 0.81;
     return `<tr><td>${esc(p)}</td><td>${n}</td>
       <td class="${np>=0?'pos':'neg'}">${(np>=0?"+":"-")+"$"+Math.abs(np).toFixed(2)}</td>
       <td>${pct(w/n)}</td><td>${"$"+(np/n).toFixed(3)}</td>
-      <td>${st.open_positions||0}</td><td>${pct(conf(p))}</td><td>${levTxt}</td></tr>`;
-  }).join("") || `<tr><td colspan="8" class="empty">No trades in this view.</td></tr>`;
+      <td>${stp.open_positions||0}</td><td>${stp.wins||0} / ${stp.losses||0}</td>
+      <td><span class="conf-bar"><i style="width:${Math.min(100,c*100).toFixed(0)}%"></i></span>${pct(c)}</td>
+      <td>${evOK ? '<span class="pos">TRADE</span>' : '<span class="neg">WAIT</span>'}</td>
+      <td>${zones ? `${lev}x (zones)` : `${lev}x`}</td></tr>`;
+  }).join("") || `<tr><td colspan="10" class="empty">No trades in this view.</td></tr>`;
+
+  // regimes
+  const byReg = {};
+  T.forEach(t => { const r=t.regime_at_entry||"unclassified"; (byReg[r]=byReg[r]||{n:0,net:0}); byReg[r].n++; byReg[r].net+=t.net_pnl||0; });
+  $("regimes").querySelector("tbody").innerHTML = Object.entries(byReg).sort((a,b)=>b[1].n-a[1].n).map(([r,d]) => {
+    const wr = T.filter(t=>(t.regime_at_entry||"unclassified")===r && (t.net_pnl||0)>0).length / d.n;
+    return `<tr><td>${esc(r)}</td><td>${d.n}</td>
+      <td class="${d.net>=0?'pos':'neg'}">${(d.net>=0?"+":"-")+"$"+Math.abs(d.net).toFixed(2)}</td>
+      <td>${pct(wr)}</td><td>${"$"+(d.net/d.n).toFixed(3)}</td></tr>`;
+  }).join("") || `<tr><td colspan="5" class="empty">—</td></tr>`;
 
   // open positions
   $("pos").querySelector("tbody").innerHTML = positions.map(q => {
-    const held = q.o ? Math.round((Date.now()-Date.parse(q.o.replace("Z","")))/60000) : null;
+    const held = q.o ? Math.round((Date.now()-tOf(q.o))/60000) : null;
     return `<tr><td>${esc(q.pr)}</td><td>${esc(q.s)}</td>
       <td>${Number(q.e).toPrecision(6)}</td><td>${fmt(q.n)}</td><td>${fmt(q.m)}</td>
       <td>${q.lv ? q.lv+"x" : "—"}</td>
@@ -287,45 +382,44 @@ function render(){
     <tr><td class="lbl">${esc((t.closed_at||"").slice(5,16).replace("T"," "))}</td>
     <td>${esc(t.pair)}</td><td>${esc(t.side)}</td><td>${t.leverage ? t.leverage+"x" : "—"}</td>
     <td><span class="badge ${esc(t.reason)}">${esc(t.reason)}</span></td>
+    <td class="pos">${pct(t.mfe_frac,2)}</td>
     <td class="${(t.net_pnl||0)>=0?'pos':'neg'}">${((t.net_pnl||0)>=0?"+":"-")+"$"+Math.abs(t.net_pnl||0).toFixed(3)}</td>
-    <td>${fmt(t.balance_after)}</td></tr>`).join("") || `<tr><td colspan="7" class="empty">No trades yet.</td></tr>`;
+    <td>${fmt(t.balance_after)}</td></tr>`).join("") || `<tr><td colspan="8" class="empty">No trades yet.</td></tr>`;
 
   // system panel
-  const zHTML = Object.keys(pairs).sort().map(p => {
-    const zones = zonesFor(p);
-    const lev = pairLeverage(p);
+  $("sys-lev").innerHTML = Object.keys(pairs).sort().map(p => {
+    const zones = zonesFor(p), lev = pairLeverage(p);
     return `<div style="margin-top:10px"><span class="lbl">${esc(p)}</span>
       <span style="float:right">${lev}x base · confidence ${pct(conf(p))}</span>
       <div class="zonetable">${Array.from({length:8},(_,b)=>`<div class="zone"><b>${zones?zones[b]+"x":lev+"x"}</b><span>${String(b*3).padStart(2,"0")}-${String(b*3+2).padStart(2,"0")}h</span></div>`).join("")}</div>
     </div>`;
   }).join("");
-  $("sys-lev").innerHTML = zHTML;
-  const fa = ((LAST.reg||{}).params||{}).FLOOR_ARM_FRAC || {};
-  const fl = ((LAST.reg||{}).params||{}).FLOOR_LVL_FRAC || {};
-  $("sys-floor").textContent = `60/40 floor (owner spec): armed at ${(fa.value!=null?fa.value*100:60)}% of TP distance, exit locked at +${(fl.value!=null?fl.value*100:40)}% — code shipped, live OFF (lab 2026-09-13: CI entirely negative; held for owner decision).`;
+  const fa = (((LAST.reg||{}).params||{}).FLOOR_ARM_FRAC||{}).value ?? 0.60;
+  const fl = (((LAST.reg||{}).params||{}).FLOOR_LVL_FRAC||{}).value ?? 0.40;
+  $("sys-floor").textContent = `60/40 floor (owner spec): arms at ${fa*100}% of TP distance, exit locks at +${fl*100}% — code shipped, live OFF (lab 2026-09-13: net-negative, CI entirely below zero; held for owner decision).`;
 }
 
 function drawEq(eq){
   const svg = $("eq"), W = 1000, H = 220, pad = 6;
   svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
-  if(!eq.length || eq.length < 2 && eq.length === 1){ svg.innerHTML = `<text x="20" y="30" fill="#8b98a9" font-size="11">No equity data yet</text>`; return; }
+  if(!eq.length){ svg.innerHTML = `<text x="20" y="30" fill="#8b98a9" font-size="11">No equity data yet</text>`; return; }
   const xs = eq.map(p=>p.x), ys = eq.map(p=>p.y);
   const x0 = Math.min(...xs), x1 = Math.max(...xs) || x0+1;
   const y0 = Math.min(...ys), y1 = Math.max(...ys);
   const sx = v => pad + (v - x0) / Math.max(1,(x1-x0)) * (W - 2*pad);
   const sy = v => H - pad - (v - y0) / Math.max(1e-9,(y1-y0)) * (H - 2*pad);
   const last = ys[ys.length-1], first = ys[0];
-  const col = last >= first ? "var(--pos)" : "var(--neg)";
+  const col = last >= first ? "#2dd4a7" : "#f4645f";
   const pts = eq.map(p => `${sx(p.x).toFixed(1)},${sy(p.y).toFixed(1)}`).join(" ");
   const area = `M ${pad},${H-pad} L ` + pts.split(" ").join(" L ") + ` L ${sx(xs[xs.length-1]).toFixed(1)},${H-pad} Z`;
   svg.innerHTML = `
     <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="${last>=first?'#2dd4a7':'#f4645f'}" stop-opacity=".18"/>
-      <stop offset="1" stop-color="${last>=first?'#2dd4a7':'#f4645f'}" stop-opacity="0"/>
+      <stop offset="0" stop-color="${col}" stop-opacity=".18"/>
+      <stop offset="1" stop-color="${col}" stop-opacity="0"/>
     </linearGradient></defs>
     <path d="${area}" fill="url(#g)"/>
     <polyline points="${pts}" fill="none" stroke="${col}" stroke-width="1.6"/>
-    <text x="${W-8}" y="16" text-anchor="end" fill="${last>=first?'#2dd4a7':'#f4645f'}" font-size="12">${fmt(last)}</text>`;
+    <text x="${W-8}" y="16" text-anchor="end" fill="${col}" font-size="12">${fmt(last)}</text>`;
 }
 
 $("tab-s").onclick = () => { MODE="session"; $("tab-s").classList.add("on"); $("tab-a").classList.remove("on"); if(LAST.state) render(); };
