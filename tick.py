@@ -53,13 +53,28 @@ TREND_CHASE = os.environ.get("TREND_CHASE", "0")  # OWNER 09-08 hypothesis: duri
 # price for a realized loss of its margin. Paper default OFF (sim floats wedges
 # forever); ON it exposes the true tail of high-leverage configs.
 SCALP_TP_ATR = 1.6  # OWNER 09-08: two-week lab verdict — 1.6x ATR is the robust center (capital-time 0.0070 $/(cap.h) IDENTICAL on both regime weeks; hostile-week maxDD halved -$0.76 vs -$5.20 at 1.2x; 2.0x hits the recycle cliff)   # TP distance = 1.2x 1m ATR (adaptive to live volatility)
-MAX_POSITIONS = int(os.environ.get("MAX_POSITIONS", "8"))  # OWNER 09-11: back to 8 slots after the concentration review (whole-account trial: one MAE_KILL outweighed a month of wins). Registry-locked.
+MAX_POSITIONS = int(os.environ.get("MAX_POSITIONS", "30"))  # V7-A 2026-09-14: ABSOLUTE sanity ceiling only. Real slot count is dynamic: N_SLOTS = floor(balance / SLOT_COST_MARGIN) (owner model: $10 -> 3 slots). Registry-locked.
 CONCENTRATED = os.environ.get("CONCENTRATED", "0")  # OWNER 09-11: 0 — slot sizing (each position ~1/8 of budget, losses sliced small). 1 = whole-account deployment. Registry-locked.
 # lab confirmed 4 slots strictly better: realized +3.84 vs +3.58, equity +0.51 vs -0.30, half the wedges    # hedge scalper: multiple concurrent positions — wedged trades don't stop the chopping
-MARGIN_BUDGET = float(os.environ.get("MARGIN_BUDGET", "0.85"))  # owner 09-07 17:40: raised so $0.05 TPs actually materialize at $3 balance (watch-period experiment; live plan stays 40%).
+MARGIN_BUDGET = float(os.environ.get("MARGIN_BUDGET", "0.99"))  # V7-A 2026-09-14: owner model — every slot costs SLOT_COST_MARGIN ($3.30) of balance; 99% commitment, 1% float for fees. Supersedes 0.85.
 # Lab (same fresh week, 4 slots): 0.80 → realized +63% but equity -$2.94 (wedge
 # cluster ate the grind). 0.40 → realized +35% and equity +$0.19 — the WORST
 # observed week still ends green. Halves wins, halves wedge damage.  # total margin across all open positions <= 80% of balance
+
+# ── V7-A (owner 2026-09-14): fixed clips + balance-scaled slots ──────────────
+# Owner model (research/v7_proposal_2026-09-14.md §9): every slot trades
+# ~$3.30 of margin ($33 notional at 10x) and hunts 10–15 cents (a 0.42–0.57%
+# TP — the engine's TP geometry already delivers this on full exits).
+# Slot count = floor(balance / $3.30): $10 → 3 slots; every +$3.3 of
+# balance earns one more slot; balance falling shrinks slots automatically.
+FIXED_NOTIONAL_USD = float(os.environ.get("FIXED_NOTIONAL_USD", "33.0"))
+SLOT_COST_MARGIN = float(os.environ.get("SLOT_COST_MARGIN", "3.30"))
+N_SLOTS_MIN = int(os.environ.get("N_SLOTS_MIN", "1"))
+# Correlated-majors cluster: BTC/ETH/SOL move together (~0.8–0.9). Three
+# aligned $33 clips in one −6% candle = −59% of a $10 account. Cap same-
+# direction cluster exposure at 2 clips (proposal §2 risk math).
+CORR_DIR_CAP = int(os.environ.get("CORR_DIR_CAP", "2"))
+CORR_CLUSTER = ("BTCUSDT", "ETHUSDT", "SOLUSDT")
 ENTRY_COOLDOWN_SEC = 90  # min seconds between entries — one signal cluster can't fill all slots
 HEARTBEAT_SEC = 3600  # if no open/close events for an hour, ping Telegram so silence never looks like downtime
 
@@ -245,7 +260,7 @@ PROTECT_ARM_FRAC = float(os.environ.get("PROTECT_ARM_FRAC", "0.70"))
 PROTECT_FLOOR_FRAC = float(os.environ.get("PROTECT_FLOOR_FRAC", "0.55"))
 START_BALANCE = 3.0
 FEE_RATE = 0.0006
-BE_BUFFER_FRAC = 2 * FEE_RATE + 2 * SLIP_ASSUMED_PCT + 0.0005   # P2: BE_STOP exit covers round-trip costs + crumb
+BE_BUFFER_FRAC = float(os.environ.get("BE_BUFFER_FRAC", "0.0027"))  # V7-B 2026-09-14: owner 0.2% fee allowance (RT) + 2x assumed slip (0.02%) + crumb (0.05%). BE_STOP exits lock ~0.14% of notional per clip — double the old crumb. Supersedes 0.0019.
 
 # ── MAKER-EXIT FEE MODEL (owner paper authorization 2026-09-13, audit §22-23) ──
 # TP and PROTECTED exits are calm resting-limit fills -> maker fee 0.02%/leg.
@@ -557,6 +572,19 @@ def get_state(pair):
             other_margin += float(p.get("margin") or 0)
     state["_other_open"] = other_open
     state["_other_margin"] = round(other_margin, 6)
+    # V7-A correlation context: same-direction position counts in the
+    # BTC/ETH/SOL cluster (for CORR_DIR_CAP gating).
+    corr_long, corr_short = 0, 0
+    for op, ops in (master.get("pairs") or {}).items():
+        if op == pair or op not in CORR_CLUSTER:
+            continue
+        for p in parse_positions(ops, ops.get("pair") or SYMBOL):
+            if p.get("side") == "long":
+                corr_long += 1
+            elif p.get("side") == "short":
+                corr_short += 1
+    state["_corr_long"] = corr_long
+    state["_corr_short"] = corr_short
     return state
 
 
@@ -574,7 +602,11 @@ def sync(pair, state_update=None, trade=None):
             acct["peak_balance"] = float(su["balance"])
         acct["status"] = su.get("status") or acct.get("status") or "running"
         acct["last_tick_at"] = su.get("last_tick_at") or acct.get("last_tick_at")
-        acct["max_positions"] = MAX_POSITIONS  # dashboard reads this — no hardcoded slot counts anywhere
+        try:
+            # V7-A: dashboard shows the LIVE balance-scaled slot count
+            acct["max_positions"] = max(N_SLOTS_MIN, min(int(float(acct.get("balance") or 0) // SLOT_COST_MARGIN), MAX_POSITIONS))
+        except (TypeError, ValueError):
+            acct["max_positions"] = MAX_POSITIONS
     ps = master.setdefault("pairs", {}).setdefault(pair, fresh_pair_state(pair))
     for k, v in su.items():
         if k == "balance":
@@ -717,6 +749,11 @@ def registry_check():
             "PAIRS": ",".join(PAIRS),
             "RECOVERY_SIZE_FRAC": RECOVERY_SIZE_FRAC,
             "DAILY_LOSS_LIMIT": DAILY_LOSS_LIMIT,
+            "FIXED_NOTIONAL_USD": FIXED_NOTIONAL_USD,
+            "SLOT_COST_MARGIN": SLOT_COST_MARGIN,
+            "N_SLOTS_MIN": N_SLOTS_MIN,
+            "CORR_DIR_CAP": CORR_DIR_CAP,
+            "MARGIN_BUDGET": MARGIN_BUDGET,
         }
         mismatches = []
         for k, v in live.items():
@@ -1152,11 +1189,23 @@ def process_tick(state):
                 wait_reason = f"regime:spike — 1m range {spike:.1f}x ATR (manipulation/liquidation cascade risk)"
         opened_this_tick = False
         _slots_cap = pair_param("MAX_SLOTS_PER_PAIR", symbol, MAX_POSITIONS)
+        # V7-A: GLOBAL slots are balance-scaled, not fixed — floor(balance/$3.30),
+        # sanity-capped at MAX_POSITIONS. $10 account -> 3 slots; growth buys slots.
+        n_slots = max(N_SLOTS_MIN, min(int(balance // SLOT_COST_MARGIN), MAX_POSITIONS))
+        # V7-A correlation cap: max CORR_DIR_CAP same-direction clips in the
+        # correlated BTC/ETH/SOL cluster (aligned $33 clips share one tail).
+        if want is not None and symbol in CORR_CLUSTER and CORR_DIR_CAP > 0:
+            _other_dir = (state.get("_corr_long") or 0) if want == "long" else (state.get("_corr_short") or 0)
+            _here_dir = sum(1 for p in still_open if p.get("side") == want)
+            if _other_dir + _here_dir >= CORR_DIR_CAP:
+                want = None
+                wait_reason = (f"corr cap: {_other_dir + _here_dir} same-direction cluster clips "
+                               f"(cap {CORR_DIR_CAP}) — BTC/ETH/SOL share one tail")
         can_open = (
             want is not None
             and entry_cooldown_ok
             and len(still_open) < _slots_cap
-            and len(still_open) + int(state.get("_other_open") or 0) < MAX_POSITIONS
+            and len(still_open) + int(state.get("_other_open") or 0) < n_slots
             and not daily_risk_off
         )
         if can_open:
@@ -1186,27 +1235,24 @@ def process_tick(state):
                 wait_reason = (f"EV gate: p={p_win:.2f} ev={ev_frac*100:+.2f}%/unit "
                                f"< req {EV_MARGIN_REQ*100:.2f}% — edge gone, WAIT")
             per_unit = entry_tp_dist / price - FEE_RATE * 2
-            # per-slot cap: 8 slots x balance notional = exactly the 80% margin
-            # budget at 10x — a single trade can never hog the whole budget and
-            # freeze the bot (the 2026-09-06 wedge lesson).
             _lev = position_leverage(symbol, now)
-            slot_cap = balance * MARGIN_BUDGET * _lev / MAX_POSITIONS
-            if safe_on:
-                # OWNER 2026-09-11 recovery sizing: 1/4 slots below the wall,
-                # floored at the dust minimum so the account keeps trading.
-                slot_cap = max(slot_cap * RECOVERY_SIZE_FRAC, 1.0)
             if per_unit > 0 and margin_left > 0.05 and ev_frac >= EV_MARGIN_REQ:
+                # ── V7-A (owner 2026-09-14): FIXED $33 clips replace the 8-way
+                # budget slice. One slot costs SLOT_COST_MARGIN ($3.30) of
+                # balance; slot COUNT is balance-scaled (n_slots, above). At
+                # 15x/20x re-tiers the same clip costs LESS margin ($2.20/$1.65)
+                # — tier upgrades buy headroom, never extra exposure. Below the
+                # SAFE_DD wall the clip shrinks to RECOVERY_SIZE_FRAC (dust
+                # floor $1) so the account keeps trading at quarter size.
+                notional = FIXED_NOTIONAL_USD
+                if safe_on:
+                    notional = max(notional * RECOVERY_SIZE_FRAC, 1.0)
+                # Full clip or nothing: if the remaining margin cannot seat the
+                # clip, WAIT for a slot to close — partial clips break the
+                # owner's per-slot economics ($3.30 in, 10–15 cents out).
+                if notional > margin_left * _lev:
+                    notional = 0.0
                 aligned = (bias != "none" and want == ("long" if bias == "bull" else "short"))
-                base = WIN_TARGET_PCT * balance if WIN_TARGET_PCT > 0 else WIN_TARGET_DOLLARS
-                target = base * TREND_MULT if (aligned and TREND_MULT != 1.0) else base
-                if CONCENTRATED == "1":
-                    # OWNER 09-11: whole account straight into the trade — the
-                    # single position gets the entire remaining budget; TP still
-                    # >= 1.6x ATR (or the 0.6% fee-survival floor), whichever
-                    # the market allows (math_spec §6).
-                    notional = min(slot_cap, margin_left * _lev, 40.0)
-                else:
-                    notional = min(target / per_unit, slot_cap, margin_left * _lev, 40.0)
                 if notional >= 1.0:  # don't open dust positions
                     # Phase 5 advisory: Second Engine scores on every entry.
                     # Logged for live out-of-sample accumulation — NEVER gates.
@@ -1327,7 +1373,7 @@ def process_tick(state):
         return "closed", f"closed {len(closed_any)} TP(s), {len(still_open)} open"
     if want is not None and not can_open:
         why = ("daily risk-off (day loss limit)" if daily_risk_off
-               else f"slots/margin full ({len(still_open)}/{MAX_POSITIONS})")
+               else f"slots/margin full ({len(still_open) + int(state.get('_other_open') or 0)}/{n_slots} V7 slots)")
         return "none", f"signal {want} skipped — {why}"
     if wait_reason:
         return "none", f"WAIT ({regime}) — {wait_reason} | {len(still_open)} open"
