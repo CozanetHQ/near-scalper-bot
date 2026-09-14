@@ -487,8 +487,8 @@ function renderAll(){
   const clip = (((reg.params||{}).FIXED_NOTIONAL_USD||{}).value) ?? 33;
   $("s-clip").textContent = "$" + clip + " fixed";
   $("s-slots").textContent = "floor(balance / " + slotCost + ")";
-  const fa = (((reg.params||{}).FLOOR_ARM_FRAC||{}).value ?? 0.60) * 100;
-  const fl = (((reg.params||{}).FLOOR_LVL_FRAC||{}).value ?? 0.40) * 100;
+  const fa = (((reg.params||{}).PROTECT_ARM_FRAC||{}).value ?? 0.70) * 100;
+  const fl = (((reg.params||{}).PROTECT_FLOOR_FRAC||{}).value ?? 0.55) * 100;
   $("s-floor").textContent = "arms " + fa.toFixed(0) + "% → locks " + fl.toFixed(0) + "%";
 }
 
@@ -524,7 +524,7 @@ function renderOverview(sess, positions, acct, bal, sessBal){
   $("k-exp").textContent = fmt(exp);
   $("k-margin2").textContent = fmt(marginUsed);
   const reg = LAST.reg || {};
-  $("protect-badge").style.display = (((reg.params||{}).FLOOR_ARM_FRAC||{}).value != null && positions.length) ? "" : "none";
+  $("protect-badge").style.display = (((reg.params||{}).PROTECT_ARM_FRAC||{}).value != null && positions.length) ? "" : "none";
 
   $("ov-positions").innerHTML = positions.slice(0,6).map(q => posCardHTML(q)).join("");
   $("ov-pos-empty").style.display = positions.length ? "none" : "block";
@@ -555,7 +555,7 @@ function renderOverview(sess, positions, acct, bal, sessBal){
   const marginUtil = bal>0 ? Math.min(1, marginUsed/(bal*marginBudget)) : 0;
   const confs = Object.keys(LAST.state.pairs||{}).map(p => conf(p));
   const avgAdv = sess.length ? sess.reduce((a,t)=>a+(t.advisory_score||0),0)/sess.length : 0;
-  const floorOK = (((reg.params||{}).FLOOR_ARM_FRAC||{}).value != null);
+  const floorOK = (((reg.params||{}).PROTECT_ARM_FRAC||{}).value != null);
 
   $("health").innerHTML = `
     ${ringHTML("TP hit rate", tpPct, "#2dd4a7")}
@@ -777,8 +777,8 @@ function renderAnalytics(){
       <div class="zonetable">${Array.from({length:8},(_,b)=>`<div class="zone"><b>${zones?zones[b]+"x":lev+"x"}</b><span>${String(b*3).padStart(2,"0")}h</span></div>`).join("")}</div>
     </div>`;
   }).join("");
-  const fa = (((LAST.reg||{}).params||{}).FLOOR_ARM_FRAC||{}).value ?? 0.60;
-  const fl = (((LAST.reg||{}).params||{}).FLOOR_LVL_FRAC||{}).value ?? 0.40;
+  const fa = (((LAST.reg||{}).params||{}).PROTECT_ARM_FRAC||{}).value ?? 0.70;
+  const fl = (((LAST.reg||{}).params||{}).PROTECT_FLOOR_FRAC||{}).value ?? 0.55;
   $("sys-floor").textContent = `Profit protection: arms at ${(fa*100).toFixed(0)}% of TP distance, locks at ${(fl*100).toFixed(0)}% — reversals exit PROTECTED with profit kept instead of scraping to BE.`;
 }
 
