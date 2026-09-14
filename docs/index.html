@@ -396,7 +396,7 @@ tr:last-child td{border-bottom:none}
 "use strict";
 const BASE = "https://raw.githubusercontent.com/CozanetHQ/near-scalper-bot/main/";
 const $ = id => document.getElementById(id);
-const fmt = (v,d=2) => (v==null||isNaN(v)) ? "—" : "$"+Number(v).toFixed(d);
+const fmt = (v,d=2) => (v==null||isNaN(v)) ? "—" : (v<0?"-$":"$")+Math.abs(Number(v)).toFixed(d);
 const pct = (v,d=1) => (v==null||isNaN(v)) ? "—" : (v>=0?"+":"")+ (v*100).toFixed(d) + "%";
 const esc = s => String(s??"").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const tOf = ts => Date.parse(String(ts||"").replace("Z",""));
