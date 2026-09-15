@@ -106,14 +106,33 @@ aside h2{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--
   </aside>
 </main>
 
-<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
+<!-- vendored same-origin (Aegis-style: ship the chart lib with the app).
+     jsdelivr/unpkg CDNs are blocked on some mobile networks (owner's case)
+     and a missing lib killed the entire page silently. -->
+<script src="vendor/lightweight-charts.standalone.production.js"></script>
+<script>
+  if (typeof LightweightCharts === "undefined")
+    document.write('<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"><\/script>');
+</script>
 <script>
 "use strict";
+if (typeof LightweightCharts === "undefined") {
+  document.body.insertAdjacentHTML("beforeend",
+    '<div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);'
+    + 'background:#12161f;border:1px solid #ef4444;border-radius:12px;padding:24px;'
+    + 'color:#e7ecf3;font:14px -apple-system,sans-serif;z-index:99;max-width:80vw">'
+    + '⚠ Chart library failed to load — check your connection and reload.</div>');
+  throw new Error("lightweight-charts unavailable");
+}
 /* ── CozanetHQ execution chart (owner spec 2026-09-15) ───────────────────
    Layer 1: 2m candles (Bitget 1m -> resampled client-side)
    Layer 2: TP/SL risk bands (canvas overlay)
    Layer 3: entry/exit markers
    Layer 4: FVG band + liquidity sweep line                                   */
+window.addEventListener("error", e => {
+  const b = document.getElementById("err");
+  if (b) { b.textContent = "Error: " + (e.message || "script failed"); b.style.display = "block"; }
+});
 const RAW = new URLSearchParams(location.search).get("raw")
          || "https://raw.githubusercontent.com/CozanetHQ/near-scalper-bot/main/";
 const BITGET = "https://api.bitget.com/api/v2/mix/market";
