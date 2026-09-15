@@ -405,16 +405,25 @@ function renderRows() {
 }
 
 async function selectTrade(tid) {
+  try {
   selTrade = tid;
   const t = (TRADES[curSym]||[]).find(x=>x.trade_id===tid);
   if (!t) return;
   await ensureCandles(t.entry_time, t.exit_time||Math.floor(Date.now()/1000));
   const pad = (t.exit_time||Math.floor(Date.now()/1000)) - t.entry_time < 1800 ? 1800 :
               (t.exit_time - t.entry_time)*0.25;
-  chart.timeScale().setVisibleRange(
-    Math.max(0,t.entry_time-pad), (t.exit_time||Math.floor(Date.now()/1000))+pad);
+  // v4 API: setVisibleRange takes {from, to} — the old two-arg v3 form
+  // threw inside the async handler and silently killed the zoom.
+  chart.timeScale().setVisibleRange({
+    from: Math.max(0, t.entry_time - pad),
+    to: (t.exit_time || Math.floor(Date.now()/1000)) + pad,
+  });
   renderRows(); drawOverlay();
   if (window.innerWidth<=920) $("aside").classList.remove("open");
+  } catch (e) {
+    const b = document.getElementById("err");
+    if (b) { b.textContent = "Replay error: " + (e.message || e); b.style.display = "block"; }
+  }
 }
 
 /* ── wiring ── */
