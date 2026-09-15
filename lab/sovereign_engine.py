@@ -1,28 +1,28 @@
 #!/usr/bin/env python3
 """
 Sovereign v6 Entry Engine — CozySovereignAI top-down restructuring (owner spec 2026-09-15).
+Update 2026-09-15 (owner): EXECUTION TIMELINE SWITCHED TO 2m — entry fills, exits and
+holds are walked on completed 2m candles (gates unchanged: 4H bias / 1H FVG / 15m sweep /
+2m CHOCH / live-only L2).
 
-Structure (a priori, locked — NOT tuned on results):
-  4H  : Directional bias  — Close > EMA50 > EMA200 (long) / Close < EMA50 < EMA200 (short)
-  1H  : Point of interest  — active Fair Value Gap zone, price trading within it
-  15m : Liquidity sweep    — wick below fractal swing low, close back above (long) [mirrored short]
-  2m  : Micro-CHOCH        — close above most recent confirmed 2m lower high
-       + L2 order-book imbalance gate (I_L2 >= 1.5) — LIVE-ONLY, cannot be replayed from
-         candles; implemented as an engine hook, stubbed True in the lab (documented).
-  Risk: SL = 1 x ATR14(2m), TP = 2 x SL (1:2 RR), 1.5% fixed capital risk,
-        TP exit POST_ONLY (maker), entry + SL exit taker.
+Modes:
+  EXEC_TF_MIN = 2        execution timeframe (2m per owner)
+  ENTRY_MODE  = taker    market entry at next 2m open (spec baseline)
+               maker     POST_ONLY retest limit at the CHOCH level (EV lever #1):
+                        placed after the CHOCH close, waits for pullback to the
+                        level, fills as maker (0.02%, no slip). POST_ONLY semantics:
+                        rests passively; never crosses. Expires after SWEEP_VALID_H.
+  SYMBOL      = near|btc dataset prefix in lab/data_sovereign/
 
 Friction model (Bitget USDT perp):
   taker 0.06%, maker 0.02%, assumed slippage 0.03% per market leg.
-  Hybrid C_win  = 0.06 + 0.03 + 0.02           = 0.11%   (taker entry + slip + maker TP)
-  All-taker     = 0.06 x 2 + 0.03              = 0.15%   (spec baseline)
-  C_loss        = 0.06 + 0.03 + 0.06 + 0.03    = 0.18%   (taker entry + slip + taker SL + slip)
-  Note: spec text says the maker exit "reclaims 0.06%"; exact arithmetic gives 0.04%
-  (0.06 taker TP leg replaced by 0.02 maker). The engine uses the exact 0.04%.
+  Taker entry: C_win = 0.11% (taker+slip entry, maker TP), C_loss = 0.18%.
+  Maker entry: C_win = 0.04% (maker entry, maker TP), C_loss = 0.11%.
+  Spec's "reclaims 0.06%" for the maker TP leg is exactly 0.04% (0.06->0.02).
 
-No-lookahead discipline: every gate is evaluated on the LAST COMPLETED candle of its
-timeframe at each 1m step. Entries fill at the NEXT 1m open. If TP and SL both fall
-inside one 1m candle, the SL is assumed to fill first (conservative).
+No-lookahead: every gate evaluated on the last COMPLETED candle of its TF at each
+2m step; entries fill at the next 2m open (taker) or on a pullback touch (maker).
+If TP and SL both fall inside one 2m candle, SL is assumed first (conservative).
 """
 import json
 import os
@@ -31,18 +31,24 @@ import bisect
 HERE = os.path.dirname(os.path.abspath(__file__))
 DATA = os.path.join(HERE, "data_sovereign")
 
-# ── Locked parameters (spec) ────────────────────────────────────────────────
-EMA_FAST, EMA_SLOW = 50, 200            # 4H dual EMA
-FRACTAL_K = 2                            # fractal confirmation neighbours each side (15m/2m)
-ATR_PERIOD = 14                          # 2m ATR14 (Wilder)
-RR = 2.0                                 # TP = 2 x SL
-RISK_FRAC = 0.015                        # 1.5% fixed capital risk per trade
-LEV_CAP = 10                             # max notional / equity
-MIN_NOTIONAL = 5.0                       # Bitget min order (USDT)
-SWEEP_VALID_H = 3.0                      # 15m sweep stays READY for 3h
-READY_TIMEOUT_H = 3.0                    # armed chain expires after 3h without trigger
-L2_IMBALANCE_MIN = 1.5                   # live-only gate (stub True in lab)
+# ── Locked parameters (spec + owner updates) ────────────────────────────────
+EMA_FAST, EMA_SLOW = 50, 200
+FRACTAL_K = 2
+ATR_PERIOD = 14
+RR = 2.0
+RISK_FRAC = 0.015
+LEV_CAP = 10
+MIN_NOTIONAL = 5.0
+SWEEP_VALID_H = 3.0
+READY_TIMEOUT_H = 3.0
+L2_IMBALANCE_MIN = 1.5          # live-only (stubbed True in lab)
 START_EQUITY = 10.0
+
+EXEC_TF_MIN = int(os.environ.get("EXEC_TF_MIN", "2"))     # owner 2026-09-15: 2m execution
+ENTRY_MODE = os.environ.get("ENTRY_MODE", "taker")        # taker | maker
+EXIT_ORDER = os.environ.get("EXIT_ORDER", "sl_first")      # sl_first (conservative) | tp_first (optimistic bound)
+SYMBOL = os.environ.get("SYMBOL", "near")                 # near | btc
+DATA_SUFFIX = os.environ.get("DATA_SUFFIX", "")           # e.g. _bear (out-of-sample window)
 
 TAKER = 0.0006
 MAKER = 0.0002
@@ -54,7 +60,6 @@ def load(name):
         return json.load(f)
 
 def resample(c1m, minutes):
-    """UTC-aligned resample of 1m candles (ts = bucket open)."""
     ms = minutes * 60_000
     out = []
     for c in c1m:
@@ -71,7 +76,6 @@ def resample(c1m, minutes):
 
 # ── Indicators ──────────────────────────────────────────────────────────────
 def ema_series(closes, period):
-    """EMA seeded with SMA of the first `period` closes (needs >= period bars)."""
     if len(closes) < period:
         return None
     k = 2.0 / (period + 1)
@@ -84,7 +88,6 @@ def ema_series(closes, period):
     return out
 
 def atr_series(candles, period):
-    """Wilder ATR, seeded with mean TR of first `period` bars."""
     trs = []
     for i, c in enumerate(candles):
         if i == 0:
@@ -103,7 +106,6 @@ def atr_series(candles, period):
     return out
 
 def fractal_lows(candles, k=2):
-    """Confirmed swing lows: low[i] is the minimum of [i-k, i+k] — known only at i+k."""
     out = []
     n = len(candles)
     for i in range(k, n - k):
@@ -122,11 +124,6 @@ def fractal_highs(candles, k=2):
     return out
 
 def fvg_zones(c1h):
-    """Active FVG zones from completed 1H candles.
-    Bullish FVG at i: high[i-2] < low[i]  -> zone (high[i-2], low[i])   (demand, longs)
-    Bearish FVG at i: low[i-2]  > high[i] -> zone (high[i], low[i-2])   (supply, shorts)
-    A zone dies when a COMPLETED 1H close trades fully through it:
-      bullish dies on close < zone_low; bearish dies on close > zone_high."""
     bull, bear = [], []
     for i in range(2, len(c1h)):
         a, c = c1h[i - 2], c1h[i]
@@ -152,30 +149,31 @@ def price_in_zone(zones, ts, price):
 
 # ── Engine ───────────────────────────────────────────────────────────────────
 def run():
-    c4h = load("near_4h.json")
-    c1h_native = load("near_1h.json")
-    c1m = load("near_1m.json")
+    c4h = load(f"{SYMBOL}{DATA_SUFFIX}_4h.json")
+    c1h_native = load(f"{SYMBOL}{DATA_SUFFIX}_1h.json")
+    c1m = load(f"{SYMBOL}{DATA_SUFFIX}_1m.json")
 
     closes4 = [c["close"] for c in c4h]
     ema50_4h = ema_series(closes4, EMA_FAST)
     ema200_4h = ema_series(closes4, EMA_SLOW)
 
-    c2m = resample(c1m, 2)
+    # execution timeline = 2m (owner). Gates on 15m still from 1m-resample for
+    # fractal independence; the exec walk itself uses the 2m series.
+    exec_c = resample(c1m, EXEC_TF_MIN)
+    tf_exec_ms = EXEC_TF_MIN * 60_000
+
     c15m = resample(c1m, 15)
-    atr2m = atr_series(c2m, ATR_PERIOD)
+    atr2m = atr_series(exec_c, ATR_PERIOD)   # ATR14 on the EXECUTION timeframe
 
     bull_zones, bear_zones = fvg_zones(c1h_native)
     swing_lows15 = fractal_lows(c15m, FRACTAL_K)
     swing_highs15 = fractal_highs(c15m, FRACTAL_K)
-    fhighs2 = fractal_highs(c2m, FRACTAL_K)
-    flows2 = fractal_lows(c2m, FRACTAL_K)
+    fhighs_x = fractal_highs(exec_c, FRACTAL_K)
+    flows_x = fractal_lows(exec_c, FRACTAL_K)
 
-    def closes_at(candles, tf_ms):
-        return [c["ts"] + tf_ms for c in candles]
-
-    idx4_close = closes_at(c4h, 4 * 3600_000)
-    idx15_close = closes_at(c15m, 15 * 60_000)
-    idx2_close = closes_at(c2m, 2 * 60_000)
+    idx4_close = [c["ts"] + 4 * 3600_000 for c in c4h]
+    idx15_close = [c["ts"] + 15 * 60_000 for c in c15m]
+    idxX_close = [c["ts"] + tf_exec_ms for c in exec_c]
 
     def last_idx(closes_at_list, ts):
         i = bisect.bisect_right(closes_at_list, ts) - 1
@@ -184,37 +182,51 @@ def run():
     equity = START_EQUITY
     trades = []
     position = None
+    pending = None  # POST_ONLY retest limit (maker mode)
 
     state = {"phase": "FLAT", "dir": None, "armed_ts": None, "sweep_ts": None,
-             "swept_low": None, "swept_high": None}
+             "swept_low": None, "swept_high": None, "choch_level": None}
 
-    for n in range(len(c1m) - 1):
-        c = c1m[n]
-        nxt = c1m[n + 1]
-        ts = c["ts"]
+    def open_position(side, entry_px, qty, i_atr, opened_ts):
+        atr = atr2m[i_atr]
+        dp = atr
+        if side == "long":
+            sl, tp = entry_px - dp, entry_px + RR * dp
+        else:
+            sl, tp = entry_px + dp, entry_px - RR * dp
+        return {"side": side, "entry": entry_px, "qty": qty, "sl": sl, "tp": tp,
+                "atr_frac": atr / entry_px, "opened_ts": opened_ts,
+                "entry_fee_mode": "maker" if ENTRY_MODE == "maker" else "taker"}
 
-        # ── open-position exit management (walked on this candle) ──
+    for n in range(len(exec_c) - 1):
+        c = exec_c[n]
+        nxt = exec_c[n + 1]
+        ts = c["ts"] + tf_exec_ms          # close time of the just-completed exec candle
+
+        # ── open-position exit management (walked on exec candles) ──
         if position:
             p, side = position, position["side"]
             hit_sl = c["low"] <= p["sl"] if side == "long" else c["high"] >= p["sl"]
             hit_tp = c["high"] >= p["tp"] if side == "long" else c["low"] <= p["tp"]
             exit_px = reason = None
-            if hit_sl:  # conservative: SL first if both in same candle
+            if hit_sl and (EXIT_ORDER == "sl_first" or not hit_tp):
                 exit_px, reason = p["sl"], "SL"
             elif hit_tp:
                 exit_px, reason = p["tp"], "TP_MAKER"
             if exit_px:
                 gross = (exit_px - p["entry"]) * p["qty"] * (1 if side == "long" else -1)
-                if reason == "TP_MAKER":
-                    fee = p["entry"] * p["qty"] * (TAKER + SLIP) + exit_px * p["qty"] * MAKER
-                else:
-                    fee = p["entry"] * p["qty"] * (TAKER + SLIP) + exit_px * p["qty"] * (TAKER + SLIP)
+                entry_fee = (p["entry"] * p["qty"] * MAKER if p["entry_fee_mode"] == "maker"
+                             else p["entry"] * p["qty"] * (TAKER + SLIP))
+                exit_fee = (exit_px * p["qty"] * MAKER if reason == "TP_MAKER"
+                            else exit_px * p["qty"] * (TAKER + SLIP))
+                fee = entry_fee + exit_fee
                 net = gross - fee
                 equity += net
                 trades.append({
                     "side": side, "entry": p["entry"], "exit": exit_px,
                     "sl": p["sl"], "tp": p["tp"], "atr_frac": p["atr_frac"],
                     "qty": p["qty"], "notional": p["qty"] * p["entry"],
+                    "entry_mode": p["entry_fee_mode"],
                     "gross": round(gross, 6), "fees": round(fee, 6), "net": round(net, 6),
                     "reason": reason, "opened_ts": p["opened_ts"], "closed_ts": ts,
                     "held_min": round((ts - p["opened_ts"]) / 60000, 1),
@@ -223,6 +235,44 @@ def run():
                 position = None
                 state = {"phase": "FLAT", "dir": None}
             continue
+
+        # ── pending POST_ONLY retest limit (maker mode) ──
+        if pending:
+            if ts > pending["expires_ts"]:
+                pending = None
+                state = {"phase": "FLAT", "dir": None}
+            else:
+                side, lvl = pending["side"], pending["level"]
+                filled = c["low"] <= lvl if side == "long" else c["high"] >= lvl
+                if filled:
+                    entry_px = lvl
+                    i_atr = pending["i_atr"]
+                    atr = atr2m[i_atr] or atr2m[max(0, i_atr)]
+                    dp = atr
+                    qty = (RISK_FRAC * equity) / dp
+                    if qty * entry_px >= MIN_NOTIONAL:
+                        position = open_position(side, entry_px, qty, i_atr, c["ts"])
+                        if qty * entry_px > LEV_CAP * equity:
+                            qty = LEV_CAP * equity / entry_px
+                            position = open_position(side, entry_px, qty, i_atr, c["ts"])
+                        # conservative: if the fill candle already breached the SL, die now
+                        p = position
+                        if (side == "long" and c["low"] <= p["sl"]) or (side == "short" and c["high"] >= p["sl"]):
+                            gross = (p["sl"] - p["entry"]) * p["qty"] * (1 if side == "long" else -1)
+                            fee = p["entry"] * p["qty"] * MAKER + p["sl"] * p["qty"] * (TAKER + SLIP)
+                            net = gross - fee
+                            equity += net
+                            trades.append({"side": side, "entry": p["entry"], "exit": p["sl"],
+                                           "sl": p["sl"], "tp": p["tp"], "atr_frac": p["atr_frac"],
+                                           "qty": p["qty"], "notional": p["qty"] * p["entry"],
+                                           "entry_mode": "maker", "gross": round(gross, 6),
+                                           "fees": round(fee, 6), "net": round(net, 6),
+                                           "reason": "SL", "opened_ts": c["ts"], "closed_ts": ts,
+                                           "held_min": 0.0, "equity": round(equity, 6)})
+                            position = None
+                    pending = None
+                    state = {"phase": "FLAT", "dir": None}
+                continue
 
         # ── gate 1: 4H macro bias (last completed 4H candle) ──
         i4 = last_idx(idx4_close, ts)
@@ -276,48 +326,50 @@ def run():
             state.update({"phase": "ARMED", "sweep_ts": None, "swept_low": None, "swept_high": None})
             continue
 
-        # ── gate 4: 2m micro-CHOCH — close beyond last confirmed 2m fractal ──
-        i2 = last_idx(idx2_close, ts)
+        # ── gate 4: 2m micro-CHOCH — close beyond the post-sweep pullback fractal ──
+        i2 = last_idx(idxX_close, ts)   # == n (the just-completed exec candle)
         if i2 is None or i2 < ATR_PERIOD or atr2m[i2] is None:
             continue
-        trig = False
-        # the CHOCH level is the pullback swing that forms AFTER the liquidity sweep
         sweep_ts = state.get("sweep_ts") or 0
+        trig = False
+        level = None
         if d == "bull":
-            fh = [f for f in fhighs2 if f["confirmed_ts"] <= c2m[i2]["ts"] and f["ts"] > sweep_ts]
-            if fh and c2m[i2]["close"] > fh[-1]["price"]:
-                trig = True
+            fh = [f for f in fhighs_x if f["confirmed_ts"] <= ts and f["ts"] > sweep_ts]
+            if fh and c["close"] > fh[-1]["price"]:
+                trig, level = True, fh[-1]["price"]
         else:
-            fl = [f for f in flows2 if f["confirmed_ts"] <= c2m[i2]["ts"] and f["ts"] > sweep_ts]
-            if fl and c2m[i2]["close"] < fl[-1]["price"]:
-                trig = True
+            fl = [f for f in flows_x if f["confirmed_ts"] <= ts and f["ts"] > sweep_ts]
+            if fl and c["close"] < fl[-1]["price"]:
+                trig, level = True, fl[-1]["price"]
         if not trig:
             continue
 
         # ── L2 imbalance gate: live-only (websocket top-10 depth, I_L2 >= 1.5).
-        #    Not replayable from candles — stub True in the lab. ──
-        # I_L2 = l2_imbalance(); if I_L2 < L2_IMBALANCE_MIN: continue   # live hook
+        #    Not replayable from candles — stubbed True in the lab. ──
 
-        # ── execute: market entry at next 1m open ──
-        atr = atr2m[i2]
-        entry = nxt["open"]
-        atr_frac = atr / entry
-        dp = atr
-        if d == "bull":
-            sl, tp = entry - dp, entry + RR * dp
+        # ── execute ──
+        if ENTRY_MODE == "maker":
+            # POST_ONLY retest limit at the CHOCH level: rests passively, waits
+            # for the pullback; fills maker (0.02%, no slip). Expires in 3h.
+            pending = {"side": "long" if d == "bull" else "short", "level": level,
+                       "i_atr": i2, "placed_ts": ts,
+                       "expires_ts": ts + SWEEP_VALID_H * 3600_000}
+            state = {"phase": "FLAT", "dir": None, "armed_ts": None,
+                     "sweep_ts": None, "swept_low": None, "swept_high": None}
         else:
-            sl, tp = entry + dp, entry - RR * dp
-        qty = (RISK_FRAC * equity) / dp
-        notional = qty * entry
-        if notional < MIN_NOTIONAL:
-            continue
-        if notional > LEV_CAP * equity:
-            notional = LEV_CAP * equity
-            qty = notional / entry
-        position = {"side": "long" if d == "bull" else "short", "entry": entry, "qty": qty, "sl": sl, "tp": tp,
-                    "atr_frac": atr_frac, "opened_ts": nxt["ts"]}
-        state = {"phase": "FLAT", "dir": None, "armed_ts": None,
-                 "sweep_ts": None, "swept_low": None, "swept_high": None}
+            # taker: market entry at next exec-candle open
+            entry = nxt["open"]
+            atr = atr2m[i2]
+            dp = atr
+            qty = (RISK_FRAC * equity) / dp
+            notional = qty * entry
+            if notional < MIN_NOTIONAL:
+                continue
+            if notional > LEV_CAP * equity:
+                qty = LEV_CAP * equity / entry
+            position = open_position("long" if d == "bull" else "short", entry, qty, i2, nxt["ts"])
+            state = {"phase": "FLAT", "dir": None, "armed_ts": None,
+                     "sweep_ts": None, "swept_low": None, "swept_high": None}
 
     return trades, equity
 
@@ -330,23 +382,29 @@ def report(trades, equity):
     aw = sum(t["net"] for t in wins) / len(wins) if wins else 0
     al = sum(t["net"] for t in losses) / len(losses) if losses else 0
     wr = len(wins) / n if n else 0
+    print(f"[{SYMBOL} exec={EXEC_TF_MIN}m entry={ENTRY_MODE}]")
     print(f"trades={n}  wins={len(wins)}  losses={len(losses)}  win_rate={wr*100:.1f}%")
     print(f"equity: {START_EQUITY:.2f} -> {equity:.2f}  (net {tot:+.4f})")
     print(f"avg_win={aw:+.4f}  avg_loss={al:+.4f}  payoff={abs(aw/al) if al else float('inf'):.2f}:1")
     if n:
         ev = wr * aw + (1 - wr) * al
         print(f"expectancy per trade: {ev:+.4f}  ({ev/START_EQUITY*100:+.3f}% of equity)")
+        fees_tot = sum(t["fees"] for t in trades)
+        print(f"total fees: {fees_tot:.4f}  ({fees_tot/abs(tot)*100 if tot else 0:.0f}% of |net|)")
     from collections import Counter
     print("exits:", dict(Counter(t["reason"] for t in trades)))
     fr = sorted(t["atr_frac"] for t in trades)
     if fr:
         med = fr[len(fr)//2]
-        print(f"SL distance (ATR14 2m): median {med*100:.3f}%  min {fr[0]*100:.3f}%  max {fr[-1]*100:.3f}%")
-        dP = med
-        w_star = (dP + 0.0018) / (3 * dP + 0.0007)
+        print(f"SL distance (ATR14 {EXEC_TF_MIN}m): median {med*100:.3f}%  min {fr[0]*100:.3f}%  max {fr[-1]*100:.3f}%")
+        # breakeven with the active entry mode's friction
+        if ENTRY_MODE == "maker":
+            c_win, c_loss = 0.0002 + 0.0002, 0.0002 + 0.0006 + 0.0003
+        else:
+            c_win, c_loss = 0.0006 + 0.0003 + 0.0002, 0.0006 + 0.0003 + 0.0006 + 0.0003
+        # exact: W*(2d - c_win) = (1-W)(d + c_loss)  ->  W* = (d + c_loss)/(3d + c_loss - c_win)
+        w_star = (med + c_loss) / (3 * med + c_loss - c_win)
         print(f"breakeven win rate at median dP: {w_star*100:.1f}%  (realized {wr*100:.1f}%)")
-        below = sum(1 for x in fr if 2 * x - 0.0011 <= 0)
-        print(f"trades with TP_net <= 0 (ATR below friction floor): {below}/{len(fr)}")
     hd = sorted(t["held_min"] for t in trades)
     if hd:
         print(f"hold minutes: median {hd[len(hd)//2]:.0f}  max {hd[-1]:.0f}")
@@ -360,6 +418,7 @@ def report(trades, equity):
 if __name__ == "__main__":
     trades, eq = run()
     report(trades, eq)
-    with open(os.path.join(HERE, "sovereign_v6_trades.json"), "w") as f:
+    suffix = f"{SYMBOL}{DATA_SUFFIX}_{EXEC_TF_MIN}m_{ENTRY_MODE}"
+    with open(os.path.join(HERE, f"sovereign_v6_trades_{suffix}.json"), "w") as f:
         json.dump(trades, f, indent=1)
-    print("\ntrade log -> lab/sovereign_v6_trades.json")
+    print(f"\ntrade log -> lab/sovereign_v6_trades_{suffix}.json")
