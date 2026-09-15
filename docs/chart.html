@@ -59,6 +59,22 @@ aside h2{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--
 .trow .meta{font-size:11px;color:var(--dim);grid-column:1/-1;font-family:var(--mono)}
 .pnl{font-family:var(--mono);font-weight:700;font-size:12px}
 .pnl.pos{color:var(--green)} .pnl.neg{color:var(--red)}
+/* chat feed (owner spec 2026-09-15: trades as a chat log, tz-aware) */
+.day{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--dim);
+     text-align:center;padding:12px 0 6px;position:sticky;top:0;background:var(--panel);z-index:2}
+.tgroup{padding:8px 14px 10px;border-bottom:1px solid var(--line);cursor:pointer;transition:background .12s}
+.tgroup:hover{background:var(--panel2)}
+.tgroup.sel{background:#182233;box-shadow:inset 3px 0 0 var(--teal)}
+.bub{display:flex;gap:8px;margin:5px 0;align-items:flex-start}
+.bub .av{width:22px;height:22px;border-radius:50%;background:var(--teal);color:#04252a;
+         font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex:none}
+.bub .bd{background:var(--panel2);border:1px solid var(--line);border-radius:4px 12px 12px 12px;
+         padding:7px 10px;font-size:12px;flex:1;min-width:0}
+.bub .bd .tm{float:right;color:var(--dim);font-size:10px;font-family:var(--mono);margin-left:10px}
+.bub.sys .av{background:var(--panel2);color:var(--teal);border:1px solid var(--teal)}
+.bub.sys .bd{border-color:rgba(0,206,202,.35)}
+.anal{color:var(--teal)}
+.expl{color:var(--dim);font-size:10px;margin-top:2px;font-family:var(--mono)}
 .errbanner{background:var(--red);color:#fff;text-align:center;padding:6px;font-size:12px;display:none}
 @media(max-width:920px){
   aside{position:fixed;right:0;top:0;bottom:0;width:min(92vw,360px);z-index:20;
@@ -78,7 +94,15 @@ aside h2{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--
   <span class="pill">2m candles · Bitget</span>
   <span class="pill" id="pnlpill">P&L <b>—</b></span>
   <span class="sub" id="updated"><span class="dot"></span>loading…</span>
-  <button id="asidetoggle">☰ Trades</button>
+  <select id="tz" aria-label="Timezone">
+    <option value="Africa/Lagos">WAT · Lagos</option>
+    <option value="UTC">UTC</option>
+    <option value="Europe/London">BST · London</option>
+    <option value="America/New_York">ET · New York</option>
+    <option value="Asia/Dubai">GST · Dubai</option>
+    <option value="Asia/Singapore">SGT · Singapore</option>
+  </select>
+  <button id="asidetoggle">☰ Chat</button>
 </header>
 <div class="errbanner" id="err">Data fetch failed — retrying…</div>
 <main>
@@ -94,7 +118,7 @@ aside h2{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--
   </div>
   <aside id="aside">
     <div class="ahead">
-      <h2>Historical executions</h2>
+      <h2>Execution chat · bot log</h2>
       <div class="chips">
         <button class="chip on" data-f="ALL">All</button>
         <button class="chip" data-f="OPEN">Open</button>
@@ -171,6 +195,8 @@ const overlay = $("overlay"), octx = overlay.getContext("2d");
 /* state */
 let TRADES = {}, symbols = [], curSym = null, filter = "ALL", selTrade = null;
 const candles2m = new Map();          // ts -> {open,high,low,close}
+let TZ = localStorage.getItem("cozy.tz") || "Africa/Lagos";   // owner: NG (WAT) default
+$("tz").value = [...$("tz").options].some(o=>o.value===TZ) ? TZ : "Africa/Lagos";
 let markers = [];
 
 /* ── data: trades JSON (REST contract, section 5) ── */
@@ -185,7 +211,7 @@ async function loadTrades() {
   sel.innerHTML = symbols.map(s => `<option>${s}</option>`).join("");
   if (prev && symbols.includes(prev)) { sel.value = prev; curSym = prev; }
   else { curSym = symbols[0]; sel.value = curSym; }
-  $("updated").innerHTML = `<span class="dot"></span>updated ${new Date(j.updated).toLocaleTimeString()}`;
+  $("updated").innerHTML = `<span class="dot"></span>updated ${new Intl.DateTimeFormat([], {timeZone:TZ, hour:"2-digit", minute:"2-digit", hour12:false}).format(new Date(j.updated))} ${TZ.split("/").pop().replace("_"," ")}`;
   renderRows(); drawOverlay();
 }
 
@@ -272,6 +298,10 @@ function drawOverlay() {
   const ts = chart.timeScale();
   const nowS = Math.floor(Date.now()/1000);
   const list = filtered().slice(-120);                       // perf cap
+  if (selTrade) {  // selected trade must always show its zones, even beyond the cap
+    const st = (TRADES[curSym]||[]).find(x => x.trade_id === selTrade);
+    if (st && !list.includes(st)) list.push(st);
+  }
   for (const t of list) {
     const endT = (t.exit_time||nowS) + (t.exit_time?0:900);
     const x1 = ts.timeToCoordinate(t.entry_time), x2 = ts.timeToCoordinate(endT);
@@ -316,25 +346,64 @@ function drawOverlay() {
 }
 
 /* ── sidebar rows ── */
-const fmtT = s => s ? new Date(s*1000).toLocaleString([], {month:"short",day:"2-digit",hour:"2-digit",minute:"2-digit"}) : "—";
+const fmtT = s => s ? new Intl.DateTimeFormat([], {timeZone:TZ, month:"short", day:"2-digit",
+                          hour:"2-digit", minute:"2-digit", hour12:false}).format(new Date(s*1000)) : "—";
+let dayFmt = new Intl.DateTimeFormat([], {timeZone:TZ, weekday:"short", month:"short", day:"2-digit"});
 const fmtP = p => p==null ? "—" : (p>=1000 ? p.toFixed(1) : p.toFixed(4));
+function tradeBubbles(t) {
+  const dir = t.direction === "LONG";
+  const out = [];
+  // bubble 1: structural analysis (sweep + FVG) — what the bot "saw"
+  if (t.sweep_price != null || (t.fvg_top != null && t.fvg_bottom != null)) {
+    const bits = [];
+    if (t.sweep_price != null) bits.push(`liquidity swept @ ${fmtP(t.sweep_price)}`);
+    if (t.fvg_top != null && t.fvg_bottom != null)
+      bits.push(`${dir ? "bullish" : "bearish"} FVG ${fmtP(t.fvg_bottom)}–${fmtP(t.fvg_top)}`);
+    out.push(`<div class="bub sys"><div class="av">◆</div><div class="bd">` +
+      `<span class="tm">${fmtT(t.entry_time - 120)}</span>` +
+      `<span class="anal">${bits.join(" · ")}</span>` +
+      `<div class="expl">structural read · ${t.engine || "v5"}</div></div></div>`);
+  }
+  // bubble 2: entry
+  out.push(`<div class="bub"><div class="av">C</div><div class="bd">` +
+    `<span class="tm">${fmtT(t.entry_time)}</span>` +
+    `<b class="dir ${dir ? "long" : "short"}">${dir ? "▲ LONG" : "▼ SHORT"}</b> @ ${fmtP(t.entry_price)}` +
+    `<div class="expl">${t.reason_entry || ""}${t.engine ? " · " + t.engine : ""}</div></div></div>`);
+  // bubble 3: exit / live status
+  if (t.exit_time) {
+    const win = t.status === "WIN_TP_HIT";
+    const tag = win ? "TP ✓" : (t.status === "LOSS_SL_HIT" ? "SL ✗" : t.status.replace(/_/g, " "));
+    out.push(`<div class="bub"><div class="av">C</div><div class="bd">` +
+      `<span class="tm">${fmtT(t.exit_time)}</span>` +
+      `<span class="pnl ${(t.net_pnl || 0) >= 0 ? "pos" : "neg"}">${tag} ${(t.net_pnl || 0) >= 0 ? "+" : ""}${(t.net_pnl || 0).toFixed(3)} USDT</span>` +
+      `<div class="expl">${t.reason_exit || ""} · exit ${fmtP(t.exit_price)}</div></div></div>`);
+  } else if (t.status === "OPEN") {
+    out.push(`<div class="bub"><div class="av">C</div><div class="bd">` +
+      `<span class="anal">riding… monitoring exit conditions</span></div></div>`);
+  }
+  return out.join("");
+}
+
 function renderRows() {
   const list = filtered().slice().reverse();
   const pnl = (TRADES[curSym]||[]).reduce((a,t)=>a+(t.net_pnl||0),0);
   $("pnlpill").innerHTML = `P&L <b style="color:${pnl>=0?"var(--green)":"var(--red)"}">${pnl>=0?"+":""}${pnl.toFixed(3)} USDT</b>`;
-  $("rows").innerHTML = list.length ? list.map(t=>`
-    <div class="trow${t.trade_id===selTrade?" sel":""}" data-tid="${t.trade_id}">
-      <span class="id">${t.trade_id||""}</span>
-      <span class="dir ${t.direction.toLowerCase()}">${t.direction==="LONG"?"▲ LONG":"▼ SHORT"}</span>
-      <span class="badge st-${t.status}">${t.status.replace("_"," ")}</span>
-      <span class="meta">${fmtP(t.entry_price)} → ${fmtP(t.exit_price)} · ${fmtT(t.entry_time)}</span>
-      <span class="meta">${t.reason_entry||""}</span>
-      <span class="pnl ${(t.net_pnl||0)>=0?"pos":"neg"}">${t.net_pnl==null?(t.status==="OPEN"?"riding…":""):((t.net_pnl>=0?"+":"")+t.net_pnl.toFixed(3))}</span>
-      <span></span>
-    </div>`).join("") : `<div style="padding:20px;color:var(--dim)">No trades for this filter.</div>`;
-  document.querySelectorAll(".trow").forEach(el => el.onclick = () => selectTrade(el.dataset.tid));
+  if (!list.length) {
+    $("rows").innerHTML = `<div style="padding:20px;color:var(--dim)">No trades for this filter.</div>`;
+    renderMarkers(); return;
+  }
+  let html = "", lastDay = "";
+  for (const t of list) {
+    const d = dayFmt.format(new Date(t.entry_time*1000));
+    if (d !== lastDay) { html += `<div class="day">${d}</div>`; lastDay = d; }
+    html += `<div class="tgroup${t.trade_id === selTrade ? " sel" : ""}" data-tid="${t.trade_id}">` +
+            tradeBubbles(t) + `</div>`;
+  }
+  $("rows").innerHTML = html;
+  document.querySelectorAll(".tgroup").forEach(el => el.onclick = () => selectTrade(el.dataset.tid));
   renderMarkers();
 }
+
 async function selectTrade(tid) {
   selTrade = tid;
   const t = (TRADES[curSym]||[]).find(x=>x.trade_id===tid);
@@ -361,6 +430,12 @@ document.querySelectorAll(".chip").forEach(c => c.onclick = () => {
   c.classList.add("on"); filter = c.dataset.f; renderRows(); drawOverlay();
 });
 $("asidetoggle").onclick = () => $("aside").classList.toggle("open");
+$("tz").onchange = () => {
+  TZ = $("tz").value; localStorage.setItem("cozy.tz", TZ);
+  dayFmt = new Intl.DateTimeFormat([], {timeZone:TZ, weekday:"short", month:"short", day:"2-digit"});
+  renderRows(); drawOverlay();
+  loadTrades().catch(()=>{});   // refresh "updated" pill in the new tz
+};
 chart.timeScale().subscribeVisibleTimeRangeChange(() => requestAnimationFrame(drawOverlay));
 new ResizeObserver(() => requestAnimationFrame(drawOverlay)).observe($("chartwrap"));
 
