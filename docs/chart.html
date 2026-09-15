@@ -136,6 +136,21 @@ window.addEventListener("error", e => {
 const RAW = new URLSearchParams(location.search).get("raw")
          || "https://raw.githubusercontent.com/CozanetHQ/near-scalper-bot/main/";
 const BITGET = "https://api.bitget.com/api/v2/mix/market";
+// Proxy through our own Vercel serverless functions when available — the
+// owner's mobile IP got geo-blocked/throttled hitting Bitget directly
+// (works fine calling from Vercel's own servers). Falls back to direct
+// Bitget calls on hosts without the proxy (e.g. GitHub Pages).
+const HAS_PROXY = location.hostname.endsWith("vercel.app");
+async function bitgetFetch(kind, params) {
+  if (HAS_PROXY) {
+    try {
+      const r = await fetch(`/api/${kind}?${params}`);
+      if (r.ok) return await r.json();
+    } catch (e) { /* fall through to direct */ }
+  }
+  const r = await fetch(`${BITGET}/${kind}?${params}&productType=USDT-FUTURES`);
+  return await r.json();
+}
 const $ = id => document.getElementById(id);
 const pairToSymbol = p => p.replace("/", "");           // NEAR/USDT -> NEARUSDT
 
@@ -176,9 +191,9 @@ async function loadTrades() {
 
 /* ── candles: Bitget 1m -> 2m ── */
 async function fetch1m(sym, startMs, endMs) {
-  let url = `${BITGET}/candles?symbol=${sym}&productType=USDT-FUTURES&granularity=1m&limit=1000`;
-  if (startMs && endMs) url += `&startTime=${startMs}&endTime=${endMs}`;
-  const r = await fetch(url); const j = await r.json();
+  let params = `symbol=${sym}&limit=1000`;
+  if (startMs && endMs) params += `&startTime=${startMs}&endTime=${endMs}`;
+  const j = await bitgetFetch("candles", params);
   if (j.code !== "00000") throw new Error(j.msg);
   return j.data.map(d => ({ts:+d[0],open:+d[1],high:+d[2],low:+d[3],close:+d[4],vol:+d[5]}))
                .sort((a,b)=>a.ts-b.ts);
@@ -352,8 +367,7 @@ new ResizeObserver(() => requestAnimationFrame(drawOverlay)).observe($("chartwra
 async function tickLoop() {
   for(;;) {
     try {
-      const r = await fetch(`${BITGET}/ticker?symbol=${pairToSymbol(curSym)}&productType=USDT-FUTURES`);
-      const j = await r.json();
+      const j = await bitgetFetch("ticker", `symbol=${pairToSymbol(curSym)}`);
       if (j.code==="00000" && j.data[0]) {
         const p = +j.data[0].lastPr;
         candles.setMarkers(markers);  // keep markers after price-line updates
