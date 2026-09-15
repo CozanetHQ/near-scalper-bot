@@ -59,6 +59,12 @@ jobs:
           echo "Starting multi-pair scalper tick engine..."
           python tick.py
 
+      - name: Regenerate no-JS static chart
+        run: |
+          # owner's mobile network strips/blocks JS+CDNs — this bakes candles
+          # and trades into pure HTML+SVG so the dashboard renders anywhere
+          python lab/gen_static_chart.py || echo "static chart regen failed (non-blocking)"
+
       - name: Commit engine state
         run: |
           # The repo IS the state store: git history is the audit trail and
