@@ -36,6 +36,13 @@ PRODUCT = "USDT-FUTURES"
 # NEAR retained for continuity with the single-pair era.
 PAIRS = [p.strip().upper() for p in os.environ.get(
     "PAIRS", "NEARUSDT,BTCUSDT,ETHUSDT,SOLUSDT,XRPUSDT").split(",") if p.strip()]
+
+# ── SOVEREIGN V6 (owner 2026-09-15): top-down MTF entry engine, ported from the
+# lab (sovereign-v6-lab branch). Off unless BOTH env flags are set. When active
+# for a pair, engine.sovereign.process_pair replaces this v5 tick entirely for
+# that pair; every other pair keeps running v5 untouched.
+SOVEREIGN_V6 = os.environ.get("SOVEREIGN_V6", "0") == "1"
+SOVEREIGN_PAIRS = {p.strip().upper() for p in os.environ.get("SOVEREIGN_PAIRS", "").split(",") if p.strip()}
 _REPO = os.path.dirname(os.path.abspath(__file__))
 STATE_FILE = os.environ.get("STATE_FILE", os.path.join(_REPO, "state", "state.json"))
 TRADES_FILE = os.environ.get("TRADES_FILE", os.path.join(_REPO, "data", "trades.jsonl"))
@@ -781,6 +788,9 @@ def registry_check():
 def process_tick(state):
     """One poll cycle for ONE pair. Returns (action, details)."""
     symbol = state.get("_pair") or SYMBOL
+    if SOVEREIGN_V6 and symbol in SOVEREIGN_PAIRS:
+        from engine.sovereign import process_pair
+        return process_pair(state)
     PTAG = symbol.replace("USDT", "")
     def _pt(text):  # every alert from this pair carries its tag
         send_telegram(f"[{PTAG}] {text}")

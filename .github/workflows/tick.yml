@@ -33,6 +33,10 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           MAX_RUNTIME: '240'
+          # Sovereign v6 (owner 2026-09-15): NEAR runs the new top-down MTF
+          # engine; the other pairs keep v5 untouched.
+          SOVEREIGN_V6: '1'
+          SOVEREIGN_PAIRS: 'NEARUSDT'
         run: |
           echo "Starting multi-pair scalper tick engine..."
           python tick.py
