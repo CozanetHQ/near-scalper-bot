@@ -142,6 +142,15 @@ def price_in_zone(zones, ts, price):
                and z["low"] <= price <= z["high"] for z in zones)
 
 
+def find_zone(zones, ts, price):
+    """The FVG zone a trigger fires in — captured for the chart overlay."""
+    for z in zones:
+        if (z["created_ts"] <= ts and (z["dead_after"] is None or z["dead_after"] > ts)
+                and z["low"] <= price <= z["high"]):
+            return z
+    return None
+
+
 def resample_2m(c1m_closed):
     """Closed 1m candles -> closed 2m candles (drops a trailing half-bucket)."""
     out = []
@@ -443,6 +452,9 @@ def process_pair(state):
                 continue
 
         if live_mode:
+            _z = find_zone(bull_zones if d == "bull" else bear_zones, ts, level) or {}
+            sv["_trig_ctx"] = {"fvg_top": _z.get("high"), "fvg_bottom": _z.get("low"),
+                               "sweep_price": sv.get("swept_level") or level}
             ok, msg = _live_place(T, live_cli, symbol, d, level, atr_frac, equity, sv, iso, _pt)
             if ok:
                 action, details = "armed-limit-live", f"live retest limit @ {level}"
@@ -450,12 +462,16 @@ def process_pair(state):
                 sv.update({"phase": "ARMED", "swept_level": None})
                 action, details = "skip-live", msg
             continue
+        zone = find_zone(bull_zones if d == "bull" else bear_zones, ts, level) or {}
         sv["pending"] = {
             "side": "long" if d == "bull" else "short",
             "level": level,
             "atr_frac": atr_frac,
             "placed_ms": ts,
             "expires_ms": ts + int(SWEEP_VALID_H * 3600_000),
+            "fvg_top": zone.get("high"),
+            "fvg_bottom": zone.get("low"),
+            "sweep_price": sv.get("swept_level") or level,
         }
         sv["phase"] = "FLAT"
         sv["walk_ms"] = ts
@@ -537,7 +553,20 @@ def _fill(T, state, sv, pending, lvl, iso, symbol, _pt):
         "tp": lvl + RR * dp if side == "long" else lvl - RR * dp,
         "atr_frac_at_entry": atr_frac, "entry_mode": "maker",
         "opened_at": iso, "mfe_frac": 0.0, "mae_frac": 0.0,
+        "trade_id": None, "fvg_top": pending.get("fvg_top"),
+        "fvg_bottom": pending.get("fvg_bottom"),
+        "sweep_price": pending.get("sweep_price"),
     }
+    try:
+        from engine import ui_store
+        pos["trade_id"] = ui_store.new_trade_id(symbol, iso)
+        ui_store.record_open(
+            pos["trade_id"], symbol, side, iso, lvl, pos["tp"], pos["sl"],
+            f"1H_{'BULL' if side == 'long' else 'BEAR'}_FVG + 15m_SWEEP + 2m_CHOCH",
+            fvg_top=pending.get("fvg_top"), fvg_bottom=pending.get("fvg_bottom"),
+            sweep_price=pending.get("sweep_price"), engine="sovereign-v6")
+    except Exception:
+        pass
     sv["pending"] = None
     sv["pos"] = pos
     _pt(f"sovereign FILLED {side} @ {lvl:.6g} (maker retest) | SL {pos['sl']:.6g} TP {pos['tp']:.6g}")
@@ -565,6 +594,7 @@ def _close(T, state, pos, exit_px, reason, symbol, sv, su, iso, _pt):
         pass
     trade = {
         "pair": symbol, "engine": "sovereign-v6", "side": side,
+        "trade_id": pos.get("trade_id"),
         "entry_mode": pos.get("entry_mode", "maker"),
         "trade_state": t_state, "mfe_frac": round(mfe, 6),
         "mae_frac": round(pos.get("mae_frac") or 0.0, 6),
@@ -637,11 +667,14 @@ def _live_place(T, live_cli, symbol, d, level, atr_frac, equity, sv, iso, _pt):
     except Exception as e:
         return False, f"place failed: {e}"
     now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+    ctx = sv.pop("_trig_ctx", {}) or {}
     sv["pending"] = {
         "side": side, "level": level, "atr_frac": atr_frac,
         "placed_ms": now_ms, "expires_ms": now_ms + int(SWEEP_VALID_H * 3600_000),
         "order_id": oid, "qty": qty, "sl": sl, "tp": tp,
         "notional": notional, "margin": notional / LEV_CAP,
+        "fvg_top": ctx.get("fvg_top"), "fvg_bottom": ctx.get("fvg_bottom"),
+        "sweep_price": ctx.get("sweep_price"),
     }
     sv["phase"] = "FLAT"
     _pt(f"LIVE TRIGGER {d}: post-only limit @ {level:.6g} qty {qty} (sl {sl:.6g} / tp {tp:.6g}, risk 1.5% of ${equity:.2f})")
@@ -668,7 +701,21 @@ def _live_reconcile(T, live_cli, state, symbol, sv, su, now_iso, _pt):
                 "sl": od["sl"] or pending["sl"], "tp": od["tp"] or pending["tp"],
                 "atr_frac_at_entry": pending["atr_frac"], "entry_mode": "maker-live",
                 "opened_at": now_iso, "mfe_frac": 0.0, "mae_frac": 0.0,
+                "trade_id": None, "fvg_top": pending.get("fvg_top"),
+                "fvg_bottom": pending.get("fvg_bottom"),
+                "sweep_price": pending.get("sweep_price"),
             }
+            try:
+                from engine import ui_store
+                sv["pos"]["trade_id"] = ui_store.new_trade_id(symbol, now_iso)
+                ui_store.record_open(
+                    sv["pos"]["trade_id"], symbol, pending["side"], now_iso,
+                    entry, sv["pos"]["sl"], sv["pos"]["tp"],
+                    f"1H_{'BULL' if pending['side'] == 'long' else 'BEAR'}_FVG + 15m_SWEEP + 2m_CHOCH",
+                    fvg_top=pending.get("fvg_top"), fvg_bottom=pending.get("fvg_bottom"),
+                    sweep_price=pending.get("sweep_price"), engine="sovereign-v6")
+            except Exception:
+                pass
             sv["pending"] = None
             _pt(f"LIVE FILLED {pending['side']} @ {entry:.6g} (sl {sv['pos']['sl']:.6g} / tp {sv['pos']['tp']:.6g} attached exchange-side)")
         elif st == "canceled":

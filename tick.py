@@ -632,6 +632,11 @@ def sync(pair, state_update=None, trade=None):
         os.makedirs(os.path.dirname(TRADES_FILE), exist_ok=True)
         with open(TRADES_FILE, "a") as f:
             f.write(json.dumps(tr, separators=(",", ":")) + "\n")
+        try:  # UI trade store (owner spec 09-15): chart overlay history
+            from engine import ui_store
+            ui_store.record_trade(tr)
+        except Exception:
+            pass
     master["updated_at"] = datetime.now(timezone.utc).isoformat()
     os.makedirs(os.path.dirname(STATE_FILE), exist_ok=True)
     tmp = STATE_FILE + ".tmp"
@@ -713,6 +718,8 @@ def close_position(pos, exit_price, reason, now, balance):
                           if pos.get("opened_at") else None),
         "tp_frac": round(tp_frac, 6),
         "entry_price": entry,
+        "tp_price": tp_price,          # UI trade store (owner spec 09-15)
+        "sl_price": pos.get("sl_price") or 0,
         "exit_price": exit_price,
         "notional": notional,
         "margin": pos["margin"],
@@ -1454,6 +1461,11 @@ def main():
         if elapsed < MAX_RUNTIME:
             time.sleep(max(1, POLL_INTERVAL - elapsed % POLL_INTERVAL))
 
+    try:  # UI export (owner spec 09-15): trades_ui.json for the chart frontend
+        from engine import ui_store
+        ui_store.export_ui_json()
+    except Exception:
+        pass
     log(f"Run complete: {ticks} ticks, {trades} trades, {time.time()-start:.0f}s")
 
 

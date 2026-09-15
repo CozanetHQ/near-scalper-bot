@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CozanetHQ — Execution Chart</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-512.png">
+<style>
+:root{
+  --bg:#0b0e14; --panel:#12161f; --panel2:#171c27; --line:#232a38;
+  --text:#e7ecf3; --dim:#8b95a7; --teal:#00ceca; --green:#22c55e;
+  --red:#ef4444; --amber:#f59e0b; --mono:ui-monospace,'SF Mono','Cascadia Code',Menlo,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--bg);color:var(--text);font:14px/1.45 -apple-system,'Segoe UI',Roboto,Inter,sans-serif;
+     display:flex;flex-direction:column;overflow:hidden}
+header{display:flex;align-items:center;gap:12px;padding:10px 16px;background:var(--panel);
+       border-bottom:1px solid var(--line);flex-wrap:wrap}
+header h1{font-size:15px;font-weight:600;letter-spacing:.4px;white-space:nowrap}
+header h1 a{color:var(--teal);text-decoration:none}
+header .sub{font-size:11px;color:var(--dim);white-space:nowrap}
+select{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:8px;
+       padding:6px 10px;font-size:13px;font-weight:600;cursor:pointer}
+.pill{font-size:11px;padding:4px 10px;border-radius:999px;background:var(--panel2);
+      border:1px solid var(--line);color:var(--dim);white-space:nowrap}
+.pill b{color:var(--text)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--green);display:inline-block;
+     box-shadow:0 0 6px var(--green);margin-right:6px}
+main{flex:1;display:flex;min-height:0}
+#chartwrap{flex:1;position:relative;min-width:0}
+#chart{position:absolute;inset:0}
+#overlay{position:absolute;inset:0;pointer-events:none}
+#legend{position:absolute;left:12px;top:10px;background:rgba(18,22,31,.82);border:1px solid var(--line);
+        border-radius:8px;padding:8px 12px;font-size:12px;color:var(--dim);pointer-events:none}
+#legend .lrow{display:flex;gap:8px;align-items:center;margin:2px 0}
+.sw{width:12px;height:12px;border-radius:3px;display:inline-block}
+aside{width:380px;border-left:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column;min-height:0}
+aside .ahead{padding:10px 14px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:8px}
+aside h2{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--dim)}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{font-size:11px;padding:4px 10px;border-radius:999px;border:1px solid var(--line);
+      background:transparent;color:var(--dim);cursor:pointer;font-weight:600}
+.chip.on{background:var(--teal);border-color:var(--teal);color:#04252a}
+#rows{flex:1;overflow-y:auto}
+.trow{display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:10px 14px;
+      border-bottom:1px solid var(--line);cursor:pointer;transition:background .12s}
+.trow:hover{background:var(--panel2)}
+.trow.sel{background:#182233;box-shadow:inset 3px 0 0 var(--teal)}
+.trow .id{font-family:var(--mono);font-size:11px;color:var(--dim);grid-column:1/-1}
+.trow .dir{font-weight:700;font-size:12px;letter-spacing:.4px}
+.dir.long{color:var(--green)} .dir.short{color:var(--red)}
+.badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px;justify-self:end}
+.st-WIN_TP_HIT{background:rgba(34,197,94,.15);color:var(--green)}
+.st-LOSS_SL_HIT{background:rgba(239,68,68,.15);color:var(--red)}
+.st-OPEN{background:rgba(245,158,11,.15);color:var(--amber)}
+.st-CANCELLED{background:rgba(139,149,167,.15);color:var(--dim)}
+.trow .meta{font-size:11px;color:var(--dim);grid-column:1/-1;font-family:var(--mono)}
+.pnl{font-family:var(--mono);font-weight:700;font-size:12px}
+.pnl.pos{color:var(--green)} .pnl.neg{color:var(--red)}
+.errbanner{background:var(--red);color:#fff;text-align:center;padding:6px;font-size:12px;display:none}
+@media(max-width:920px){
+  aside{position:fixed;right:0;top:0;bottom:0;width:min(92vw,360px);z-index:20;
+        transform:translateX(100%);transition:transform .2s;box-shadow:-8px 0 30px rgba(0,0,0,.5)}
+  aside.open{transform:none}
+  #asidetoggle{display:flex}
+  #legend{display:none}
+}
+#asidetoggle{display:none;align-items:center;gap:6px;background:var(--panel2);border:1px solid var(--line);
+             color:var(--text);border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer;font-weight:600}
+</style>
+</head>
+<body>
+<header>
+  <h1><a href="index.html">NEAR SCALPER</a> · EXECUTION CHART</h1>
+  <select id="symbol" aria-label="Trading pair"></select>
+  <span class="pill">2m candles · Bitget</span>
+  <span class="pill" id="pnlpill">P&L <b>—</b></span>
+  <span class="sub" id="updated"><span class="dot"></span>loading…</span>
+  <button id="asidetoggle">☰ Trades</button>
+</header>
+<div class="errbanner" id="err">Data fetch failed — retrying…</div>
+<main>
+  <div id="chartwrap">
+    <div id="chart"></div>
+    <canvas id="overlay"></canvas>
+    <div id="legend">
+      <div class="lrow"><span class="sw" style="background:rgba(34,197,94,.25);border:1px solid var(--green)"></span>Take-profit zone</div>
+      <div class="lrow"><span class="sw" style="background:rgba(239,68,68,.22);border:1px solid var(--red)"></span>Stop-loss zone</div>
+      <div class="lrow"><span class="sw" style="background:rgba(0,206,202,.16);border:1px solid var(--teal)"></span>Fair Value Gap</div>
+      <div class="lrow"><span style="border-top:2px dotted var(--amber);width:14px;display:inline-block"></span>Liquidity sweep</div>
+    </div>
+  </div>
+  <aside id="aside">
+    <div class="ahead">
+      <h2>Historical executions</h2>
+      <div class="chips">
+        <button class="chip on" data-f="ALL">All</button>
+        <button class="chip" data-f="OPEN">Open</button>
+        <button class="chip" data-f="WIN_TP_HIT">Wins</button>
+        <button class="chip" data-f="LOSS_SL_HIT">Losses</button>
+      </div>
+    </div>
+    <div id="rows"></div>
+  </aside>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
+<script>
+"use strict";
+/* ── CozanetHQ execution chart (owner spec 2026-09-15) ───────────────────
+   Layer 1: 2m candles (Bitget 1m -> resampled client-side)
+   Layer 2: TP/SL risk bands (canvas overlay)
+   Layer 3: entry/exit markers
+   Layer 4: FVG band + liquidity sweep line                                   */
+const RAW = new URLSearchParams(location.search).get("raw")
+         || "https://raw.githubusercontent.com/CozanetHQ/near-scalper-bot/main/";
+const BITGET = "https://api.bitget.com/api/v2/mix/market";
+const $ = id => document.getElementById(id);
+const pairToSymbol = p => p.replace("/", "");           // NEAR/USDT -> NEARUSDT
+
+/* chart */
+const chart = LightweightCharts.createChart($("chart"), {
+  layout: {background:{type:"solid",color:"#0b0e14"},textColor:"#8b95a7"},
+  grid: {vertLines:{color:"#161c28"},horzLines:{color:"#161c28"}},
+  timeScale:{timeVisible:true,secondsVisible:false,borderColor:"#232a38",rightOffset:12},
+  rightPriceScale:{borderColor:"#232a38"},
+  crosshair:{mode:0},
+  autoSize:true,
+});
+const candles = chart.addCandlestickSeries({
+  upColor:"#22c55e",downColor:"#ef4444",borderVisible:false,wickUpColor:"#22c55e",wickDownColor:"#ef4444",
+});
+const overlay = $("overlay"), octx = overlay.getContext("2d");
+
+/* state */
+let TRADES = {}, symbols = [], curSym = null, filter = "ALL", selTrade = null;
+const candles2m = new Map();          // ts -> {open,high,low,close}
+let markers = [];
+
+/* ── data: trades JSON (REST contract, section 5) ── */
+async function loadTrades() {
+  const r = await fetch(RAW + "data/trades_ui.json?t=" + Date.now(), {cache:"no-store"});
+  if (!r.ok) throw new Error("trades_ui.json " + r.status);
+  const j = await r.json();
+  TRADES = j.symbols || {};
+  const prev = curSym;
+  symbols = Object.keys(TRADES).sort();
+  const sel = $("symbol");
+  sel.innerHTML = symbols.map(s => `<option>${s}</option>`).join("");
+  if (prev && symbols.includes(prev)) { sel.value = prev; curSym = prev; }
+  else { curSym = symbols[0]; sel.value = curSym; }
+  $("updated").innerHTML = `<span class="dot"></span>updated ${new Date(j.updated).toLocaleTimeString()}`;
+  renderRows(); drawOverlay();
+}
+
+/* ── candles: Bitget 1m -> 2m ── */
+async function fetch1m(sym, startMs, endMs) {
+  let url = `${BITGET}/candles?symbol=${sym}&productType=USDT-FUTURES&granularity=1m&limit=1000`;
+  if (startMs && endMs) url += `&startTime=${startMs}&endTime=${endMs}`;
+  const r = await fetch(url); const j = await r.json();
+  if (j.code !== "00000") throw new Error(j.msg);
+  return j.data.map(d => ({ts:+d[0],open:+d[1],high:+d[2],low:+d[3],close:+d[4],vol:+d[5]}))
+               .sort((a,b)=>a.ts-b.ts);
+}
+function absorb1m(rows) {
+  for (const c of rows) {
+    const b = Math.floor(c.ts/120000)*120000;
+    let k = candles2m.get(b);
+    if (!k) { candles2m.set(b,{open:c.open,high:c.high,low:c.low,close:c.close}); }
+    else { k.high=Math.max(k.high,c.high); k.low=Math.min(k.low,c.low); k.close=c.close; }
+  }
+  chart.applyOptions({}); // no-op keeps chart responsive
+  candles.setData([...candles2m.entries()].sort((a,b)=>a[0]-b[0])
+    .map(([time,v])=>({time:time/1000,open:v.open,high:v.high,low:v.low,close:v.close})));
+}
+async function ensureCandles(fromS, toS) {
+  const sym = pairToSymbol(curSym);
+  if (candles2m.size === 0) { absorb1m(await fetch1m(sym)); return; }
+  const first = Math.min(...candles2m.keys()), last = Math.max(...candles2m.keys());
+  const needBefore = fromS*1000 < first - 120000, needAfter = toS*1000 > last + 120000;
+  if (!needBefore && !needAfter) return;
+  try {
+    const tasks = [];
+    if (needBefore) tasks.push(fetch1m(sym, Math.max(0, fromS*1000 - 3600e3), first));
+    if (needAfter)  tasks.push(fetch1m(sym, last, toS*1000 + 3600e3));
+    (await Promise.all(tasks)).forEach(absorb1m);
+  } catch(e) { /* window fetch optional — candles may be out of Bitget retention */ }
+}
+
+/* ── markers (layer 3) ── */
+function renderMarkers() {
+  const list = filtered().map(t => {
+    const m = [{time:t.entry_time, position:t.direction==="LONG"?"belowBar":"aboveBar",
+      color:t.direction==="LONG"?"#22c55e":"#ef4444",
+      shape:t.direction==="LONG"?"arrowUp":"arrowDown",
+      text:(t.direction==="LONG"?"BUY":"SELL")+(t.engine==="sovereign-v6"?" ★":"")}];
+    if (t.exit_time) {
+      const win = t.status==="WIN_TP_HIT";
+      m.push({time:t.exit_time, position:t.direction==="LONG"?"aboveBar":"belowBar",
+        color:win?"#22c55e":"#ef4444", shape:win?"arrowUp":"arrowDown",
+        text:win?"TP ✓":"SL ✗"});
+    }
+    return m;
+  }).flat().sort((a,b)=>a.time-b.time);
+  markers = list;
+  candles.setMarkers(list);
+}
+
+/* ── risk bands + FVG + sweep (layers 2 & 4, canvas overlay) ── */
+function filtered() { return (TRADES[curSym]||[]).filter(t=>filter==="ALL"||t.status===filter); }
+
+function drawOverlay() {
+  const wrap = $("chartwrap");
+  const dpr = window.devicePixelRatio||1;
+  overlay.width = wrap.clientWidth*dpr; overlay.height = wrap.clientHeight*dpr;
+  octx.setTransform(dpr,0,0,dpr,0,0);
+  octx.clearRect(0,0,wrap.clientWidth,wrap.clientHeight);
+  const ts = chart.timeScale();
+  const nowS = Math.floor(Date.now()/1000);
+  const list = filtered().slice(-120);                       // perf cap
+  for (const t of list) {
+    const endT = (t.exit_time||nowS) + (t.exit_time?0:900);
+    const x1 = ts.timeToCoordinate(t.entry_time), x2 = ts.timeToCoordinate(endT);
+    if (x2 === null || x1 === null) { if (x1===null && x2===null) continue; }
+    const xa = x1===null?0:x1, xb = x2===null?wrap.clientWidth:x2;
+    const P = p => candles.priceToCoordinate(p);
+    const solid = t.tp_price>0 && t.sl_price>0;
+    if (solid) {
+      const eY=P(t.entry_price), tpY=P(t.tp_price), slY=P(t.sl_price);
+      const lo = Math.min(eY,tpY), hi=Math.max(eY,tpY);
+      octx.fillStyle = "rgba(34,197,94,.14)"; octx.fillRect(xa,lo,xb-xa,hi-lo);
+      octx.strokeStyle = "rgba(34,197,94,.55)"; octx.lineWidth=1; octx.strokeRect(xa,lo,xb-xa,hi-lo);
+      const lo2=Math.min(eY,slY), hi2=Math.max(eY,slY);
+      octx.fillStyle = "rgba(239,68,68,.12)"; octx.fillRect(xa,lo2,xb-xa,hi2-lo2);
+      octx.strokeStyle = "rgba(239,68,68,.5)"; octx.strokeRect(xa,lo2,xb-xa,hi2-lo2);
+      octx.fillStyle = "rgba(231,236,243,.75)"; octx.font="600 10px -apple-system,sans-serif";
+      octx.fillText("TP", xb-24, lo-3); octx.fillText("SL", xb-24, hi2+11);
+    }
+    if (t.fvg_top!=null && t.fvg_bottom!=null) {
+      const fx1 = ts.timeToCoordinate(t.entry_time - 3600*2) ?? xa;
+      const fy1=P(t.fvg_top), fy2=P(t.fvg_bottom);
+      const lo=Math.min(fy1,fy2), hi=Math.max(fy1,fy2);
+      octx.fillStyle="rgba(0,206,202,.13)"; octx.fillRect(fx1,lo,xb-fx1,hi-lo);
+      octx.strokeStyle="rgba(0,206,202,.5)"; octx.setLineDash([]);
+      octx.strokeRect(fx1,lo,xb-fx1,hi-lo);
+      octx.fillStyle="rgba(0,206,202,.85)"; octx.fillText("FVG", fx1+5, lo+11);
+      octx.setLineDash([]);
+    }
+    if (t.sweep_price!=null) {
+      const sy=P(t.sweep_price);
+      const sx1 = ts.timeToCoordinate(t.entry_time-1800) ?? xa;
+      octx.strokeStyle="rgba(245,158,11,.8)"; octx.setLineDash([4,4]); octx.lineWidth=1.5;
+      octx.beginPath(); octx.moveTo(sx1,sy); octx.lineTo(xb,sy); octx.stroke(); octx.setLineDash([]);
+      octx.fillStyle="rgba(245,158,11,.9)"; octx.fillText("SWEEP", sx1+4, sy-4);
+    }
+    if (selTrade && t.trade_id===selTrade) {
+      octx.strokeStyle="#00ceca"; octx.lineWidth=1.5;
+      octx.strokeRect(xa-2, Math.min(P(t.entry_price),P(t.tp_price||t.entry_price))-2,
+                      (xb-xa)+4, Math.abs(P(t.tp_price||t.entry_price)-P(t.sl_price||t.entry_price))+4);
+    }
+  }
+}
+
+/* ── sidebar rows ── */
+const fmtT = s => s ? new Date(s*1000).toLocaleString([], {month:"short",day:"2-digit",hour:"2-digit",minute:"2-digit"}) : "—";
+const fmtP = p => p==null ? "—" : (p>=1000 ? p.toFixed(1) : p.toFixed(4));
+function renderRows() {
+  const list = filtered().slice().reverse();
+  const pnl = (TRADES[curSym]||[]).reduce((a,t)=>a+(t.net_pnl||0),0);
+  $("pnlpill").innerHTML = `P&L <b style="color:${pnl>=0?"var(--green)":"var(--red)"}">${pnl>=0?"+":""}${pnl.toFixed(3)} USDT</b>`;
+  $("rows").innerHTML = list.length ? list.map(t=>`
+    <div class="trow${t.trade_id===selTrade?" sel":""}" data-tid="${t.trade_id}">
+      <span class="id">${t.trade_id||""}</span>
+      <span class="dir ${t.direction.toLowerCase()}">${t.direction==="LONG"?"▲ LONG":"▼ SHORT"}</span>
+      <span class="badge st-${t.status}">${t.status.replace("_"," ")}</span>
+      <span class="meta">${fmtP(t.entry_price)} → ${fmtP(t.exit_price)} · ${fmtT(t.entry_time)}</span>
+      <span class="meta">${t.reason_entry||""}</span>
+      <span class="pnl ${(t.net_pnl||0)>=0?"pos":"neg"}">${t.net_pnl==null?(t.status==="OPEN"?"riding…":""):((t.net_pnl>=0?"+":"")+t.net_pnl.toFixed(3))}</span>
+      <span></span>
+    </div>`).join("") : `<div style="padding:20px;color:var(--dim)">No trades for this filter.</div>`;
+  document.querySelectorAll(".trow").forEach(el => el.onclick = () => selectTrade(el.dataset.tid));
+  renderMarkers();
+}
+async function selectTrade(tid) {
+  selTrade = tid;
+  const t = (TRADES[curSym]||[]).find(x=>x.trade_id===tid);
+  if (!t) return;
+  await ensureCandles(t.entry_time, t.exit_time||Math.floor(Date.now()/1000));
+  const pad = (t.exit_time||Math.floor(Date.now()/1000)) - t.entry_time < 1800 ? 1800 :
+              (t.exit_time - t.entry_time)*0.25;
+  chart.timeScale().setVisibleRange(
+    Math.max(0,t.entry_time-pad), (t.exit_time||Math.floor(Date.now()/1000))+pad);
+  renderRows(); drawOverlay();
+  if (window.innerWidth<=920) $("aside").classList.remove("open");
+}
+
+/* ── wiring ── */
+$("symbol").onchange = async () => {
+  curSym = $("symbol").value; selTrade = null;
+  candles2m.clear();
+  await ensureCandles(Math.floor(Date.now()/1000)-86400, Math.floor(Date.now()/1000));
+  renderRows(); drawOverlay();
+};
+document.querySelectorAll(".chip").forEach(c => c.onclick = () => {
+  document.querySelectorAll(".chip").forEach(x=>x.classList.remove("on"));
+  c.classList.add("on"); filter = c.dataset.f; renderRows(); drawOverlay();
+});
+$("asidetoggle").onclick = () => $("aside").classList.toggle("open");
+chart.timeScale().subscribeVisibleTimeRangeChange(() => requestAnimationFrame(drawOverlay));
+new ResizeObserver(() => requestAnimationFrame(drawOverlay)).observe($("chartwrap"));
+
+async function tickLoop() {
+  for(;;) {
+    try {
+      const r = await fetch(`${BITGET}/ticker?symbol=${pairToSymbol(curSym)}&productType=USDT-FUTURES`);
+      const j = await r.json();
+      if (j.code==="00000" && j.data[0]) {
+        const p = +j.data[0].lastPr;
+        candles.setMarkers(markers);  // keep markers after price-line updates
+        candles.applyOptions({priceLineVisible:true});
+        $("updated").innerHTML = `<span class="dot"></span>${curSym} ${fmtP(p)}`;
+      }
+    } catch(e){}
+    await new Promise(r=>setTimeout(r, 30000));
+  }
+}
+
+(async function boot(){
+  for(;;) {
+    try { await loadTrades(); $("err").style.display="none"; break; }
+    catch(e) { $("err").style.display="block"; await new Promise(r=>setTimeout(r,5000)); }
+  }
+  await ensureCandles(Math.floor(Date.now()/1000)-86400, Math.floor(Date.now()/1000));
+  renderRows(); drawOverlay();
+  tickLoop();
+  setInterval(loadTrades, 60000);
+})();
+</script>
+</body>
+</html>
