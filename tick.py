@@ -43,14 +43,19 @@ PAIRS = [p.strip().upper() for p in os.environ.get(
 # that pair; every other pair keeps running v5 untouched.
 SOVEREIGN_V6 = os.environ.get("SOVEREIGN_V6", "0") == "1"
 SOVEREIGN_PAIRS = {p.strip().upper() for p in os.environ.get("SOVEREIGN_PAIRS", "").split(",") if p.strip()}
+# LIVE trading (owner 2026-09-15): only sovereign pairs in LIVE_PAIRS trade real
+# orders; everything else stays paper. Requires Bitget API keys in env.
+LIVE_TRADING = os.environ.get("LIVE_TRADING", "0") == "1"
+LIVE_PAIRS = {p.strip().upper() for p in os.environ.get("LIVE_PAIRS", "").split(",") if p.strip()}
 _REPO = os.path.dirname(os.path.abspath(__file__))
 STATE_FILE = os.environ.get("STATE_FILE", os.path.join(_REPO, "state", "state.json"))
 TRADES_FILE = os.environ.get("TRADES_FILE", os.path.join(_REPO, "data", "trades.jsonl"))
 ATR_PERIOD = 14
 SL_ATR_MULT = 4.0     # GRID SEARCH WINNER (1152 configs): wide stop, rarely hit
 TP_SL_RATIO = 1.5     # most exits are 20-min drift-capture time stops
-WIN_TARGET_DOLLARS = 0.05  # OWNER 09-07: each TP aims for $0.05 (slot cap still binds in low vol)
-WIN_TARGET_PCT = float(os.environ.get("WIN_TARGET_PCT", "0.0167"))
+WIN_TARGET_DOLLARS = 0.15  # OWNER 09-15: flat $0.15 per-slot win target. Set WIN_TARGET_PCT>0 to
+                           # switch to percentage-compounding (1.67% of balance: $0.05 at $3, $0.15 at $9)
+WIN_TARGET_PCT = float(os.environ.get("WIN_TARGET_PCT", "0"))  # 0 = flat WIN_TARGET_DOLLARS (owner 09-15)
 SLIP_PCT = float(os.environ.get("SLIP_PCT", "0"))  # owner 09-08 stress lab: extra per-side execution cost (slippage/spread/failed fills)
 TRANSITION_GATE = os.environ.get("TRANSITION_GATE", "0")  # owner 09-08: yellow-state — closed 4H vs forming 4H+15m disagree = pause OLD-direction entries  # OWNER 09-08: speak percentages — target = 1.67% of balance (=$0.05 at $3), auto-compounds with the account; 0 = fixed dollars
 LIQ_MODEL = os.environ.get("LIQ_MODEL", "0")
@@ -1221,7 +1226,18 @@ def process_tick(state):
         if can_open:
             used_margin = sum(p["margin"] for p in still_open) + float(state.get("_other_margin") or 0)
             margin_left = balance * MARGIN_BUDGET - used_margin
-            tp_dist = max(SCALP_TP_ATR * (atr or 0.003 * price), MIN_TP_DIST_FRAC * price)
+            # ── OWNER 2026-09-15: WIN TARGET WIRED (was defined 09-07, never read —
+            # wins were landing ~$0.05 instead of the target). The entry TP must
+            # NET the target: WIN_TARGET_PCT x balance (auto-compounds: $0.05 at
+            # $3, ~$0.13 at $8, $0.15 at $9); WIN_TARGET_PCT=0 -> fixed
+            # WIN_TARGET_DOLLARS. Only the normal $33 clip chases the target;
+            # safe-mode recovery clips keep the adaptive ATR TP (a $1 clip would
+            # need a 13% move — pointless). ATR/TP floors still bind below it.
+            target_usd = WIN_TARGET_PCT * balance if WIN_TARGET_PCT > 0 else WIN_TARGET_DOLLARS
+            _clip = FIXED_NOTIONAL_USD if not safe_on else max(FIXED_NOTIONAL_USD * RECOVERY_SIZE_FRAC, 1.0)
+            target_frac = (target_usd / _clip) + FEE_RATE * 2 if not safe_on else 0.0
+            tp_dist = max(SCALP_TP_ATR * (atr or 0.003 * price), MIN_TP_DIST_FRAC * price,
+                          target_frac * price)
             entry_tp_dist = tp_dist
             if SWING_TP == "1":
                 lvl = nearest_swing_tp(c15m[:-1], want, price)

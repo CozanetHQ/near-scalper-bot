@@ -37,6 +37,17 @@ jobs:
           # engine; the other pairs keep v5 untouched.
           SOVEREIGN_V6: '1'
           SOVEREIGN_PAIRS: 'NEARUSDT'
+          # ── LIVE TRADING (owner 2026-09-15) ──
+          # LIVE_TRADING stays '0' until the Bitget API secrets are confirmed.
+          # BITGET_DEMO='1' first: identical code against Bitget demo funds —
+          # verify orders in the Bitget app, then flip to '0' for real money.
+          LIVE_TRADING: '0'
+          LIVE_PAIRS: 'NEARUSDT'
+          LIVE_MAX_NOTIONAL: '50'
+          BITGET_DEMO: '1'
+          BITGET_API_KEY: ${{ secrets.BITGET_API_KEY }}
+          BITGET_SECRET: ${{ secrets.BITGET_SECRET }}
+          BITGET_PASSPHRASE: ${{ secrets.BITGET_PASSPHRASE }}
         run: |
           echo "Starting multi-pair scalper tick engine..."
           python tick.py

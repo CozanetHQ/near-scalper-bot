@@ -38,6 +38,8 @@ import json
 import os
 from datetime import datetime, timezone
 
+from engine import live as LIVE_EXEC
+
 # ── locked parameters (spec + lab report) ───────────────────────────────────
 EMA_FAST, EMA_SLOW = 50, 200
 FRACTAL_K = 2
@@ -201,6 +203,25 @@ def process_pair(state):
     balance = state["balance"]
     now = datetime.now(timezone.utc)
 
+    # ── live mode: real account, real orders (owner 2026-09-15) ──
+    live_mode = (getattr(T, "LIVE_TRADING", False)
+                 and symbol in getattr(T, "LIVE_PAIRS", set())
+                 and LIVE_EXEC.keys_present())
+    live_cli, equity = None, None
+    if live_mode:
+        try:
+            live_cli = LIVE_EXEC.client()
+            equity = live_cli.account_equity()
+            state["balance"] = equity          # risk sizing on REAL equity
+            su["live_mode"] = True
+            su["last_live_equity"] = round(equity, 4)
+            if sv.get("pending") and not sv["pending"].get("order_id"):
+                sv["pending"] = None            # stale paper pending from before the flip
+                _pt("paper pending cleared on live activation")
+        except Exception as e:
+            _pt(f"LIVE unreachable: {e} — trading paused this tick")
+            return "live-paused", f"live account unreachable: {e}"
+
     # ── fetch all timeframes (drop forming candles) ──
     c4h = T.fetch_candles("4H", _N4H, symbol)[:-1]
     c1h = T.fetch_candles("1H", _N1H, symbol)[:-1]
@@ -255,6 +276,17 @@ def process_pair(state):
         iso = datetime.fromtimestamp(ts / 1000, timezone.utc).isoformat()
         sv["walk_ms"] = ts             # cursor advances on EVERY consumed candle
                                        # (a close/expiry must not replay this candle)
+        if live_mode and (sv.get("pos") or (sv.get("pending") or {}).get("order_id")):
+            # live: the resting order / exchange TP+SL own execution; the
+            # replay only tracks excursions (no simulated fills or closes)
+            p = sv.get("pos")
+            if p:
+                side = p["side"]
+                adv = (c["high"] - p["entry"]) / p["entry"] if side == "long" else (p["entry"] - c["low"]) / p["entry"]
+                bad = (c["low"] - p["entry"]) / p["entry"] if side == "long" else (p["entry"] - c["high"]) / p["entry"]
+                p["mfe_frac"] = round(max(p.get("mfe_frac") or 0.0, max(adv, 0)), 6)
+                p["mae_frac"] = round(max(p.get("mae_frac") or 0.0, max(bad, 0)), 6)
+            continue
         # lab-faithful sweep visibility: the lab's gate only ever saw the last
         # completed 15m candle WHILE ARMED. Candles closed while the machine
         # was busy (position riding, pending resting, bias off, outside zone)
@@ -410,6 +442,14 @@ def process_pair(state):
                 action, details = "veto-l2", f"I_L2 {ratio:.2f} < {L2_MIN}"
                 continue
 
+        if live_mode:
+            ok, msg = _live_place(T, live_cli, symbol, d, level, atr_frac, equity, sv, iso, _pt)
+            if ok:
+                action, details = "armed-limit-live", f"live retest limit @ {level}"
+            else:
+                sv.update({"phase": "ARMED", "swept_level": None})
+                action, details = "skip-live", msg
+            continue
         sv["pending"] = {
             "side": "long" if d == "bull" else "short",
             "level": level,
@@ -423,8 +463,9 @@ def process_pair(state):
         _pt(f"sovereign TRIGGER {d}: POST_ONLY retest limit @ {level:.6g} (3h expiry, ATR {atr_frac*100:.3f}%)")
         continue
 
-    # ── live-price touch checks between candle closes (intra-tick safety) ──
-    pos = sv.get("pos")
+    # ── live-price touch checks between candle closes (intra-tick safety;
+    #    PAPER ONLY — in live mode the exchange's resting orders do this) ──
+    pos = None if live_mode else sv.get("pos")
     if pos and action in ("observe", "hold"):
         side = pos["side"]
         if (side == "long" and price <= pos["sl"]) or (side == "short" and price >= pos["sl"]):
@@ -435,7 +476,7 @@ def process_pair(state):
             _close(T, state, pos, pos["tp"], "TP", symbol, sv, su, now_iso, _pt)
             action, details = "closed", f"sovereign TP (maker) @ {pos['tp']} (tick price)"
             pos = None
-    pending = sv.get("pending")
+    pending = None if live_mode else sv.get("pending")
     if not pos and pending and now_ms <= pending["expires_ms"]:
         side, lvl = pending["side"], pending["level"]
         if (side == "long" and price <= lvl) or (side == "short" and price >= lvl):
@@ -444,6 +485,13 @@ def process_pair(state):
                 action, details = "opened", f"sovereign {side} maker fill @ {lvl} (tick price)"
             else:
                 action, details = "skip", msg
+
+    # ── live reconcile: the exchange is the source of truth ──
+    if live_mode:
+        try:
+            _live_reconcile(T, live_cli, state, symbol, sv, su, now_iso, _pt)
+        except Exception as e:
+            _pt(f"LIVE reconcile error: {e} — exchange stays source of truth")
 
     # ── persist: mirror position for budget/dashboard, save machine state ──
     pos = sv.get("pos")
@@ -565,3 +613,131 @@ def _mirror(pos, symbol):
         "margin": pos["margin"], "opened_at": pos["opened_at"],
     })
     return su
+
+
+# ── live execution helpers (owner 2026-09-15) ───────────────────────────────
+def _live_place(T, live_cli, symbol, d, level, atr_frac, equity, sv, iso, _pt):
+    """Place the REAL post-only retest limit with exchange-side TP/SL."""
+    side = "long" if d == "bull" else "short"
+    dp = atr_frac * level
+    try:
+        info = live_cli.contract_info(symbol)
+        qty = live_cli.round_qty(symbol, (RISK_FRAC * equity) / dp)
+        notional = qty * level
+        if qty < info["min_size"] or notional < max(MIN_NOTIONAL, info.get("min_usdt", LIVE_EXEC.LIVE_MIN_NOTIONAL)):
+            return False, f"below Bitget minimum (qty {qty} @ {level:.6g})"
+        cap = min(LEV_CAP * equity, LIVE_EXEC.LIVE_MAX_NOTIONAL)
+        if notional > cap:
+            qty = live_cli.round_qty(symbol, cap / level)
+            notional = qty * level
+        sl = level - dp if side == "long" else level + dp
+        tp = level + RR * dp if side == "long" else level - RR * dp
+        live_cli.set_leverage(symbol, LEV_CAP)
+        oid = live_cli.place_entry_limit(symbol, side, qty, level, sl, tp)
+    except Exception as e:
+        return False, f"place failed: {e}"
+    now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+    sv["pending"] = {
+        "side": side, "level": level, "atr_frac": atr_frac,
+        "placed_ms": now_ms, "expires_ms": now_ms + int(SWEEP_VALID_H * 3600_000),
+        "order_id": oid, "qty": qty, "sl": sl, "tp": tp,
+        "notional": notional, "margin": notional / LEV_CAP,
+    }
+    sv["phase"] = "FLAT"
+    _pt(f"LIVE TRIGGER {d}: post-only limit @ {level:.6g} qty {qty} (sl {sl:.6g} / tp {tp:.6g}, risk 1.5% of ${equity:.2f})")
+    return True, oid
+
+
+def _live_reconcile(T, live_cli, state, symbol, sv, su, now_iso, _pt):
+    """Adopt exchange truth into the machine each tick: order fills, cancels,
+    expiry, position closes (booked from real fills), orphan adoption."""
+    now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+
+    # a) resting entry order
+    pending = sv.get("pending")
+    if pending and pending.get("order_id"):
+        od = live_cli.order_detail(symbol, pending["order_id"])
+        st = od["state"]
+        if st in ("filled", "partially_filled"):
+            entry = od["avg_price"] or pending["level"]
+            sv["pos"] = {
+                "side": pending["side"], "entry": entry,
+                "qty": od["filled_size"] or pending["qty"],
+                "notional": (od["filled_size"] or pending["qty"]) * entry,
+                "margin": pending.get("margin", 0),
+                "sl": od["sl"] or pending["sl"], "tp": od["tp"] or pending["tp"],
+                "atr_frac_at_entry": pending["atr_frac"], "entry_mode": "maker-live",
+                "opened_at": now_iso, "mfe_frac": 0.0, "mae_frac": 0.0,
+            }
+            sv["pending"] = None
+            _pt(f"LIVE FILLED {pending['side']} @ {entry:.6g} (sl {sv['pos']['sl']:.6g} / tp {sv['pos']['tp']:.6g} attached exchange-side)")
+        elif st == "canceled":
+            sv["pending"] = None
+            _pt("LIVE entry order canceled by exchange (would have crossed book) — re-armed")
+        elif now_ms > pending["expires_ms"]:
+            try:
+                live_cli.cancel_order(symbol, pending["order_id"])
+            except Exception:
+                pass
+            sv["pending"] = None
+            _pt(f"LIVE retest limit EXPIRED @ {pending['level']:.6g} — canceled, re-armed")
+
+    # b) orphan resting order (crash between placement and state commit)
+    if not sv.get("pending"):
+        for od_row in live_cli.pending_orders(symbol):
+            if (od_row.get("tradeSide") or "") != "open":
+                continue
+            oid = od_row.get("orderId")
+            od = live_cli.order_detail(symbol, oid)
+            if od["state"] not in ("new", "live", "live_part"):
+                continue
+            now_ms2 = int(datetime.now(timezone.utc).timestamp() * 1000)
+            sv["pending"] = {
+                "side": "long" if (od_row.get("side") or "buy") == "buy" else "short",
+                "level": od["price"], "atr_frac": abs(od["sl"] - od["price"]) / od["price"] if od["sl"] else 0.0,
+                "placed_ms": int(od_row.get("cTime") or now_ms2),
+                "expires_ms": now_ms2 + int(SWEEP_VALID_H * 3600_000),
+                "order_id": oid, "qty": float(od_row.get("size") or 0),
+                "sl": od["sl"], "tp": od["tp"],
+            }
+            _pt(f"LIVE adopted orphan resting order @ {od['price']:.6g}")
+            break
+
+    # c) open position: real exits happen exchange-side; book when closed
+    pos = sv.get("pos")
+    ex = live_cli.position(symbol)
+    if pos and ex is None:
+        opened_ms = None
+        try:
+            opened_ms = int(datetime.fromisoformat(pos["opened_at"]).timestamp() * 1000)
+        except Exception:
+            opened_ms = None
+        exit_px, reason = None, None
+        if opened_ms:
+            cf = live_cli.closing_fill(symbol, opened_ms)
+            if cf and cf.get("price"):
+                exit_px = cf["price"]
+                reason = "TP" if abs(cf["price"] - pos["tp"]) <= abs(cf["price"] - pos["sl"]) else "SL"
+        if exit_px is None:
+            exit_px = pos["tp"] if abs((pos.get("tp") or 0)) else pos["sl"]
+            reason = "TP" if exit_px == pos.get("tp") else "SL"
+        _close(T, state, pos, exit_px, reason, symbol, sv, su, now_iso, _pt)
+        try:
+            su["balance"] = round(live_cli.account_equity(), 6)
+        except Exception:
+            pass
+        _pt(f"LIVE position closed {reason} @ {exit_px:.6g} — booked from exchange fills")
+    elif pos and ex:
+        if ex["entry"]:
+            pos["entry"] = ex["entry"]
+        pos["qty"] = ex["size"]
+    elif not pos and ex:
+        # orphan position (crash between fill and state commit) — adopt
+        sv["pos"] = {
+            "side": ex["side"], "entry": ex["entry"], "qty": ex["size"],
+            "notional": ex["size"] * ex["entry"], "margin": ex["size"] * ex["entry"] / max(ex.get("leverage") or LEV_CAP, 1),
+            "sl": 0.0, "tp": 0.0,
+            "atr_frac_at_entry": 0.0, "entry_mode": "maker-live",
+            "opened_at": now_iso, "mfe_frac": 0.0, "mae_frac": 0.0,
+        }
+        _pt(f"LIVE adopted orphan {ex['side']} position @ {ex['entry']:.6g} — exchange-side TP/SL active, verify in Bitget app")
