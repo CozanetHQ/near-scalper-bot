@@ -177,7 +177,25 @@ function absorb1m(rows) {
 }
 async function ensureCandles(fromS, toS) {
   const sym = pairToSymbol(curSym);
-  if (candles2m.size === 0) { absorb1m(await fetch1m(sym)); return; }
+  if (candles2m.size === 0) {
+    // BUGFIX 09-15: this fetch was unguarded — a single flaky mobile-network
+    // request threw here, which killed renderRows()/drawOverlay()/tickLoop()
+    // for the ENTIRE page (chart + sidebar both went blank, header still
+    // showed because loadTrades() already ran). Now retries with backoff
+    // and never throws past this point.
+    for (let attempt = 0; attempt < 4; attempt++) {
+      try { absorb1m(await fetch1m(sym)); return; }
+      catch (e) {
+        $("err").textContent = "Chart data fetch failed — retrying…";
+        $("err").style.display = "block";
+        await new Promise(r => setTimeout(r, 1500 * (attempt + 1)));
+      }
+    }
+    $("err").textContent = "Chart data unavailable — check connection and reload.";
+    $("err").style.display = "block";
+    return; // give up gracefully; header/sidebar still render
+  }
+  $("err").style.display = "none";
   const first = Math.min(...candles2m.keys()), last = Math.max(...candles2m.keys());
   const needBefore = fromS*1000 < first - 120000, needAfter = toS*1000 > last + 120000;
   if (!needBefore && !needAfter) return;
@@ -300,7 +318,8 @@ async function selectTrade(tid) {
 $("symbol").onchange = async () => {
   curSym = $("symbol").value; selTrade = null;
   candles2m.clear();
-  await ensureCandles(Math.floor(Date.now()/1000)-86400, Math.floor(Date.now()/1000));
+  try { await ensureCandles(Math.floor(Date.now()/1000)-86400, Math.floor(Date.now()/1000)); }
+  catch(e) {}
   renderRows(); drawOverlay();
 };
 document.querySelectorAll(".chip").forEach(c => c.onclick = () => {
@@ -332,7 +351,8 @@ async function tickLoop() {
     try { await loadTrades(); $("err").style.display="none"; break; }
     catch(e) { $("err").style.display="block"; await new Promise(r=>setTimeout(r,5000)); }
   }
-  await ensureCandles(Math.floor(Date.now()/1000)-86400, Math.floor(Date.now()/1000));
+  try { await ensureCandles(Math.floor(Date.now()/1000)-86400, Math.floor(Date.now()/1000)); }
+  catch(e) { /* ensureCandles no longer throws, but stay defensive */ }
   renderRows(); drawOverlay();
   tickLoop();
   setInterval(loadTrades, 60000);
