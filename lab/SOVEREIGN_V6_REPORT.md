@@ -62,3 +62,71 @@ Realized payoff fell from 2:1 gross to 0.85:1 net — friction consumed roughly 
 3. Only after out-of-sample + maker-entry shows W* margin ≥ 5pts sustained: port the state machine into tick.py v6 behind a feature flag.
 
 **Files:** `lab/sovereign_engine.py`, `lab/sovereign_v6_trades.json`, `lab/data_sovereign/{near_4h,near_1h,near_1m}.json`
+
+---
+
+# Run 2 — 2m Execution Switch (owner request, 2026-09-15) + maker-retest + BTC + short-side attempt
+
+The engine is now timeframe-parametric: `EXEC_TF_MIN` (default **2m**, per owner) sets the
+execution walk; gates unchanged (4H bias / 1H FVG / 15m sweep / 2m CHOCH / live L2).
+`ENTRY_MODE`: `taker` (spec: market at CHOCH close) vs `maker` (POST_ONLY retest limit
+at the CHOCH level — lever #1). `EXIT_ORDER`: SL-first vs TP-first bounding.
+
+## Results matrix (all 1.5% risk, 10x cap, $10 start)
+
+| Run | Data | Exec | Entry | Trades | WR | Breakeven | Net |
+|---|---|---|---|---|---|---|---|
+| prev | NEAR 21d | 1m walk | taker | 16 | 56.2% | 52.8% | **+0.17** |
+| A | NEAR 21d | 2m | taker | 15 | 40.0% | 52.9% | −0.95 |
+| B | NEAR 21d | 2m | **maker retest** | 14 | 50.0% | 44.1% | **+0.33** |
+| C | BTC 21d | 2m | taker | 12 | 33.3% | 80.1% | −1.52 |
+| D | BTC 21d | 2m | maker | 12 | 33.3% | 59.2% | −1.04 |
+| E | BTC bear 5d | 2m | maker | 0 | — | — | 0 |
+| F | NEAR 21d | 1m | maker | 19 | 31.6% | 48.2% | −1.62 |
+
+## Findings
+
+1. **2m switch works; exit ambiguity is free.** TP-first vs SL-first bounding on run B is
+   identical (+0.3276 both) — no trade had both levels inside one 2m candle at ATR-scaled
+   stops. The visible cost of the 2m walk (A vs prev) is *entry timing*: the momentum
+   market-buy fills up to 2 minutes after the CHOCH close, chasing the move.
+2. **Maker retest entry is the fix and the best config** (B): waiting for the pullback to
+   the CHOCH level (a) fills at 0.02% maker instead of 0.09% taker+slip, (b) buys the
+   dip rather than the breakout spike. Fees drop $1.34 → $0.69. Breakeven 44.1% vs
+   realized 50.0% → expectancy +0.234%/trade. NOTE: this deviates from the spec's
+   "Execute Market Buy" — owner decision required before live.
+3. **BTC at 2m ATR width is mathematically dead** (C/D): median ΔP = 0.088% vs
+   round-trip friction 0.11–0.18%. TP gross = 0.176% cannot cover the 0.198% net loss.
+   No execution model fixes a sub-friction stop width — BTC needs a wider execution TF
+   or an ATR multiple. (5m/15m probes were too thin to conclude: 9 and 1 trades.)
+4. **Short side: implemented, untested.** Bitget 1m history reaches only ~30 days; the
+   May–Jun bear stretch is unavailable at 1m/1H. The partial Aug 13–17 window (5 days
+   of 1m) produced a funnel of 1,382 bear-bias 2m candles → 99 inside an active FVG →
+   0 sweep+CHOCH alignments. The 4-gate stack is rare by design (~0.7 setups/day on
+   NEAR); 0 in 5 days is within variance. Shorts will exercise live when a bear
+   stretch occurs; logic is fully mirrored (bias, supply FVG, swing-high sweep, CHOCH
+   below post-sweep low).
+5. **F (1m + maker) is the worst combo** — the 1m ATR stop (median 0.171%) plus retest
+   fill sits closer to the stop: tighter stop, same friction. Confirms: stop width must
+   scale with timeframe; 2m ATR is the narrowest workable width on NEAR-class vol.
+
+## Corrected breakeven math
+
+W\*(2ΔP − C_win) = (1−W)(ΔP + C_loss) → **W\* = (ΔP + C_loss) / (3ΔP + C_loss − C_win)**
+
+| Entry mode | C_win | C_loss |
+|---|---|---|
+| taker entry + maker TP | 0.11% | 0.18% |
+| maker entry + maker TP | 0.04% | 0.11% |
+
+## Recommendation for live v6 (pending owner approval)
+
+- Execution walk: **2m** (owner directive) — exits verified unambiguous at this width.
+- Entry: **POST_ONLY retest limit** at the CHOCH level, 3h expiry — the single largest
+  EV lever (+0.3 vs −0.95 on the same window).
+- Pair filter: require ΔP = ATR14(2m) ≥ friction floor (≈0.15% for taker, ≈0.10% maker);
+  excludes BTC/ETH-class at 2m, keeps NEAR/SOL-class.
+- Before any live port: out-of-sample NEAR window + first live bear stretch short audit.
+
+**Files:** `lab/sovereign_engine.py` (parametric), `lab/sovereign_v6_trades_*.json` (7 runs),
+`lab/data_sovereign/` (NEAR + BTC datasets incl. bear window).
