@@ -208,28 +208,92 @@ def process_pair(state):
         except Exception:
             pass
 
-    sv = state.get("sovereign") or {}
+    sv = state.setdefault("sovereign", {})   # setdefault: never detach from state
     balance = state["balance"]
     now = datetime.now(timezone.utc)
 
     # ── live mode: real account, real orders (owner 2026-09-15) ──
+    # AUTO-FALLBACK (owner 2026-09-15): if the LIVE wallet can't fund a trade
+    # (equity < MIN_LIVE_EQUITY) while the account is flat, the pair flips to
+    # Bitget DEMO (same engine, pap:1 header, demo funds) and keeps trading.
+    # While on demo the live wallet is re-probed every LIVE_RECHECK_MINUTES;
+    # when it can fund trades again AND the demo side is flat, the pair flips
+    # back to live. A position or resting order on either side blocks the
+    # flip — it is never abandoned mid-trade.
+    su = {}                                   # (was created too late — live block wrote to it)
     live_mode = (getattr(T, "LIVE_TRADING", False)
                  and symbol in getattr(T, "LIVE_PAIRS", set())
                  and LIVE_EXEC.keys_present())
     live_cli, equity = None, None
+    on_demo = sv.get("trading_env") == "DEMO_FALLBACK"
     if live_mode:
-        try:
-            live_cli = LIVE_EXEC.client()
-            equity = live_cli.account_equity()
-            state["balance"] = equity          # risk sizing on REAL equity
+        min_eq = getattr(LIVE_EXEC, "MIN_LIVE_EQUITY", 10.0)
+        recheck_s = getattr(LIVE_EXEC, "LIVE_RECHECK_MINUTES", 60.0) * 60
+        live_probe, live_eq = None, None
+
+        # probe the LIVE wallet — every tick while live; on the demo-fallback
+        # only hourly (owner: "demo one hour, another hour" — keep trading,
+        # check the live wallet periodically until funds arrive).
+        probe_due = (not on_demo) or (now - datetime.fromisoformat(sv.get("last_live_check", "1970-01-01T00:00:00+00:00"))).total_seconds() >= recheck_s
+        if probe_due:
+            try:
+                live_probe = LIVE_EXEC.client(demo=False)
+                live_eq = live_probe.account_equity()
+                sv["last_live_check"] = now.isoformat()
+            except Exception as e:
+                if on_demo:
+                    _pt(f"live wallet recheck failed ({e}) — staying on demo")
+                else:
+                    _pt(f"LIVE unreachable: {e} — trading paused this tick")
+                    return "live-paused", f"live account unreachable: {e}"
+
+        if not on_demo:
+            if live_eq is not None:
+                su["last_live_equity"] = round(live_eq, 4)
+            if live_eq is not None and live_eq < min_eq and not sv.get("pos") \
+                    and not (sv.get("pending") or {}).get("order_id"):
+                sv["trading_env"] = "DEMO_FALLBACK"
+                on_demo = True
+                _pt(f"live wallet ${live_eq:.2f} below ${min_eq:.0f} min — "
+                    f"AUTO-FALLBACK to Bitget demo; live rechecked every "
+                    f"{getattr(LIVE_EXEC, 'LIVE_RECHECK_MINUTES', 60.0):.0f}min")
+            elif live_eq is not None and live_eq < min_eq:
+                _pt(f"live wallet ${live_eq:.2f} below ${min_eq:.0f} min but a "
+                    f"position/order is open — managing it live, no new sizing")
+        elif live_probe is not None:
+            # on demo, hourly live probe returned — switch back when it can
+            # fund trades AND the demo side is flat
+            demo_flat = not sv.get("pos") and not (sv.get("pending") or {}).get("order_id")
+            if live_eq is not None and live_eq >= min_eq and demo_flat:
+                sv.pop("trading_env", None)
+                on_demo = False
+                _pt(f"live wallet funded (${live_eq:.2f} ≥ ${min_eq:.0f}) and demo flat — "
+                    f"SWITCHED BACK to live trading")
+
+        if on_demo:
+            live_cli = LIVE_EXEC.client(demo=True)
+            try:
+                equity = live_cli.account_equity()   # demo funds size the trade
+            except Exception as e:
+                _pt(f"demo account unreachable: {e} — trading paused this tick")
+                return "live-paused", f"demo account unreachable: {e}"
+            state["balance"] = equity
             su["live_mode"] = True
-            su["last_live_equity"] = round(equity, 4)
+            su["trading_env"] = "DEMO_FALLBACK"
+            if sv.get("pending") and not sv["pending"].get("order_id"):
+                sv["pending"] = None            # stale paper pending from before the flip
+                _pt("paper pending cleared on demo activation")
+        elif live_eq is not None or live_probe is not None:
+            live_cli = live_probe or LIVE_EXEC.client(demo=False)
+            if live_eq is not None:
+                equity = live_eq
+                state["balance"] = equity      # risk sizing on REAL equity
+            su["live_mode"] = True
             if sv.get("pending") and not sv["pending"].get("order_id"):
                 sv["pending"] = None            # stale paper pending from before the flip
                 _pt("paper pending cleared on live activation")
-        except Exception as e:
-            _pt(f"LIVE unreachable: {e} — trading paused this tick")
-            return "live-paused", f"live account unreachable: {e}"
+        # (probe not due & on demo → handled above: live_cli stays None this
+        # tick only if unreachable; demo client set below)
 
     # ── fetch all timeframes (drop forming candles) ──
     c4h = T.fetch_candles("4H", _N4H, symbol)[:-1]
@@ -243,7 +307,8 @@ def process_pair(state):
     if len(c4h) < EMA_SLOW + 1 or len(c2m) < 20 or len(c15) < 2 * FRACTAL_K + 2:
         return "defer", "insufficient history for sovereign gates"
 
-    su = {"last_price": price, "last_tick_at": now.isoformat()}
+    su["last_price"] = price
+    su["last_tick_at"] = now.isoformat()
     now_ms = c2m[-1]["ts"] + 120_000
     now_iso = datetime.fromtimestamp(now_ms / 1000, timezone.utc).isoformat()
 

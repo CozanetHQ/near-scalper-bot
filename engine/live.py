@@ -43,6 +43,8 @@ _KEYS = {
     "passphrase": os.environ.get("BITGET_PASSPHRASE", ""),
 }
 DEMO = os.environ.get("BITGET_DEMO", "1") == "1"
+MIN_LIVE_EQUITY = float(os.environ.get("MIN_LIVE_EQUITY", "10"))
+LIVE_RECHECK_MINUTES = float(os.environ.get("LIVE_RECHECK_MINUTES", "60"))
 
 
 def keys_present():
@@ -54,10 +56,16 @@ class BitgetError(RuntimeError):
 
 
 class BitgetPrivate:
-    """Signed Bitget v2 REST client (HMAC-SHA256 / base64)."""
+    """Signed Bitget v2 REST client (HMAC-SHA256 / base64).
 
-    def __init__(self):
+    demo=None -> module default (BITGET_DEMO env). demo=True/False pins the
+    environment per instance so the auto-fallback can hold a live client and
+    a demo client at the same time.
+    """
+
+    def __init__(self, demo=None):
         self._contracts = {}
+        self.demo = DEMO if demo is None else demo
 
     def _sign(self, ts, method, path, body):
         pre = f"{ts}{method}{path}{body}"
@@ -80,7 +88,7 @@ class BitgetPrivate:
             "Content-Type": "application/json",
             "locale": "en-US",
         }
-        if DEMO:
+        if self.demo:
             headers["pap"] = "1"   # Bitget demo trading
         url = API + path
         req = urllib.request.Request(url, data=(body_str.encode() if body_str else None),
@@ -236,10 +244,11 @@ class BitgetPrivate:
         return f"{round(price, 4):.4f}"
 
 
-_CLIENT = None
+_CLIENTS = {}
 
-def client():
-    global _CLIENT
-    if _CLIENT is None:
-        _CLIENT = BitgetPrivate()
-    return _CLIENT
+def client(demo=None):
+    """Cached client per environment (None=default, True=demo, False=live)."""
+    key = None if demo is None else bool(demo)
+    if key not in _CLIENTS:
+        _CLIENTS[key] = BitgetPrivate(demo=demo)
+    return _CLIENTS[key]
