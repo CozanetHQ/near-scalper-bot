@@ -36,7 +36,10 @@ jobs:
           # Sovereign v6 (owner 2026-09-15): NEAR runs the new top-down MTF
           # engine; the other pairs keep v5 untouched.
           SOVEREIGN_V6: '1'
-          SOVEREIGN_PAIRS: 'NEARUSDT'
+          # BTC promoted to v6 paper (owner 2026-09-16): 94% win rate, only
+          # pair with solidly positive paper PnL (+0.478). LIVE stays NEAR-only
+          # until Futures permission + audit gates clear.
+          SOVEREIGN_PAIRS: 'NEARUSDT,BTCUSDT'
           # ── LIVE TRADING (owner 2026-09-15) ──
           # LIVE_TRADING stays '0' until the Bitget key has Futures
           # permissions confirmed (40014 without them) AND the NEAR
