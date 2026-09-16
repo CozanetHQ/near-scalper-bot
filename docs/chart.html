@@ -165,15 +165,27 @@ const BITGET = "https://api.bitget.com/api/v2/mix/market";
 // Proxy through our own Vercel serverless functions when available — the
 // owner's mobile IP got geo-blocked/throttled hitting Bitget directly.
 const HAS_PROXY = location.hostname.endsWith("vercel.app");
+// Owner 2026-09-16: GitHub Pages has no serverless functions, and the
+// owner's ISP geo-blocks direct Bitget API calls — the GH-Pages chart died
+// with "Data fetch failed" while the Vercel copy worked, which is why the
+// two URLs seemed like two different apps. Fall back to the Vercel proxy
+// (it serves Access-Control-Allow-Origin: *) so BOTH URLs behave the same
+// on any network. Vercel origin: proxy first, direct as backup. GH Pages:
+// direct first (fast where it works), proxy as backup.
+const PROXY = "https://cozanet-scalper-chart.vercel.app";
 async function bitgetFetch(kind, params) {
-  if (HAS_PROXY) {
+  const routes = HAS_PROXY
+    ? [`/api/${kind}?${params}`, `${BITGET}/${kind}?${params}&productType=USDT-FUTURES`]
+    : [`${BITGET}/${kind}?${params}&productType=USDT-FUTURES`, `${PROXY}/api/${kind}?${params}`];
+  let err = null;
+  for (const url of routes) {
     try {
-      const r = await fetch(`/api/${kind}?${params}`);
+      const r = await fetch(url);
       if (r.ok) return await r.json();
-    } catch (e) { /* fall through to direct */ }
+      err = "HTTP " + r.status;
+    } catch (e) { err = e.message || e; }
   }
-  const r = await fetch(`${BITGET}/${kind}?${params}&productType=USDT-FUTURES`);
-  return await r.json();
+  throw new Error(`${kind} fetch failed (${err})`);
 }
 const $ = id => document.getElementById(id);
 const pairToSymbol = p => p.replace("/", "");           // NEAR/USDT -> NEARUSDT
@@ -204,7 +216,22 @@ async function loadTrades() {
   const sel = $("symbol");
   sel.innerHTML = symbols.map(s => `<option>${s}</option>`).join("");
   if (prev && symbols.includes(prev)) { sel.value = prev; curSym = prev; }
-  else { curSym = symbols[0]; sel.value = curSym; }
+  else {
+    // Owner 2026-09-16: the chart used to open on the alphabetically-first
+    // pair (BTC/USDT) — a sovereign pair that can stay silent for days, so
+    // recent trades looked "not stroked in the chat and on the chart" even
+    // though other pairs were trading live. Open on the pair with the
+    // FRESHEST trade activity; honor the user's last manual pick only if
+    // that pair actually traded within the last 24h.
+    const fresh = s => (TRADES[s] || []).reduce(
+      (m, t) => Math.max(m, t.exit_time || 0, t.entry_time || 0), 0);
+    const best = symbols.reduce((a, s) => (!a || fresh(s) > fresh(a)) ? s : a, null);
+    const last = localStorage.getItem("cozy.chartPair");
+    const dayAgo = Date.now() / 1000 - 86400;
+    curSym = (last && symbols.includes(last) && fresh(last) > dayAgo) ? last
+           : (best || symbols[0]);
+    sel.value = curSym;
+  }
   $("updated").innerHTML = `<span class="dot"></span>updated ${new Intl.DateTimeFormat([], {timeZone:TZ, hour:"2-digit", minute:"2-digit", hour12:false}).format(new Date(j.updated))} ${TZ.split("/").pop().replace("_"," ")}`;
   renderRows(); draw();
 }
@@ -849,6 +876,7 @@ async function selectTrade(tid) {
 /* ── wiring ── */
 $("symbol").onchange = async () => {
   curSym = $("symbol").value; selTrade = null; selZone = null;
+  localStorage.setItem("cozy.chartPair", curSym);   // owner pick sticks
   clearReplay();
   bindCandles(curSym); VW = {t1:0, t2:0};
   /* INSTANT (owner 2026-09-16: "if I select eth it should show only its
