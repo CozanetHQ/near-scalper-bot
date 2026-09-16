@@ -338,7 +338,8 @@ function applyReplay(t) {
   if (t.tp_price > 0 && t.sl_price > 0) {
     const risk = Math.abs(t.entry_price - t.sl_price);
     const reward = Math.abs(t.tp_price - t.entry_price);
-    $("sbRR").textContent = risk > 0 ? (reward / risk).toFixed(1) : "—";
+    const rr = risk > 0 ? reward / risk : 0;
+    $("sbRR").textContent = risk > 0 ? (rr < 1 ? rr.toFixed(2) : rr.toFixed(1)) : "—";
   } else {
     $("sbRR").textContent = "—";  // v5 trades didn't record SL/TP
   }
