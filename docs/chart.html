@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0b0e14">
 <title>CozanetHQ — Execution Chart</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon-512.png">
@@ -13,65 +14,52 @@
   --red:#ef4444; --amber:#f59e0b; --mono:ui-monospace,'SF Mono','Cascadia Code',Menlo,monospace;
 }
 *{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%}
+html,body{height:100%;overflow:hidden}
 body{background:var(--bg);color:var(--text);font:14px/1.45 -apple-system,'Segoe UI',Roboto,Inter,sans-serif;
-     display:flex;flex-direction:column;overflow:hidden}
-header{display:flex;align-items:center;gap:12px;padding:10px 16px;background:var(--panel);
+     display:flex;flex-direction:column;-webkit-text-size-adjust:100%}
+header{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--panel);
        border-bottom:1px solid var(--line);flex-wrap:wrap}
-header h1{font-size:15px;font-weight:600;letter-spacing:.4px;white-space:nowrap}
+header h1{font-size:14px;font-weight:600;letter-spacing:.4px;white-space:nowrap}
 header h1 a{color:var(--teal);text-decoration:none}
 header .sub{font-size:11px;color:var(--dim);white-space:nowrap}
 select{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:8px;
-       padding:6px 10px;font-size:13px;font-weight:600;cursor:pointer}
-.pill{font-size:11px;padding:4px 10px;border-radius:999px;background:var(--panel2);
+       padding:7px 10px;font-size:13px;font-weight:600;cursor:pointer;max-width:42vw}
+.pill{font-size:11px;padding:5px 10px;border-radius:999px;background:var(--panel2);
       border:1px solid var(--line);color:var(--dim);white-space:nowrap}
 .pill b{color:var(--text)}
 .dot{width:8px;height:8px;border-radius:50%;background:var(--green);display:inline-block;
      box-shadow:0 0 6px var(--green);margin-right:6px}
 main{flex:1;display:flex;min-height:0}
-#replaybtn{background:#292a2d;color:#e8eaed;border:1px solid #3a3d42;border-radius:999px;
-  padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap}
-#replaybtn:hover{background:#35383d}
-#statsbar{position:absolute;left:12px;bottom:44px;display:flex;align-items:center;gap:14px;
-  background:rgba(18,21,26,.92);border:1px solid #2a2f38;border-radius:10px;padding:8px 14px;z-index:5}
+#replaybtn,#fitbtn,#asidetoggle{background:#292a2d;color:#e8eaed;border:1px solid #3a3d42;border-radius:999px;
+  padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;touch-action:manipulation}
+#replaybtn:hover,#fitbtn:hover,#asidetoggle:hover{background:#35383d}
+#chartwrap{flex:1;position:relative;min-width:0}
+#chart{position:absolute;inset:0;width:100%;height:100%;touch-action:none;display:block}
+#loadpill{position:absolute;top:10px;left:50%;transform:translateX(-50%);background:rgba(18,21,26,.92);
+  border:1px solid var(--line);border-radius:999px;padding:5px 14px;font-size:11px;color:var(--teal);
+  display:none;z-index:6;white-space:nowrap}
+#statsbar{position:absolute;left:10px;bottom:36px;display:flex;align-items:center;gap:12px;
+  background:rgba(18,21,26,.92);border:1px solid #2a2f38;border-radius:10px;padding:8px 12px;z-index:5;
+  max-width:calc(100% - 20px);flex-wrap:wrap}
 #statsbar[hidden]{display:none}
 #statsbar .stat{display:flex;flex-direction:column;gap:2px}
 #statsbar label{font-size:9px;letter-spacing:.12em;color:#9aa0a6;font-weight:600}
 #statsbar b{font-size:13px;color:#e8eaed;font-variant-numeric:tabular-nums}
 #statsbar .sep{width:1px;height:22px;background:#2a2f38}
-#statsbar #sbClear{background:none;border:none;color:#9aa0a6;cursor:pointer;font-size:11px;margin-left:2px}
+#statsbar #sbClear{background:none;border:none;color:#9aa0a6;cursor:pointer;font-size:13px;margin-left:2px;padding:4px 8px}
 #statsbar #sbClear:hover{color:#fff}
-#chartwrap{flex:1;position:relative;min-width:0}
-#chart{position:absolute;inset:0}
-#overlay{position:absolute;inset:0;pointer-events:none}
-#legend{position:absolute;left:12px;top:10px;background:rgba(18,22,31,.82);border:1px solid var(--line);
-        border-radius:8px;padding:8px 12px;font-size:12px;color:var(--dim);pointer-events:none}
+#legend{position:absolute;left:10px;top:10px;background:rgba(18,22,31,.82);border:1px solid var(--line);
+        border-radius:8px;padding:8px 12px;font-size:11px;color:var(--dim);pointer-events:none;z-index:4}
 #legend .lrow{display:flex;gap:8px;align-items:center;margin:2px 0}
 .sw{width:12px;height:12px;border-radius:3px;display:inline-block}
 aside{width:380px;border-left:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column;min-height:0}
 aside .ahead{padding:10px 14px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:8px}
 aside h2{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--dim)}
 .chips{display:flex;gap:6px;flex-wrap:wrap}
-.chip{font-size:11px;padding:4px 10px;border-radius:999px;border:1px solid var(--line);
-      background:transparent;color:var(--dim);cursor:pointer;font-weight:600}
+.chip{font-size:12px;padding:6px 12px;border-radius:999px;border:1px solid var(--line);
+      background:transparent;color:var(--dim);cursor:pointer;font-weight:600;touch-action:manipulation}
 .chip.on{background:var(--teal);border-color:var(--teal);color:#04252a}
-#rows{flex:1;overflow-y:auto}
-.trow{display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:10px 14px;
-      border-bottom:1px solid var(--line);cursor:pointer;transition:background .12s}
-.trow:hover{background:var(--panel2)}
-.trow.sel{background:#182233;box-shadow:inset 3px 0 0 var(--teal)}
-.trow .id{font-family:var(--mono);font-size:11px;color:var(--dim);grid-column:1/-1}
-.trow .dir{font-weight:700;font-size:12px;letter-spacing:.4px}
-.dir.long{color:var(--green)} .dir.short{color:var(--red)}
-.badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px;justify-self:end}
-.st-WIN_TP_HIT{background:rgba(34,197,94,.15);color:var(--green)}
-.st-LOSS_SL_HIT{background:rgba(239,68,68,.15);color:var(--red)}
-.st-OPEN{background:rgba(245,158,11,.15);color:var(--amber)}
-.st-CANCELLED{background:rgba(139,149,167,.15);color:var(--dim)}
-.trow .meta{font-size:11px;color:var(--dim);grid-column:1/-1;font-family:var(--mono)}
-.pnl{font-family:var(--mono);font-weight:700;font-size:12px}
-.pnl.pos{color:var(--green)} .pnl.neg{color:var(--red)}
-/* chat feed (owner spec 2026-09-15: trades as a chat log, tz-aware) */
+#rows{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
 .day{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--dim);
      text-align:center;padding:12px 0 6px;position:sticky;top:0;background:var(--panel);z-index:2}
 .tgroup{padding:8px 14px 10px;border-bottom:1px solid var(--line);cursor:pointer;transition:background .12s}
@@ -88,22 +76,23 @@ aside h2{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--
 .anal{color:var(--teal)}
 .expl{color:var(--dim);font-size:10px;margin-top:2px;font-family:var(--mono)}
 .errbanner{background:var(--red);color:#fff;text-align:center;padding:6px;font-size:12px;display:none}
-@media(max-width:920px){
-  aside{position:fixed;right:0;top:0;bottom:0;width:min(92vw,360px);z-index:20;
-        transform:translateX(100%);transition:transform .2s;box-shadow:-8px 0 30px rgba(0,0,0,.5)}
-  aside.open{transform:none}
-  #asidetoggle{display:flex}
-  #legend{display:none}
+/* mobile-first: full-width chart, chat as drawer */
+#asidetoggle{display:flex}
+aside{position:fixed;right:0;top:0;bottom:0;width:min(94vw,380px);z-index:20;
+      transform:translateX(100%);transition:transform .2s;box-shadow:-8px 0 30px rgba(0,0,0,.5)}
+aside.open{transform:none}
+#legend{display:none}
+@media(min-width:921px){
+  #asidetoggle{display:none}
+  aside{position:static;transform:none;box-shadow:none;width:380px}
+  #legend{display:block}
 }
-#asidetoggle{display:none;align-items:center;gap:6px;background:var(--panel2);border:1px solid var(--line);
-             color:var(--text);border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer;font-weight:600}
 </style>
 </head>
 <body>
 <header>
-  <h1><a href="index.html">NEAR SCALPER</a> · EXECUTION CHART</h1>
+  <h1><a href="index.html">NEAR SCALPER</a> · EXECUTION</h1>
   <select id="symbol" aria-label="Trading pair"></select>
-  <span class="pill">2m candles · Bitget</span>
   <span class="pill" id="pnlpill">P&L <b>—</b></span>
   <span class="sub" id="updated"><span class="dot"></span>loading…</span>
   <select id="tz" aria-label="Timezone">
@@ -114,16 +103,15 @@ aside h2{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--
     <option value="Asia/Dubai">GST · Dubai</option>
     <option value="Asia/Singapore">SGT · Singapore</option>
   </select>
+  <button id="fitbtn" title="Fit all loaded history">⤢ Fit</button>
   <button id="replaybtn" title="Replay the selected trade (or the latest one)">⟲ Replay</button>
   <button id="asidetoggle">☰ Chat</button>
 </header>
 <div class="errbanner" id="err">Data fetch failed — retrying…</div>
 <main>
   <div id="chartwrap">
-    <div id="chart"></div>
-    <canvas id="overlay"></canvas>
-    <div id="dbg" style="position:absolute;right:70px;top:10px;background:rgba(0,0,0,.85);color:#0f0;
-         font:11px monospace;padding:4px 8px;border-radius:6px;z-index:9;display:none;max-width:70%;white-space:pre-wrap"></div>
+    <canvas id="chart"></canvas>
+    <div id="loadpill">loading candles…</div>
     <div id="legend">
       <div class="lrow"><span class="sw" style="background:rgba(34,197,94,.25);border:1px solid var(--green)"></span>Take-profit zone</div>
       <div class="lrow"><span class="sw" style="background:rgba(239,68,68,.22);border:1px solid var(--red)"></span>Stop-loss zone</div>
@@ -153,29 +141,15 @@ aside h2{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--
   </aside>
 </main>
 
-<!-- vendored same-origin (Aegis-style: ship the chart lib with the app).
-     jsdelivr/unpkg CDNs are blocked on some mobile networks (owner's case)
-     and a missing lib killed the entire page silently. -->
-<script src="vendor/lightweight-charts.standalone.production.js"></script>
-<script>
-  if (typeof LightweightCharts === "undefined")
-    document.write('<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"><\/script>');
-</script>
 <script>
 "use strict";
-if (typeof LightweightCharts === "undefined") {
-  document.body.insertAdjacentHTML("beforeend",
-    '<div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);'
-    + 'background:#12161f;border:1px solid #ef4444;border-radius:12px;padding:24px;'
-    + 'color:#e7ecf3;font:14px -apple-system,sans-serif;z-index:99;max-width:80vw">'
-    + '⚠ Chart library failed to load — check your connection and reload.</div>');
-  throw new Error("lightweight-charts unavailable");
-}
-/* ── CozanetHQ execution chart (owner spec 2026-09-15) ───────────────────
-   Layer 1: 2m candles (Bitget 1m -> resampled client-side)
-   Layer 2: TP/SL risk bands (canvas overlay)
+/* ── CozanetHQ execution chart — CUSTOM canvas engine (owner 2026-09-16).
+   No external chart library (Aegis-style: we own the render pipeline).
+   Layer 1: 2m candles (Bitget 1m -> 2m, resampled client-side)
+   Layer 2: TP/SL zone boxes for the selected trade (dashed, clipped)
    Layer 3: entry/exit markers
-   Layer 4: FVG band + liquidity sweep line                                   */
+   Layer 4: FVG band + liquidity sweep line
+   Pan: one-finger drag / mouse drag · Zoom: pinch / wheel · Fit: ⤢ ──────── */
 window.addEventListener("error", e => {
   const b = document.getElementById("err");
   if (b) { b.textContent = "Error: " + (e.message || "script failed"); b.style.display = "block"; }
@@ -184,9 +158,7 @@ const RAW = new URLSearchParams(location.search).get("raw")
          || "https://raw.githubusercontent.com/CozanetHQ/near-scalper-bot/main/";
 const BITGET = "https://api.bitget.com/api/v2/mix/market";
 // Proxy through our own Vercel serverless functions when available — the
-// owner's mobile IP got geo-blocked/throttled hitting Bitget directly
-// (works fine calling from Vercel's own servers). Falls back to direct
-// Bitget calls on hosts without the proxy (e.g. GitHub Pages).
+// owner's mobile IP got geo-blocked/throttled hitting Bitget directly.
 const HAS_PROXY = location.hostname.endsWith("vercel.app");
 async function bitgetFetch(kind, params) {
   if (HAS_PROXY) {
@@ -201,26 +173,13 @@ async function bitgetFetch(kind, params) {
 const $ = id => document.getElementById(id);
 const pairToSymbol = p => p.replace("/", "");           // NEAR/USDT -> NEARUSDT
 
-/* chart */
-const chart = LightweightCharts.createChart($("chart"), {
-  layout: {background:{type:"solid",color:"#0b0e14"},textColor:"#8b95a7"},
-  grid: {vertLines:{color:"#161c28"},horzLines:{color:"#161c28"}},
-  timeScale:{timeVisible:true,secondsVisible:false,borderColor:"#232a38",rightOffset:12},
-  rightPriceScale:{borderColor:"#232a38"},
-  crosshair:{mode:0},
-  autoSize:true,
-});
-const candles = chart.addCandlestickSeries({
-  upColor:"#22c55e",downColor:"#ef4444",borderVisible:false,wickUpColor:"#22c55e",wickDownColor:"#ef4444",
-});
-const overlay = $("overlay"), octx = overlay.getContext("2d");
-
-/* state */
+/* ── state ── */
 let TRADES = {}, ZONEV = {}, symbols = [], curSym = null, filter = "ALL", selTrade = null, selZone = null;
-const candles2m = new Map();          // ts -> {open,high,low,close}
+const candles2m = new Map();          // bucketMs -> {open,high,low,close}
+let bars = [], barsDirty = true;      // sorted 2m bars cache
 let TZ = localStorage.getItem("cozy.tz") || "Africa/Lagos";   // owner: NG (WAT) default
 $("tz").value = [...$("tz").options].some(o=>o.value===TZ) ? TZ : "Africa/Lagos";
-let markers = [];
+let markers = [], livePrice = null, loadingBar = false;
 
 /* ── data: trades JSON (REST contract, section 5) ── */
 async function loadTrades() {
@@ -236,7 +195,7 @@ async function loadTrades() {
   if (prev && symbols.includes(prev)) { sel.value = prev; curSym = prev; }
   else { curSym = symbols[0]; sel.value = curSym; }
   $("updated").innerHTML = `<span class="dot"></span>updated ${new Intl.DateTimeFormat([], {timeZone:TZ, hour:"2-digit", minute:"2-digit", hour12:false}).format(new Date(j.updated))} ${TZ.split("/").pop().replace("_"," ")}`;
-  renderRows(); drawOverlay();
+  renderRows(); draw();
 }
 
 /* ── candles: Bitget 1m -> 2m ── */
@@ -255,124 +214,341 @@ function absorb1m(rows) {
     if (!k) { candles2m.set(b,{open:c.open,high:c.high,low:c.low,close:c.close}); }
     else { k.high=Math.max(k.high,c.high); k.low=Math.min(k.low,c.low); k.close=c.close; }
   }
-  chart.applyOptions({}); // no-op keeps chart responsive
-  candles.setData([...candles2m.entries()].sort((a,b)=>a[0]-b[0])
-    .map(([time,v])=>({time:time/1000,open:v.open,high:v.high,low:v.low,close:v.close})));
+  barsDirty = true;
+  if (loadingBar) fitAll();           // keep whole history in view while backfilling
+}
+function getBars() {
+  if (barsDirty) {
+    bars = [...candles2m.entries()].sort((a,b)=>a[0]-b[0])
+      .map(([ms,v]) => ({ts:ms/1000, o:v.open, h:v.high, l:v.low, c:v.close}));
+    barsDirty = false;
+  }
+  return bars;
 }
 async function ensureCandles(fromS, toS) {
   const sym = pairToSymbol(curSym);
-  if (candles2m.size === 0) {
-    // BUGFIX 09-15: this fetch was unguarded — a single flaky mobile-network
-    // request threw here, which killed renderRows()/drawOverlay()/tickLoop()
-    // for the ENTIRE page (chart + sidebar both went blank, header still
-    // showed because loadTrades() already ran). Now retries with backoff
-    // and never throws past this point.
-    for (let attempt = 0; attempt < 4; attempt++) {
-      try { absorb1m(await fetch1m(sym)); return; }
-      catch (e) {
-        $("err").textContent = "Chart data fetch failed — retrying…";
-        $("err").style.display = "block";
-        await new Promise(r => setTimeout(r, 1500 * (attempt + 1)));
+  loadingBar = true; $("loadpill").style.display = "block";
+  try {
+    if (candles2m.size === 0) {
+      // guarded fetch: a flaky mobile-network request must not kill the page
+      for (let attempt = 0; attempt < 4; attempt++) {
+        try { absorb1m(await fetch1m(sym)); break; }
+        catch (e) {
+          $("err").textContent = "Chart data fetch failed — retrying…";
+          $("err").style.display = "block";
+          await new Promise(r => setTimeout(r, 1500 * (attempt + 1)));
+        }
+      }
+      if (!candles2m.size) { $("err").textContent = "Chart data unavailable — check connection and reload."; $("err").style.display = "block"; return; }
+      $("err").style.display = "none";
+    }
+    // multi-hop backfill: one 1m fetch only covers ~16.7h (1000 candles),
+    // so loop backward/forward until the range is covered or data runs out.
+    const MAX_HOPS = 30;
+    let hops = 0;
+    while (hops < MAX_HOPS) {
+      const first = Math.min(...candles2m.keys());
+      if (fromS*1000 >= first - 120000) break;
+      try {
+        const rows = await fetch1m(sym, Math.max(0, fromS*1000 - 3600e3), first);
+        if (!rows.length) break;
+        absorb1m(rows);
+        if (Math.min(...candles2m.keys()) >= first) break;  // retention floor
+      } catch (e) { break; }
+      hops++;
+    }
+    hops = 0;
+    while (hops < MAX_HOPS) {
+      const last = Math.max(...candles2m.keys());
+      if (toS*1000 <= last + 120000) break;
+      try {
+        const rows = await fetch1m(sym, last, toS*1000 + 3600e3);
+        if (!rows.length) break;
+        absorb1m(rows);
+        if (Math.max(...candles2m.keys()) <= last) break;  // no progress
+      } catch (e) { break; }
+      hops++;
+    }
+  } finally {
+    loadingBar = false; $("loadpill").style.display = "none";
+  }
+}
+
+/* ══ CUSTOM CHART ENGINE ══════════════════════════════════════════════════
+   View model: VW = {t1, t2} seconds. Price scale auto-fits visible bars.
+   Everything (candles, markers, zones, price lines, crosshair) draws on one
+   canvas — we own the pipeline, anything can be added (Aegis-style).      */
+const cv = $("chart"), ctx = cv.getContext("2d");
+const AXR = 62, AXB = 22;              // right price axis / bottom time axis px
+let VW = {t1: 0, t2: 0};              // visible window (sec)
+let CW = 0, CH = 0;                   // canvas css px
+let hover = null;                     // {x,y} crosshair
+
+function resize() {
+  const wrap = $("chartwrap"), dpr = window.devicePixelRatio || 1;
+  CW = wrap.clientWidth; CH = wrap.clientHeight;
+  cv.width = CW * dpr; cv.height = CH * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  if (!VW.t2 && getBars().length) fitAll();
+  draw();
+}
+const t2x = t => (t - VW.t1) / (VW.t2 - VW.t1) * (CW - AXR);
+const x2t = x => VW.t1 + x / (CW - AXR) * (VW.t2 - VW.t1);
+
+function fitAll() {
+  const b = getBars();
+  if (!b.length) return;
+  const span = b[b.length-1].ts - b[0].ts + 120;
+  VW.t1 = b[0].ts - span * 0.02;
+  VW.t2 = b[b.length-1].ts + 120 + span * 0.02;
+  draw();
+}
+function visBars() {
+  const b = getBars();
+  let lo = 0, hi = b.length;          // binary search visible slice
+  while (lo < hi) { const m = (lo+hi)>>1; if (b[m].ts < VW.t1 - 120) lo = m+1; else hi = m; }
+  const start = lo; hi = b.length;
+  while (lo < hi) { const m = (lo+hi)>>1; if (b[m].ts <= VW.t2) lo = m+1; else hi = m; }
+  return b.slice(start, lo);
+}
+
+function niceStep(range, targetLines) {
+  const raw = range / targetLines;
+  const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  for (const m of [1, 2, 2.5, 5, 10]) if (mag * m >= raw) return mag * m;
+  return mag * 10;
+}
+function fmtP(p) { return p==null ? "—" : (p>=1000 ? p.toFixed(1) : p>=10 ? p.toFixed(2) : p.toFixed(4)); }
+const hourFmt = () => new Intl.DateTimeFormat([], {timeZone:TZ, hour:"2-digit", minute:"2-digit", hour12:false});
+
+function tzOffsetSec() {
+  // offset of the selected tz right now, so axis ticks land on wall-clock :00
+  const d = new Date();
+  const loc = new Date(d.toLocaleString("en-US", {timeZone: TZ}));
+  return Math.round((loc - d) / 1000);
+}
+function draw() {
+  ctx.clearRect(0, 0, CW, CH);
+  const plotW = CW - AXR, plotH = CH - AXB;
+  if (plotW <= 10 || plotH <= 10) return;
+  const vis = visBars();
+  if (!vis.length) {  // nothing loaded for this window — offer a hint
+    ctx.fillStyle = "#8b95a7"; ctx.font = "12px -apple-system,sans-serif"; ctx.textAlign = "center";
+    ctx.fillText("no candles in this window — hit ⤢ Fit", plotW/2, plotH/2);
+    ctx.textAlign = "left"; return;
+  }
+  let pMin = Infinity, pMax = -Infinity;
+  for (const b of vis) { if (b.l < pMin) pMin = b.l; if (b.h > pMax) pMax = b.h; }
+  const padP = (pMax - pMin) * 0.08 || pMax * 0.001;
+  pMin -= padP; pMax += padP;
+  const y = p => plotH - (p - pMin) / (pMax - pMin) * plotH;
+
+  /* grid + price axis */
+  const step = niceStep(pMax - pMin, Math.max(3, Math.floor(plotH / 46)));
+  ctx.font = "11px -apple-system,sans-serif"; ctx.textBaseline = "middle";
+  for (let p = Math.ceil(pMin/step)*step; p <= pMax; p += step) {
+    const yy = y(p);
+    ctx.strokeStyle = "#161c28"; ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(plotW, yy); ctx.stroke();
+    ctx.fillStyle = "#8b95a7"; ctx.textAlign = "left";
+    ctx.fillText(fmtP(p), plotW + 6, yy);
+  }
+  /* time axis: hour ticks (day boundary when span > 2 days) */
+  const span = VW.t2 - VW.t1;
+  const hf = hourFmt();
+  const dayF = new Intl.DateTimeFormat([], {timeZone:TZ, weekday:"short", day:"2-digit", month:"short"});
+  const tStep = span > 86400*2 ? 86400 : span > 14400 ? 3600 : span > 3600 ? 900 : 300;
+  ctx.textAlign = "center";
+  const off = tzOffsetSec();
+  const startTick = Math.ceil((VW.t1 - off) / tStep) * tStep + off;
+  for (let t = startTick; t <= VW.t2; t += tStep) {
+    const xx = t2x(t);
+    if (xx < 0 || xx > plotW) continue;
+    ctx.strokeStyle = "#161c28"; ctx.beginPath(); ctx.moveTo(xx, 0); ctx.lineTo(xx, plotH); ctx.stroke();
+    const d = new Date(t * 1000);
+    ctx.fillStyle = "#8b95a7";
+    ctx.fillText(tStep >= 86400 ? dayF.format(d) : hf.format(d), xx, plotH + 11);
+  }
+  /* axis borders */
+  ctx.strokeStyle = "#232a38";
+  ctx.beginPath(); ctx.moveTo(plotW + .5, 0); ctx.lineTo(plotW + .5, CH); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0, plotH + .5); ctx.lineTo(CW, plotH + .5); ctx.stroke();
+
+  /* candles */
+  const barW = plotW / vis.length;
+  const bodyW = Math.max(1, Math.min(13, barW * 0.7));
+  for (let i = 0; i < vis.length; i++) {
+    const b = vis[i], cx = Math.floor(t2x(b.ts) + barW/2) + .5;
+    const up = b.c >= b.o;
+    ctx.strokeStyle = up ? "#22c55e" : "#ef4444";
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(cx, y(b.h)); ctx.lineTo(cx, y(b.l)); ctx.stroke();
+    const yO = y(b.o), yC = y(b.c);
+    const top = Math.min(yO, yC), hgt = Math.max(1, Math.abs(yC - yO));
+    ctx.fillStyle = up ? "#22c55e" : "#ef4444";
+    ctx.fillRect(cx - bodyW/2, top, bodyW, hgt);
+  }
+
+  /* markers (layer 3) */
+  ctx.font = "600 10px -apple-system,sans-serif"; ctx.textAlign = "center";
+  for (const m of markers) {
+    const cx = t2x(m.ts);
+    if (cx < -20 || cx > plotW + 20) continue;
+    let b = null;                       // nearest bar for marker y
+    for (const vb of vis) if (vb.ts >= m.ts - 60 && vb.ts <= m.ts + 120) { b = vb; break; }
+    const base = b ? (m.pos === "above" ? y(b.h) : y(b.l)) : plotH/2;
+    const dir = m.pos === "above" ? -1 : 1;
+    ctx.fillStyle = m.color;
+    ctx.beginPath();
+    ctx.moveTo(cx, base + dir*7);
+    ctx.lineTo(cx - 4.5, base + dir*14);
+    ctx.lineTo(cx + 4.5, base + dir*14);
+    ctx.closePath(); ctx.fill();
+    ctx.fillText(m.text, cx, base + dir*26);
+  }
+
+  /* zones for selected trade / zone event (layers 2 & 4) */
+  const selT = selTrade && (TRADES[curSym]||[]).find(x => x.trade_id === selTrade);
+  if (selT) drawTradeZones(selT, t2x, y, plotW, plotH);
+  const selZ = selZone && (ZONEV[curSym]||[]).find(x => x.id === selZone);
+  if (selZ) drawZoneEvent(selZ, t2x, y, plotW, plotH);
+
+  /* entry / SL / TP price lines with right-axis tags */
+  if (selT) {
+    const mk = (p, color, title) => {
+      if (!p || p <= 0 || p < pMin || p > pMax) return;
+      const yy = y(p);
+      ctx.strokeStyle = color; ctx.setLineDash([6,4]); ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(plotW, yy); ctx.stroke(); ctx.setLineDash([]);
+      const lbl = title + " " + fmtP(p);
+      const w = ctx.measureText(lbl).width + 10;
+      ctx.fillStyle = color;
+      ctx.fillRect(plotW - w, yy - 8, w, 16);
+      ctx.fillStyle = "#0b0e14"; ctx.textAlign = "left";
+      ctx.fillText(lbl, plotW - w + 5, yy);
+    };
+    mk(selT.entry_price, "#2979ff", "Entry");
+    mk(selT.tp_price, "#22c55e", "TP");
+    mk(selT.sl_price, "#f4645f", "SL");
+  }
+  /* live price line */
+  if (livePrice != null && livePrice >= pMin && livePrice <= pMax) {
+    const yy = y(livePrice);
+    ctx.strokeStyle = "#8b95a7"; ctx.setLineDash([2,3]); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(plotW, yy); ctx.stroke(); ctx.setLineDash([]);
+    const lbl = fmtP(livePrice);
+    const w = ctx.measureText(lbl).width + 10;
+    ctx.fillStyle = "#e7ecf3";
+    ctx.fillRect(plotW - w, yy - 8, w, 16);
+    ctx.fillStyle = "#0b0e14"; ctx.textAlign = "left"; ctx.fillText(lbl, plotW - w + 5, yy);
+  }
+  /* crosshair (desktop hover) */
+  if (hover && hover.x < plotW && hover.y < plotH) {
+    ctx.strokeStyle = "#3a4252"; ctx.setLineDash([3,3]);
+    ctx.beginPath(); ctx.moveTo(hover.x, 0); ctx.lineTo(hover.x, plotH); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, hover.y); ctx.lineTo(plotW, hover.y); ctx.stroke();
+    ctx.setLineDash([]);
+    const t = Math.round(x2t(hover.x));
+    const p = pMax - (hover.y / plotH) * (pMax - pMin);
+    ctx.fillStyle = "#232a38"; ctx.fillRect(hover.x - 40, plotH + 1, 80, AXB - 2);
+    ctx.fillStyle = "#e7ecf3"; ctx.textAlign = "center";
+    ctx.fillText(hf.format(new Date(t*1000)), hover.x, plotH + 11);
+    ctx.fillStyle = "#232a38"; ctx.fillRect(plotW, hover.y - 8, AXR, 16);
+    ctx.fillStyle = "#e7ecf3"; ctx.textAlign = "left";
+    ctx.fillText(fmtP(p), plotW + 6, hover.y);
+  }
+  ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+}
+
+/* dashed zone boxes for the selected trade — clipped to its time span */
+function drawTradeZones(t, t2x, y, plotW, plotH) {
+  const nowS = Math.floor(Date.now()/1000);
+  const endT = t.exit_time || nowS;
+  let xa = t2x(t.entry_time), xb = t2x(endT + (t.exit_time ? 0 : 900));
+  if (xb - xa < 6) xb = xa + 40;       // min visible width
+  const eY = y(t.entry_price);
+  if (t.tp_price > 0 && t.sl_price > 0) {
+    const tpY = y(t.tp_price), slY = y(t.sl_price);
+    ctx.setLineDash([6,4]); ctx.lineWidth = 1.5;
+    const loT = Math.min(eY,tpY), hiT = Math.max(eY,tpY);
+    if (loT > -200 && hiT < plotH + 200) {   // skip fully off-scale boxes
+      ctx.fillStyle = "rgba(34,197,94,.15)"; ctx.fillRect(xa, loT, xb-xa, hiT-loT);
+      ctx.strokeStyle = "rgba(34,197,94,.8)"; ctx.strokeRect(xa, loT, xb-xa, hiT-loT);
+      ctx.fillStyle = "rgba(34,197,94,.95)"; ctx.font = "700 10px -apple-system,sans-serif";
+      ctx.fillText("TP", xa+6, Math.max(12, loT-4));
+    }
+    const loS = Math.min(eY,slY), hiS = Math.max(eY,slY);
+    if (loS > -200 && hiS < plotH + 200) {
+      ctx.fillStyle = "rgba(127,29,29,.35)"; ctx.fillRect(xa, loS, xb-xa, hiS-loS);
+      ctx.strokeStyle = "rgba(244,100,95,.8)"; ctx.strokeRect(xa, loS, xb-xa, hiS-loS);
+      ctx.fillStyle = "rgba(244,100,95,.95)"; ctx.font = "700 10px -apple-system,sans-serif";
+      ctx.fillText("SL", xa+6, Math.max(12, loS-4));
+    }
+    ctx.setLineDash([]);
+    const win = t.exit_time && (t.net_pnl || 0) >= 0;
+    const touch = win ? findTouch(t, t.tp_price, t.direction === "LONG")
+                       : (t.exit_time ? findTouch(t, t.sl_price, t.direction !== "LONG") : null);
+    if (touch) {
+      const tx = t2x(touch.ts), ty = y(touch.price);
+      if (tx >= -20 && tx <= plotW+20 && ty >= 10 && ty <= plotH-10) {
+        ctx.font = "15px -apple-system,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillStyle = win ? "#2dd4a7" : "#f4645f";
+        ctx.fillText(win ? "★" : "✕", tx, ty);
+        ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
       }
     }
-    $("err").textContent = "Chart data unavailable — check connection and reload.";
-    $("err").style.display = "block";
-    return; // give up gracefully; header/sidebar still render
   }
-  $("err").style.display = "none";
-  // BUGFIX 09-16: old trades (multiple days back) need MANY backward hops —
-  // a single fetch1m() only covers ~16.7h (1000x 1m candles). A trade from
-  // 3+ days ago left the chart blank because one hop couldn't reach it.
-  // Loop backward/forward until the range is covered, data runs out
-  // (Bitget retention floor), or a sane hop cap is hit.
-  const MAX_HOPS = 20;
-  let hops = 0;
-  while (hops < MAX_HOPS) {
-    const first = Math.min(...candles2m.keys());
-    if (fromS*1000 >= first - 120000) break;
-    try {
-      const rows = await fetch1m(sym, Math.max(0, fromS*1000 - 3600e3), first);
-      if (!rows.length) break;
-      absorb1m(rows);
-      if (Math.min(...candles2m.keys()) >= first) break;  // no progress -> retention floor
-    } catch (e) { break; }
-    hops++;
+  if (eY >= 0 && eY <= plotH) {          // entry dot
+    ctx.fillStyle = "#2979ff";
+    ctx.beginPath(); ctx.arc(xa, eY, 4, 0, Math.PI*2); ctx.fill();
   }
-  hops = 0;
-  while (hops < MAX_HOPS) {
-    const last = Math.max(...candles2m.keys());
-    if (toS*1000 <= last + 120000) break;
-    try {
-      const rows = await fetch1m(sym, last, toS*1000 + 3600e3);
-      if (!rows.length) break;
-      absorb1m(rows);
-      if (Math.max(...candles2m.keys()) <= last) break;  // no progress
-    } catch (e) { break; }
-    hops++;
-  }
-}
-
-/* ── markers (layer 3) ── */
-function renderMarkers() {
-  const list = filtered().map(t => {
-    const m = [{time:t.entry_time, position:t.direction==="LONG"?"belowBar":"aboveBar",
-      color:t.direction==="LONG"?"#22c55e":"#ef4444",
-      shape:t.direction==="LONG"?"arrowUp":"arrowDown",
-      text:(t.direction==="LONG"?"BUY":"SELL")+(t.engine==="sovereign-v6"?" ★":"")}];
-    if (t.exit_time) {
-      const win = t.status==="WIN_TP_HIT";
-      m.push({time:t.exit_time, position:t.direction==="LONG"?"aboveBar":"belowBar",
-        color:win?"#22c55e":"#ef4444", shape:win?"arrowUp":"arrowDown",
-        text:win?"TP ✓":"SL ✗"});
+  if (t.fvg_top != null && t.fvg_bottom != null) {
+    const fx1 = t2x(t.entry_time - 3600*2);
+    const fy1 = y(t.fvg_top), fy2 = y(t.fvg_bottom);
+    const lo = Math.min(fy1,fy2), hi = Math.max(fy1,fy2);
+    if (lo > -200 && hi < plotH + 200 && xa - fx1 > 4) {
+      ctx.fillStyle = "rgba(0,206,202,.12)"; ctx.fillRect(fx1, lo, xa-fx1, hi-lo);
+      ctx.strokeStyle = "rgba(0,206,202,.55)"; ctx.lineWidth = 1; ctx.strokeRect(fx1, lo, xa-fx1, hi-lo);
+      ctx.fillStyle = "rgba(0,206,202,.9)"; ctx.font = "700 10px -apple-system,sans-serif";
+      ctx.fillText("FVG", fx1+5, Math.max(12, lo+12));
     }
-    return m;
-  }).flat().sort((a,b)=>a.time-b.time);
-  markers = list;
-  candles.setMarkers(list);
-}
-
-/* ── risk bands + FVG + sweep (layers 2 & 4, canvas overlay) ── */
-function filtered() { return (TRADES[curSym]||[]).filter(t=>filter==="ALL"||t.status===filter); }
-
-/* ── replay overlay (owner 2026-09-16, Gemini-mockup style): dotted
-   Entry/SL/TP price lines with axis labels + shaded trade-span rectangle ── */
-let activePriceLines = [];
-function clearReplay() {
-  for (const l of activePriceLines) { try { candles.removePriceLine(l); } catch(e){} }
-  activePriceLines = [];
-  $("statsbar").hidden = true;
-}
-const LS = (window.LightweightCharts && LightweightCharts.LineStyle) || {Dashed:1, Dotted:2};
-function applyReplay(t) {
-  clearReplay();
-  if (!t) return;
-  const mk = (p, color, title, style) => {
-    if (!p || p <= 0) return;
-    activePriceLines.push(candles.createPriceLine({
-      price: p, color, lineWidth: 1, lineStyle: style,
-      axisLabelVisible: true, title,
-    }));
-  };
-  mk(t.entry_price, "#2979ff", "Entry", LS.Dashed);
-  mk(t.sl_price,     "#f4645f", "SL",    LS.Dashed);
-  mk(t.tp_price,     "#22c55e", "TP",    LS.Dashed);
-  // stats bar: ENTRY + R:R (risk = |entry−sl|, reward = |tp−entry|)
-  $("sbEntry").textContent = fmtP(t.entry_price);
-  $("sbSide").textContent = t.direction === "LONG" ? "▲ LONG" : "▼ SHORT";
-  $("sbSide").style.color = t.direction === "LONG" ? "var(--green)" : "var(--red)";
-  if (t.tp_price > 0 && t.sl_price > 0) {
-    const risk = Math.abs(t.entry_price - t.sl_price);
-    const reward = Math.abs(t.tp_price - t.entry_price);
-    const rr = risk > 0 ? reward / risk : 0;
-    $("sbRR").textContent = risk > 0 ? (rr < 1 ? rr.toFixed(2) : rr.toFixed(1)) : "—";
-  } else {
-    $("sbRR").textContent = "—";  // v5 trades didn't record SL/TP
   }
-  $("statsbar").hidden = false;
+  if (t.sweep_price != null) {
+    const sy = y(t.sweep_price);
+    const sx1 = t2x(t.entry_time - 1800);
+    if (sy >= 0 && sy <= plotH && xa - sx1 > 4) {
+      ctx.strokeStyle = "rgba(245,158,11,.85)"; ctx.setLineDash([4,4]); ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(sx1,sy); ctx.lineTo(xa,sy); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = "rgba(245,158,11,.9)"; ctx.font = "700 10px -apple-system,sans-serif";
+      ctx.fillText("SWEEP", sx1+4, Math.max(12, sy-5));
+    }
+  }
 }
-
-// owner 2026-09-16: find the first candle where price actually touched TP/SL,
-// for the star/marker in the replay zone box (matches the reference mock).
+function drawZoneEvent(z, t2x, y, plotW, plotH) {
+  const x0 = Math.max(0, t2x(z.ts)), x1 = plotW;
+  if (x0 >= x1) return;
+  if (z.fvg_top != null && z.fvg_bottom != null) {
+    const yT = y(z.fvg_top), yB = y(z.fvg_bottom);
+    const lo = Math.min(yT,yB);
+    if (lo > -200 && Math.abs(yT-yB) < plotH + 200) {
+      ctx.fillStyle = "rgba(0,206,202,.13)"; ctx.fillRect(x0, lo, x1-x0, Math.abs(yT-yB));
+      ctx.strokeStyle = "rgba(0,206,202,.55)"; ctx.lineWidth = 1; ctx.strokeRect(x0, lo, x1-x0, Math.abs(yT-yB));
+      ctx.fillStyle = "rgba(0,206,202,.95)"; ctx.font = "700 10px -apple-system,sans-serif";
+      ctx.fillText("FVG", x0+6, Math.max(12, lo-3));
+    }
+  }
+  ctx.font = "700 10px -apple-system,sans-serif";
+  for (const [lv, lbl, col] of [[z.level, "CHOCH", "rgba(231,236,243,.8)"],
+                                [z.sweep_price, "SWEEP", "rgba(255,210,0,.85)"]]) {
+    if (lv == null) continue;
+    const yy = y(lv);
+    if (yy < 0 || yy > plotH) continue;
+    ctx.strokeStyle = col; ctx.setLineDash([5,4]); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x0, yy); ctx.lineTo(x1, yy); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = col; ctx.fillText(lbl, x0+6, Math.max(12, yy-3));
+  }
+}
+// first 2m candle whose high/low touched the level (star/x in the zone box)
 function findTouch(t, level, isHigh) {
   if (!level || level <= 0) return null;
   const from = Math.floor(t.entry_time*1000/120000)*120000;
@@ -384,151 +560,103 @@ function findTouch(t, level, isHigh) {
   return null;
 }
 
-function drawOverlay() {
-  const wrap = $("chartwrap");
-  const dpr = window.devicePixelRatio||1;
-  overlay.width = wrap.clientWidth*dpr; overlay.height = wrap.clientHeight*dpr;
-  octx.setTransform(dpr,0,0,dpr,0,0);
-  octx.clearRect(0,0,wrap.clientWidth,wrap.clientHeight);
-  const ts = chart.timeScale();
-  const H = wrap.clientHeight;
-
-  // CLEAN REBUILD (owner 2026-09-16): unselected trades draw NOTHING on
-  // the canvas — only their lightweight-charts entry/exit markers. All
-  // the old per-trade bands/FVG/sweep clutter made the chart unreadable.
-  // The selected trade gets the reference-mock treatment: dashed TP/SL
-  // zone boxes + entry dot + touch star + FVG band + sweep line.
-  const selT = selTrade && (TRADES[curSym]||[]).find(x => x.trade_id === selTrade);
-  if (selT) drawTradeZones(selT, ts);
-
-  const selZ = selZone && (ZONEV[curSym]||[]).find(x => x.id === selZone);
-  if (selZ) drawZoneEvent(selZ, ts);
-  if (location.search.includes("debug=1") && !selT) {
-    const d = $("dbg"); d.style.display = "block";
-    d.textContent = "drawOverlay: no selT (selTrade=" + selTrade + ", curSym=" + curSym + ", n=" + (TRADES[curSym]||[]).length + ")";
+/* ── pan / zoom / crosshair (touch + mouse, one code path via pointers) ── */
+const pointers = new Map();
+let pinch0 = null;   // {d, t1, t2, midT}
+let lastTapT = 0;
+cv.addEventListener("pointerdown", e => {
+  cv.setPointerCapture(e.pointerId);
+  pointers.set(e.pointerId, {x: e.clientX, y: e.clientY});
+  if (pointers.size === 2) {
+    const r = cv.getBoundingClientRect();
+    const [a, b] = [...pointers.values()];
+    pinch0 = { d: Math.abs(a.x - b.x) || 1, t1: VW.t1, t2: VW.t2,
+               midT: x2t((a.x + b.x)/2 - r.left) };
   }
+});
+cv.addEventListener("pointermove", e => {
+  const r = cv.getBoundingClientRect();
+  hover = {x: e.clientX - r.left, y: e.clientY - r.top};
+  if (!pointers.has(e.pointerId)) { draw(); return; }
+  const prev = pointers.get(e.pointerId);
+  if (pointers.size === 1) {           // pan
+    const dt = -((e.clientX - prev.x) / (CW - AXR)) * (VW.t2 - VW.t1);
+    VW.t1 += dt; VW.t2 += dt;
+  } else if (pointers.size === 2) {     // pinch zoom (time axis)
+    pointers.set(e.pointerId, {x: e.clientX, y: e.clientY});
+    const [a, b] = [...pointers.values()];
+    const d = Math.abs(a.x - b.x) || 1;
+    const scale = pinch0.d / d;
+    const span = (pinch0.t2 - pinch0.t1) * scale;
+    VW.t1 = pinch0.midT - (pinch0.midT - pinch0.t1) / (pinch0.t2 - pinch0.t1) * span;
+    VW.t2 = VW.t1 + span;
+  }
+  pointers.set(e.pointerId, {x: e.clientX, y: e.clientY});
+  draw();
+});
+function endPointer(e) {
+  pointers.delete(e.pointerId);
+  if (pointers.size < 2) pinch0 = null;
+  // double-tap / double-click = fit (mobile-friendly)
+  const now = Date.now();
+  if (now - lastTapT < 350 && pointers.size === 0) fitAll();
+  lastTapT = now;
+  if (!pointers.size) draw();
 }
+cv.addEventListener("pointerup", endPointer);
+cv.addEventListener("pointercancel", endPointer);
+cv.addEventListener("pointerleave", () => { hover = null; draw(); });
+cv.addEventListener("wheel", e => {
+  e.preventDefault();
+  const r = cv.getBoundingClientRect();
+  const t = x2t(e.clientX - r.left);
+  const scale = e.deltaY > 0 ? 1.12 : 1/1.12;
+  VW.t1 = t + (VW.t1 - t) * scale;
+  VW.t2 = t + (VW.t2 - t) * scale;
+  draw();
+}, {passive: false});
+cv.addEventListener("dblclick", fitAll);
 
-// off-scale levels (priceToCoordinate -> null) clamp just past the canvas
-// edge; fillRect/strokeRect clip naturally so the box still reads.
-function yOf(p, entry, H) {
-  const y = candles.priceToCoordinate(p);
-  return (y == null || Number.isNaN(y)) ? (p > entry ? -60 : H + 60) : y;
+/* ── markers (layer 3, drawn by engine above) ── */
+function renderMarkers() {
+  markers = filtered().flatMap(t => {
+    const m = [{ts: t.entry_time, pos: t.direction==="LONG" ? "below" : "above",
+      color: t.direction==="LONG" ? "#22c55e" : "#ef4444",
+      text: (t.direction==="LONG" ? "BUY" : "SELL") + (t.engine==="sovereign-v6" ? " ★" : "")}];
+    if (t.exit_time) {
+      const win = t.status==="WIN_TP_HIT";
+      m.push({ts: t.exit_time, pos: t.direction==="LONG" ? "above" : "below",
+        color: win ? "#22c55e" : "#ef4444", text: win ? "TP ✓" : "SL ✗"});
+    }
+    return m;
+  }).sort((a,b)=>a.ts-b.ts);
+  draw();
 }
+function filtered() { return (TRADES[curSym]||[]).filter(t=>filter==="ALL"||t.status===filter); }
 
-function drawTradeZones(t, ts) {
-  const wrap = $("chartwrap"), H = wrap.clientHeight, W = wrap.clientWidth;
-  const nowS = Math.floor(Date.now()/1000);
-  const endT = (t.exit_time||nowS) + (t.exit_time?0:900);
-  let xa = ts.timeToCoordinate(t.entry_time), xb = ts.timeToCoordinate(endT);
-  if (xa === null && xb === null) return;
-  if (xa === null) xa = 0;
-  if (xb === null) xb = W;
-  const eY = yOf(t.entry_price, t.entry_price, H);
-  const win = t.exit_time && (t.net_pnl || 0) >= 0;
-
+/* ── replay: stats bar (price lines are drawn by the engine) ── */
+function clearReplay() { $("statsbar").hidden = true; }
+function applyReplay(t) {
+  if (!t) return;
+  $("sbEntry").textContent = fmtP(t.entry_price);
+  $("sbSide").textContent = t.direction === "LONG" ? "▲ LONG" : "▼ SHORT";
+  $("sbSide").style.color = t.direction === "LONG" ? "var(--green)" : "var(--red)";
   if (t.tp_price > 0 && t.sl_price > 0) {
-    const tpY = yOf(t.tp_price, t.entry_price, H);
-    const slY = yOf(t.sl_price, t.entry_price, H);
-    octx.setLineDash([6,4]); octx.lineWidth = 1.5;
-    // TP zone (green, entry -> TP)
-    const loT = Math.min(eY,tpY), hiT = Math.max(eY,tpY);
-    octx.fillStyle = "rgba(34,197,94,.15)"; octx.fillRect(xa, loT, xb-xa, hiT-loT);
-    octx.strokeStyle = "rgba(34,197,94,.8)"; octx.strokeRect(xa, loT, xb-xa, hiT-loT);
-    // SL zone (maroon, SL -> entry)
-    const loS = Math.min(eY,slY), hiS = Math.max(eY,slY);
-    octx.fillStyle = "rgba(127,29,29,.35)"; octx.fillRect(xa, loS, xb-xa, hiS-loS);
-    octx.strokeStyle = "rgba(244,100,95,.8)"; octx.strokeRect(xa, loS, xb-xa, hiS-loS);
-    octx.setLineDash([]);
-    octx.font = "700 10px -apple-system,sans-serif";
-    octx.fillStyle = "rgba(34,197,94,.95)"; octx.fillText("TP", xa+6, loT-4 < 0 ? hiT+12 : loT-4);
-    octx.fillStyle = "rgba(244,100,95,.95)"; octx.fillText("SL", xa+6, loS-4 < 0 ? hiS+12 : loS-4);
-    if (location.search.includes("debug=1")) {
-      const d = $("dbg"); d.style.display = "block";
-      d.textContent = `xa=${xa} xb=${xb} W=${W} H=${H}\neY=${eY} tpY=${tpY} slY=${slY}\ntp=${t.tp_price} sl=${t.sl_price} dir=${t.direction} win=${win}`;
-    }
-    // star / x at the candle that actually touched TP or SL
-    const touch = win ? findTouch(t, t.tp_price, t.direction === "LONG")
-                       : (t.exit_time ? findTouch(t, t.sl_price, t.direction !== "LONG") : null);
-    if (touch) {
-      const tx = ts.timeToCoordinate(touch.ts), ty = yOf(touch.price, t.entry_price, H);
-      if (tx !== null && ty !== null && ty >= 0 && ty <= H) {
-        octx.font = "15px -apple-system,sans-serif"; octx.textAlign = "center"; octx.textBaseline = "middle";
-        octx.fillStyle = win ? "#2dd4a7" : "#f4645f";
-        octx.fillText(win ? "★" : "✕", tx, ty);
-        octx.textAlign = "left"; octx.textBaseline = "alphabetic";
-      }
-    }
-  }
-  // entry dot
-  if (eY >= 0 && eY <= H) {
-    octx.fillStyle = "#2979ff";
-    octx.beginPath(); octx.arc(xa, eY, 4, 0, Math.PI*2); octx.fill();
-  }
-  // FVG band for this trade (teal, ends at entry)
-  if (t.fvg_top != null && t.fvg_bottom != null) {
-    const fx1 = ts.timeToCoordinate(t.entry_time - 3600*2);
-    const fy1 = yOf(t.fvg_top, t.entry_price, H), fy2 = yOf(t.fvg_bottom, t.entry_price, H);
-    const lo = Math.min(fy1,fy2), hi = Math.max(fy1,fy2);
-    const x0 = fx1 === null ? 0 : fx1;
-    octx.fillStyle = "rgba(0,206,202,.12)"; octx.fillRect(x0, lo, xa-x0, hi-lo);
-    octx.strokeStyle = "rgba(0,206,202,.55)"; octx.lineWidth = 1; octx.strokeRect(x0, lo, xa-x0, hi-lo);
-    octx.fillStyle = "rgba(0,206,202,.9)"; octx.font = "700 10px -apple-system,sans-serif";
-    octx.fillText("FVG", x0+5, lo+12);
-  }
-  // liquidity sweep line (amber dashed, 30m before entry)
-  if (t.sweep_price != null) {
-    const sy = yOf(t.sweep_price, t.entry_price, H);
-    const sx1 = ts.timeToCoordinate(t.entry_time-1800);
-    const x0 = sx1 === null ? 0 : sx1;
-    if (sy >= 0 && sy <= H) {
-      octx.strokeStyle = "rgba(245,158,11,.85)"; octx.setLineDash([4,4]); octx.lineWidth = 1.5;
-      octx.beginPath(); octx.moveTo(x0,sy); octx.lineTo(xa,sy); octx.stroke(); octx.setLineDash([]);
-      octx.fillStyle = "rgba(245,158,11,.9)"; octx.font = "700 10px -apple-system,sans-serif";
-      octx.fillText("SWEEP", x0+4, sy-5);
-    }
-  }
-}
-
-function drawZoneEvent(z, ts) {
-  const wrap = $("chartwrap"), H = wrap.clientHeight, W = wrap.clientWidth;
-  const P = p => candles.priceToCoordinate(p);
-  const xs = ts.timeToCoordinate(z.ts);
-  const x0 = xs === null ? 0 : xs, x1 = W;
-  if (z.fvg_top != null && z.fvg_bottom != null) {
-    const yT = P(z.fvg_top), yB = P(z.fvg_bottom);
-    if (yT !== null && yB !== null) {
-      const yLo = Math.min(yT, yB);
-      octx.fillStyle = "rgba(0,206,202,.13)";
-      octx.fillRect(x0, yLo, x1-x0, Math.abs(yT-yB));
-      octx.strokeStyle = "rgba(0,206,202,.55)"; octx.lineWidth = 1;
-      octx.strokeRect(x0, yLo, x1-x0, Math.abs(yT-yB));
-      octx.fillStyle = "rgba(0,206,202,.95)"; octx.font = "700 10px -apple-system,sans-serif";
-      octx.fillText("FVG", x0+6, yLo-3);
-    }
-  }
-  for (const [lv, lbl, col] of [[z.level, "CHOCH", "rgba(231,236,243,.8)"],
-                                [z.sweep_price, "SWEEP", "rgba(255,210,0,.85)"]]) {
-    if (lv == null) continue;
-    const y = P(lv);
-    if (y === null) continue;
-    octx.strokeStyle = col; octx.setLineDash([5,4]); octx.lineWidth = 1;
-    octx.beginPath(); octx.moveTo(x0, y); octx.lineTo(x1, y); octx.stroke();
-    octx.setLineDash([]);
-    octx.fillStyle = col; octx.font = "700 10px -apple-system,sans-serif";
-    octx.fillText(lbl, x0+6, y-3);
-  }
+    const risk = Math.abs(t.entry_price - t.sl_price);
+    const reward = Math.abs(t.tp_price - t.entry_price);
+    const rr = risk > 0 ? reward / risk : 0;
+    $("sbRR").textContent = risk > 0 ? (rr < 1 ? rr.toFixed(2) : rr.toFixed(1)) : "—";
+  } else $("sbRR").textContent = "—";
+  $("statsbar").hidden = false;
 }
 
 /* ── sidebar rows ── */
 const fmtT = s => s ? new Intl.DateTimeFormat([], {timeZone:TZ, month:"short", day:"2-digit",
                           hour:"2-digit", minute:"2-digit", hour12:false}).format(new Date(s*1000)) : "—";
 let dayFmt = new Intl.DateTimeFormat([], {timeZone:TZ, weekday:"short", month:"short", day:"2-digit"});
-const fmtP = p => p==null ? "—" : (p>=1000 ? p.toFixed(1) : p.toFixed(4));
 function tradeBubbles(t) {
   const dir = t.direction === "LONG";
   const out = [];
-  // bubble 1: structural analysis (sweep + FVG) — what the bot "saw"
   if (t.sweep_price != null || (t.fvg_top != null && t.fvg_bottom != null)) {
     const bits = [];
     if (t.sweep_price != null) bits.push(`liquidity swept @ ${fmtP(t.sweep_price)}`);
@@ -539,12 +667,10 @@ function tradeBubbles(t) {
       `<span class="anal">${bits.join(" · ")}</span>` +
       `<div class="expl">structural read · ${t.engine || "v5"}</div></div></div>`);
   }
-  // bubble 2: entry
   out.push(`<div class="bub"><div class="av">C</div><div class="bd">` +
     `<span class="tm">${fmtT(t.entry_time)}</span>` +
     `<b class="dir ${dir ? "long" : "short"}">${dir ? "▲ LONG" : "▼ SHORT"}</b> @ ${fmtP(t.entry_price)}` +
     `<div class="expl">${t.reason_entry || ""}${t.engine && !(t.reason_entry||"").includes(t.engine) ? " · " + t.engine : ""}</div></div></div>`);
-  // bubble 3: exit / live status
   if (t.exit_time) {
     const win = t.status === "WIN_TP_HIT";
     const tag = win ? "TP ✓" : (t.status === "LOSS_SL_HIT" ? "SL ✗" : t.status.replace(/_/g, " "));
@@ -558,7 +684,6 @@ function tradeBubbles(t) {
   }
   return out.join("");
 }
-
 function zoneBubbles(z) {
   const bull = z.side === "bull";
   let title, expl = z.note || "";
@@ -583,7 +708,6 @@ function zoneBubbles(z) {
     `<span class="tm">${fmtT(z.ts)}</span><span class="anal">${title}</span>` +
     `<div class="expl">${expl} · sovereign-v6</div></div></div>`;
 }
-
 function renderRows() {
   const trades = filtered().map(t => ({ kind: "t", ts: t.entry_time, t }));
   const zones = (filter === "ALL" ? (ZONEV[curSym]||[]) : []).map(z => ({ kind: "z", ts: z.ts, z }));
@@ -621,11 +745,8 @@ async function selectZone(zid) {
   selZone = zid; selTrade = null;
   clearReplay();
   await ensureCandles(z.ts - 7200, z.ts + 7200);
-  chart.timeScale().setVisibleRange({
-    from: Math.max(0, z.ts - 5400),
-    to: z.ts + 2700,
-  });
-  renderRows(); drawOverlay();
+  VW = {t1: Math.max(0, z.ts - 5400), t2: z.ts + 2700};
+  renderRows(); draw();
   if (window.innerWidth<=920) $("aside").classList.remove("open");
   } catch (e) {
     const b = document.getElementById("err");
@@ -639,16 +760,10 @@ async function selectTrade(tid) {
   const t = (TRADES[curSym]||[]).find(x=>x.trade_id===tid);
   if (!t) return;
   await ensureCandles(t.entry_time, t.exit_time||Math.floor(Date.now()/1000));
-  const pad = (t.exit_time||Math.floor(Date.now()/1000)) - t.entry_time < 1800 ? 1800 :
-              (t.exit_time - t.entry_time)*0.25;
-  // v4 API: setVisibleRange takes {from, to} — the old two-arg v3 form
-  // threw inside the async handler and silently killed the zoom.
-  chart.timeScale().setVisibleRange({
-    from: Math.max(0, t.entry_time - pad),
-    to: (t.exit_time || Math.floor(Date.now()/1000)) + pad,
-  });
+  const span = Math.max(1800, (t.exit_time||Math.floor(Date.now()/1000)) - t.entry_time);
+  VW = {t1: Math.max(0, t.entry_time - span*0.5), t2: (t.exit_time||Math.floor(Date.now()/1000)) + span*0.5};
   applyReplay(t);
-  renderRows(); drawOverlay();
+  renderRows(); draw();
   if (window.innerWidth<=920) $("aside").classList.remove("open");
   } catch (e) {
     const b = document.getElementById("err");
@@ -660,20 +775,19 @@ async function selectTrade(tid) {
 $("symbol").onchange = async () => {
   curSym = $("symbol").value; selTrade = null; selZone = null;
   clearReplay();
-  candles2m.clear();
-  try { await ensureCandles(Math.floor(Date.now()/1000)-86400, Math.floor(Date.now()/1000)); }
-  catch(e) {}
-  renderRows(); drawOverlay();
+  candles2m.clear(); barsDirty = true; VW = {t1:0, t2:0};
+  await bootCandles();
+  renderRows(); draw();
 };
 document.querySelectorAll(".chip").forEach(c => c.onclick = () => {
   document.querySelectorAll(".chip").forEach(x=>x.classList.remove("on"));
-  c.classList.add("on"); filter = c.dataset.f; renderRows(); drawOverlay();
+  c.classList.add("on"); filter = c.dataset.f; renderRows(); draw();
 });
 $("asidetoggle").onclick = () => $("aside").classList.toggle("open");
 $("tz").onchange = () => {
   TZ = $("tz").value; localStorage.setItem("cozy.tz", TZ);
   dayFmt = new Intl.DateTimeFormat([], {timeZone:TZ, weekday:"short", month:"short", day:"2-digit"});
-  renderRows(); drawOverlay();
+  renderRows(); draw();
   loadTrades().catch(()=>{});   // refresh "updated" pill in the new tz
 };
 $("replaybtn").addEventListener("click", () => {
@@ -682,26 +796,36 @@ $("replaybtn").addEventListener("click", () => {
   const tid = selTrade || (latest ? latest.trade_id : null);
   if (tid) selectTrade(tid);
 });
+$("fitbtn").addEventListener("click", fitAll);
 $("sbClear").addEventListener("click", () => {
-  selTrade = null; clearReplay(); renderRows(); drawOverlay();
-  chart.timeScale().fitContent();
+  selTrade = null; selZone = null; clearReplay(); renderRows(); fitAll();
 });
-chart.timeScale().subscribeVisibleTimeRangeChange(() => requestAnimationFrame(drawOverlay));
-new ResizeObserver(() => requestAnimationFrame(drawOverlay)).observe($("chartwrap"));
+new ResizeObserver(() => requestAnimationFrame(resize)).observe($("chartwrap"));
 
 async function tickLoop() {
   for(;;) {
     try {
       const j = await bitgetFetch("ticker", `symbol=${pairToSymbol(curSym)}`);
       if (j.code==="00000" && j.data[0]) {
-        const p = +j.data[0].lastPr;
-        candles.setMarkers(markers);  // keep markers after price-line updates
-        candles.applyOptions({priceLineVisible:true});
-        $("updated").innerHTML = `<span class="dot"></span>${curSym} ${fmtP(p)}`;
+        livePrice = +j.data[0].lastPr;
+        $("updated").innerHTML = `<span class="dot"></span>${curSym} ${fmtP(livePrice)}`;
+        draw();
       }
     } catch(e){}
     await new Promise(r=>setTimeout(r, 30000));
   }
+}
+
+/* boot: load the FULL trade history for the current pair — the whole point
+   of the custom engine is seeing the entire run, not just the last 24h. */
+async function bootCandles() {
+  const list = TRADES[curSym] || [];
+  const zones = ZONEV[curSym] || [];
+  let fromS = Math.floor(Date.now()/1000) - 86400;
+  const stamps = list.map(t => t.entry_time).concat(zones.map(z => z.ts)).filter(Boolean);
+  if (stamps.length) fromS = Math.min(...stamps) - 3600;
+  await ensureCandles(fromS, Math.floor(Date.now()/1000));
+  fitAll();
 }
 
 (async function boot(){
@@ -709,9 +833,9 @@ async function tickLoop() {
     try { await loadTrades(); $("err").style.display="none"; break; }
     catch(e) { $("err").style.display="block"; await new Promise(r=>setTimeout(r,5000)); }
   }
-  try { await ensureCandles(Math.floor(Date.now()/1000)-86400, Math.floor(Date.now()/1000)); }
-  catch(e) { /* ensureCandles no longer throws, but stay defensive */ }
-  renderRows(); drawOverlay();
+  resize();
+  await bootCandles();
+  renderRows(); draw();
   tickLoop();
   setInterval(loadTrades, 60000);
 })();
