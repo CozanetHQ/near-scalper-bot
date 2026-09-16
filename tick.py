@@ -588,9 +588,18 @@ def get_state(pair):
         state["_last_close"] = pair_trades[0].get("closed_at")
         state["_last_reason"] = pair_trades[0].get("reason")
     # Day-start balance (UTC) for the daily loss circuit breaker — account-level.
+    # BUG FIX 2026-09-16 (owner screenshot: XRP showed day_start $9.37, SOL
+    # showed $10.18 for the SAME shared account balance, same moment). This
+    # walked PAIR_TRADES — each pair's OWN last trade before today — but
+    # `balance` is account-wide/shared across every pair. Two pairs whose most
+    # recent pre-today trades landed at different points in the shared
+    # balance's history got two different "day starts", so the same 12% drop
+    # tripped (or didn't) at different real balances depending which pair
+    # asked. Walk the account-wide `trades` list (newest-first, same as
+    # pair_trades) instead — one true day-start balance for every pair.
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     day_start = None
-    for t in pair_trades:
+    for t in trades:
         if (t.get("closed_at") or "").startswith(today):
             continue
         day_start = t.get("balance_after")
