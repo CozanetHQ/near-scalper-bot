@@ -29,6 +29,17 @@ select{background:var(--panel2);color:var(--text);border:1px solid var(--line);b
 .dot{width:8px;height:8px;border-radius:50%;background:var(--green);display:inline-block;
      box-shadow:0 0 6px var(--green);margin-right:6px}
 main{flex:1;display:flex;min-height:0}
+#replaybtn{background:#292a2d;color:#e8eaed;border:1px solid #3a3d42;border-radius:999px;
+  padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap}
+#replaybtn:hover{background:#35383d}
+#statsbar{position:absolute;left:12px;bottom:44px;display:flex;align-items:center;gap:14px;
+  background:rgba(18,21,26,.92);border:1px solid #2a2f38;border-radius:10px;padding:8px 14px;z-index:5}
+#statsbar .stat{display:flex;flex-direction:column;gap:2px}
+#statsbar label{font-size:9px;letter-spacing:.12em;color:#9aa0a6;font-weight:600}
+#statsbar b{font-size:13px;color:#e8eaed;font-variant-numeric:tabular-nums}
+#statsbar .sep{width:1px;height:22px;background:#2a2f38}
+#statsbar #sbClear{background:none;border:none;color:#9aa0a6;cursor:pointer;font-size:11px;margin-left:2px}
+#statsbar #sbClear:hover{color:#fff}
 #chartwrap{flex:1;position:relative;min-width:0}
 #chart{position:absolute;inset:0}
 #overlay{position:absolute;inset:0;pointer-events:none}
@@ -102,6 +113,7 @@ aside h2{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--
     <option value="Asia/Dubai">GST · Dubai</option>
     <option value="Asia/Singapore">SGT · Singapore</option>
   </select>
+  <button id="replaybtn" title="Replay the selected trade (or the latest one)">⟲ Replay</button>
   <button id="asidetoggle">☰ Chat</button>
 </header>
 <div class="errbanner" id="err">Data fetch failed — retrying…</div>
@@ -114,6 +126,14 @@ aside h2{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--
       <div class="lrow"><span class="sw" style="background:rgba(239,68,68,.22);border:1px solid var(--red)"></span>Stop-loss zone</div>
       <div class="lrow"><span class="sw" style="background:rgba(0,206,202,.16);border:1px solid var(--teal)"></span>Fair Value Gap</div>
       <div class="lrow"><span style="border-top:2px dotted var(--amber);width:14px;display:inline-block"></span>Liquidity sweep</div>
+    </div>
+    <div id="statsbar" hidden>
+      <span class="stat"><label>ENTRY</label><b id="sbEntry">—</b></span>
+      <span class="sep"></span>
+      <span class="stat"><label>R:R RATIO</label><b id="sbRR">—</b></span>
+      <span class="sep"></span>
+      <span class="stat"><label>SIDE</label><b id="sbSide">—</b></span>
+      <button id="sbClear" title="Clear replay overlay">✕</button>
     </div>
   </div>
   <aside id="aside">
@@ -289,6 +309,42 @@ function renderMarkers() {
 /* ── risk bands + FVG + sweep (layers 2 & 4, canvas overlay) ── */
 function filtered() { return (TRADES[curSym]||[]).filter(t=>filter==="ALL"||t.status===filter); }
 
+/* ── replay overlay (owner 2026-09-16, Gemini-mockup style): dotted
+   Entry/SL/TP price lines with axis labels + shaded trade-span rectangle ── */
+let activePriceLines = [];
+function clearReplay() {
+  for (const l of activePriceLines) { try { candles.removePriceLine(l); } catch(e){} }
+  activePriceLines = [];
+  $("statsbar").hidden = true;
+}
+const LS = (window.LightweightCharts && LightweightCharts.LineStyle) || {Dashed:1, Dotted:2};
+function applyReplay(t) {
+  clearReplay();
+  if (!t) return;
+  const mk = (p, color, title, style) => {
+    if (!p || p <= 0) return;
+    activePriceLines.push(candles.createPriceLine({
+      price: p, color, lineWidth: 1, lineStyle: style,
+      axisLabelVisible: true, title,
+    }));
+  };
+  mk(t.entry_price, "#2979ff", "Entry", LS.Dotted);
+  mk(t.sl_price,     "#e8eaed", "SL",    LS.Dotted);
+  mk(t.tp_price,     "#22c55e", "TP",    LS.Dashed);
+  // stats bar: ENTRY + R:R (risk = |entry−sl|, reward = |tp−entry|)
+  $("sbEntry").textContent = fmtP(t.entry_price);
+  $("sbSide").textContent = t.direction === "LONG" ? "▲ LONG" : "▼ SHORT";
+  $("sbSide").style.color = t.direction === "LONG" ? "var(--green)" : "var(--red)";
+  if (t.tp_price > 0 && t.sl_price > 0) {
+    const risk = Math.abs(t.entry_price - t.sl_price);
+    const reward = Math.abs(t.tp_price - t.entry_price);
+    $("sbRR").textContent = risk > 0 ? (reward / risk).toFixed(1) : "—";
+  } else {
+    $("sbRR").textContent = "—";  // v5 trades didn't record SL/TP
+  }
+  $("statsbar").hidden = false;
+}
+
 function drawOverlay() {
   const wrap = $("chartwrap");
   const dpr = window.devicePixelRatio||1;
@@ -308,7 +364,18 @@ function drawOverlay() {
     if (x2 === null || x1 === null) { if (x1===null && x2===null) continue; }
     const xa = x1===null?0:x1, xb = x2===null?wrap.clientWidth:x2;
     const P = p => candles.priceToCoordinate(p);
-    const solid = t.tp_price>0 && t.sl_price>0;
+    const isSel = selTrade && t.trade_id === selTrade;
+    // Selected trade gets the Gemini-style span rectangle instead of bands —
+    // its Entry/SL/TP levels are the dotted price lines from applyReplay().
+    if (isSel) {
+      const win = t.exit_time && (t.net_pnl || 0) >= 0;
+      const loss = t.exit_time && (t.net_pnl || 0) < 0;
+      octx.fillStyle = win ? "rgba(34,197,94,.09)" : loss ? "rgba(239,68,68,.09)" : "rgba(41,121,255,.08)";
+      octx.fillRect(xa, 0, xb-xa, wrap.clientHeight);
+      octx.strokeStyle = win ? "rgba(34,197,94,.5)" : loss ? "rgba(239,68,68,.5)" : "rgba(41,121,255,.5)";
+      octx.lineWidth=1; octx.strokeRect(xa, 0, xb-xa, wrap.clientHeight);
+    }
+    const solid = t.tp_price>0 && t.sl_price>0 && !isSel;
     if (solid) {
       const eY=P(t.entry_price), tpY=P(t.tp_price), slY=P(t.sl_price);
       const lo = Math.min(eY,tpY), hi=Math.max(eY,tpY);
@@ -336,11 +403,6 @@ function drawOverlay() {
       octx.strokeStyle="rgba(245,158,11,.8)"; octx.setLineDash([4,4]); octx.lineWidth=1.5;
       octx.beginPath(); octx.moveTo(sx1,sy); octx.lineTo(xb,sy); octx.stroke(); octx.setLineDash([]);
       octx.fillStyle="rgba(245,158,11,.9)"; octx.fillText("SWEEP", sx1+4, sy-4);
-    }
-    if (selTrade && t.trade_id===selTrade) {
-      octx.strokeStyle="#00ceca"; octx.lineWidth=1.5;
-      octx.strokeRect(xa-2, Math.min(P(t.entry_price),P(t.tp_price||t.entry_price))-2,
-                      (xb-xa)+4, Math.abs(P(t.tp_price||t.entry_price)-P(t.sl_price||t.entry_price))+4);
     }
   }
 }
@@ -418,6 +480,7 @@ async function selectTrade(tid) {
     from: Math.max(0, t.entry_time - pad),
     to: (t.exit_time || Math.floor(Date.now()/1000)) + pad,
   });
+  applyReplay(t);
   renderRows(); drawOverlay();
   if (window.innerWidth<=920) $("aside").classList.remove("open");
   } catch (e) {
@@ -429,6 +492,7 @@ async function selectTrade(tid) {
 /* ── wiring ── */
 $("symbol").onchange = async () => {
   curSym = $("symbol").value; selTrade = null;
+  clearReplay();
   candles2m.clear();
   try { await ensureCandles(Math.floor(Date.now()/1000)-86400, Math.floor(Date.now()/1000)); }
   catch(e) {}
@@ -445,6 +509,15 @@ $("tz").onchange = () => {
   renderRows(); drawOverlay();
   loadTrades().catch(()=>{});   // refresh "updated" pill in the new tz
 };
+$("replaybtn").addEventListener("click", () => {
+  const list = TRADES[curSym] || [];
+  const tid = selTrade || (list.length ? list[0].trade_id : null);
+  if (tid) selectTrade(tid);
+});
+$("sbClear").addEventListener("click", () => {
+  selTrade = null; clearReplay(); renderRows(); drawOverlay();
+  chart.timeScale().fitContent();
+});
 chart.timeScale().subscribeVisibleTimeRangeChange(() => requestAnimationFrame(drawOverlay));
 new ResizeObserver(() => requestAnimationFrame(drawOverlay)).observe($("chartwrap"));
 
