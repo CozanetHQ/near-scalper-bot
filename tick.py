@@ -65,7 +65,7 @@ TREND_CHASE = os.environ.get("TREND_CHASE", "0")  # OWNER 09-08 hypothesis: duri
 # price for a realized loss of its margin. Paper default OFF (sim floats wedges
 # forever); ON it exposes the true tail of high-leverage configs.
 SCALP_TP_ATR = 1.6  # OWNER 09-08: two-week lab verdict — 1.6x ATR is the robust center (capital-time 0.0070 $/(cap.h) IDENTICAL on both regime weeks; hostile-week maxDD halved -$0.76 vs -$5.20 at 1.2x; 2.0x hits the recycle cliff)   # TP distance = 1.2x 1m ATR (adaptive to live volatility)
-MAX_POSITIONS = int(os.environ.get("MAX_POSITIONS", "30"))  # V7-A 2026-09-14: ABSOLUTE sanity ceiling only. Real slot count is dynamic: N_SLOTS = floor(balance / SLOT_COST_MARGIN) (owner model: $10 -> 3 slots). Registry-locked.
+MAX_POSITIONS = int(os.environ.get("MAX_POSITIONS", "30"))  # V7-A 2026-09-14: ABSOLUTE sanity ceiling only. Real slot count is dynamic: N_SLOTS = floor(balance / SLOT_MARGIN_USD) (V7-C owner model: $10 -> 3 slots). Registry-locked.
 CONCENTRATED = os.environ.get("CONCENTRATED", "0")  # OWNER 09-11: 0 — slot sizing (each position ~1/8 of budget, losses sliced small). 1 = whole-account deployment. Registry-locked.
 # lab confirmed 4 slots strictly better: realized +3.84 vs +3.58, equity +0.51 vs -0.30, half the wedges    # hedge scalper: multiple concurrent positions — wedged trades don't stop the chopping
 MARGIN_BUDGET = float(os.environ.get("MARGIN_BUDGET", "0.99"))  # V7-A 2026-09-14: owner model — every slot costs SLOT_COST_MARGIN ($3.30) of balance; 99% commitment, 1% float for fees. Supersedes 0.85.
@@ -82,6 +82,20 @@ MARGIN_BUDGET = float(os.environ.get("MARGIN_BUDGET", "0.99"))  # V7-A 2026-09-1
 FIXED_NOTIONAL_USD = float(os.environ.get("FIXED_NOTIONAL_USD", "33.0"))
 SLOT_COST_MARGIN = float(os.environ.get("SLOT_COST_MARGIN", "3.30"))
 N_SLOTS_MIN = int(os.environ.get("N_SLOTS_MIN", "1"))
+# ── V7-C (owner 2026-09-16): $3 margin seats × ADJUSTABLE leverage ──────────
+# Owner directive: "hunt 0.15 per trade entering with $3 adjustable
+# leverage, mathematically aware of price movements." Every slot occupies the
+# same $3.00 of balance; the pair's live leverage tier (position_leverage —
+# conclusive 14d evidence only) now COMMANDS the notional: 5x→$15, 10x→$30,
+# 15x→$45, 20x→$60. Proven pairs scale exposure on the same $3 seat;
+# re-tiered-down pairs shrink automatically. TP stays a flat $0.15 HUNT net
+# of fees, so a 20x clip needs only ~0.37% of price vs ~0.62% at 10x (ledger
+# evidence 2026-09-16, n=157: median BE_STOP trade runs 67% of the TP
+# distance then reverses — closer targets convert those half-runners).
+# The ATR floor (SCALP_TP_ATR × 1m ATR) still binds in fast tape, and
+# HARD_SL_BY_LEV tightens with the tier (20x → 3% price = 60% of slot
+# margin), so added notional never buys added tail risk.
+SLOT_MARGIN_USD = float(os.environ.get("SLOT_MARGIN_USD", "3.0"))
 # Correlated-majors cluster: BTC/ETH/SOL move together (~0.8–0.9). Three
 # aligned $33 clips in one −6% candle = −59% of a $10 account. Cap same-
 # direction cluster exposure at 2 clips (proposal §2 risk math).
@@ -220,7 +234,7 @@ def nearest_swing_tp(closed15m, side, price):
         return min(above) if above else None
     below = [l for l in levels["lo"] if l < price]
     return max(below) if below else None
-MIN_TP_DIST_FRAC = float(os.environ.get("MIN_TP_DIST_FRAC", "0.006"))  # TP floor as a FRACTION of price (~0.13%): below this, fees eat the scalp alive. Was an absolute $0.003 in the single-pair NEAR era ($2.4 price); multi-pair demands price-proportionate ($0.003/$2.42 ≈ 0.125%). Registry-locked.
+MIN_TP_DIST_FRAC = float(os.environ.get("MIN_TP_DIST_FRAC", "0.0025"))  # V7-C RE-LOCK 2026-09-16 (owner hunt-$0.15 directive, BEFORE any results observed under it): the 0.6% deadlock-release floor vetoed the dollar hunt — at 15-20x tiers the $0.15 target is 0.25-0.33% + fees. New floor 0.25% = the dollar target at the 20x tier ($60 clip); anything closer is fee-starved. The ATR floor (1.6x 1m ATR) still binds in fast tape. Old 0.6% was an owner release after the 2026-09-11 zero-trade deadlock.  # TP floor as a FRACTION of price (~0.13%): below this, fees eat the scalp alive. Was an absolute $0.003 in the single-pair NEAR era ($2.4 price); multi-pair demands price-proportionate ($0.003/$2.42 ≈ 0.125%). Registry-locked.
 EMA_FAST = 9         # scalper momentum: EMA9 vs EMA21 on 1m closes
 EMA_SLOW = 21
 ATR_MIN = 0.0008      # GRID SEARCH WINNER: low gate — more shots on goal
@@ -616,7 +630,7 @@ def sync(pair, state_update=None, trade=None):
         acct["last_tick_at"] = su.get("last_tick_at") or acct.get("last_tick_at")
         try:
             # V7-A: dashboard shows the LIVE balance-scaled slot count
-            acct["max_positions"] = max(N_SLOTS_MIN, min(int(float(acct.get("balance") or 0) // SLOT_COST_MARGIN), MAX_POSITIONS))
+            acct["max_positions"] = max(N_SLOTS_MIN, min(int(float(acct.get("balance") or 0) // SLOT_MARGIN_USD), MAX_POSITIONS))
         except (TypeError, ValueError):
             acct["max_positions"] = MAX_POSITIONS
     ps = master.setdefault("pairs", {}).setdefault(pair, fresh_pair_state(pair))
@@ -773,6 +787,8 @@ def registry_check():
             "N_SLOTS_MIN": N_SLOTS_MIN,
             "CORR_DIR_CAP": CORR_DIR_CAP,
             "MARGIN_BUDGET": MARGIN_BUDGET,
+            "SLOT_MARGIN_USD": SLOT_MARGIN_USD,
+            "WIN_TARGET_DOLLARS": WIN_TARGET_DOLLARS,
         }
         mismatches = []
         for k, v in live.items():
@@ -1211,9 +1227,9 @@ def process_tick(state):
                 wait_reason = f"regime:spike — 1m range {spike:.1f}x ATR (manipulation/liquidation cascade risk)"
         opened_this_tick = False
         _slots_cap = pair_param("MAX_SLOTS_PER_PAIR", symbol, MAX_POSITIONS)
-        # V7-A: GLOBAL slots are balance-scaled, not fixed — floor(balance/$3.30),
-        # sanity-capped at MAX_POSITIONS. $10 account -> 3 slots; growth buys slots.
-        n_slots = max(N_SLOTS_MIN, min(int(balance // SLOT_COST_MARGIN), MAX_POSITIONS))
+        # V7-C: GLOBAL slots are balance-scaled — floor(balance/$3.00), capped
+        # at MAX_POSITIONS. $10 account -> 3 slots; growth buys slots.
+        n_slots = max(N_SLOTS_MIN, min(int(balance // SLOT_MARGIN_USD), MAX_POSITIONS))
         # V7-A correlation cap: max CORR_DIR_CAP same-direction clips in the
         # correlated BTC/ETH/SOL cluster (aligned $33 clips share one tail).
         if want is not None and symbol in CORR_CLUSTER and CORR_DIR_CAP > 0:
@@ -1240,9 +1256,15 @@ def process_tick(state):
             # WIN_TARGET_DOLLARS. Only the normal $33 clip chases the target;
             # safe-mode recovery clips keep the adaptive ATR TP (a $1 clip would
             # need a 13% move — pointless). ATR/TP floors still bind below it.
+            # V7-C: the clip is the $3 seat × the pair's leverage tier, computed
+            # BEFORE the TP math so the $0.15 hunt adapts to the commanded
+            # notional (bigger clip → closer price target).
+            _lev = position_leverage(symbol, now)
+            notional = SLOT_MARGIN_USD * _lev
+            if safe_on:
+                notional = max(notional * RECOVERY_SIZE_FRAC, 1.0)
             target_usd = WIN_TARGET_PCT * balance if WIN_TARGET_PCT > 0 else WIN_TARGET_DOLLARS
-            _clip = FIXED_NOTIONAL_USD if not safe_on else max(FIXED_NOTIONAL_USD * RECOVERY_SIZE_FRAC, 1.0)
-            target_frac = (target_usd / _clip) + FEE_RATE * 2 if not safe_on else 0.0
+            target_frac = (target_usd / notional) + FEE_RATE * 2 if not safe_on else 0.0
             tp_dist = max(SCALP_TP_ATR * (atr or 0.003 * price), MIN_TP_DIST_FRAC * price,
                           target_frac * price)
             entry_tp_dist = tp_dist
@@ -1268,21 +1290,18 @@ def process_tick(state):
                 wait_reason = (f"EV gate: p={p_win:.2f} ev={ev_frac*100:+.2f}%/unit "
                                f"< req {EV_MARGIN_REQ*100:.2f}% — edge gone, WAIT")
             per_unit = entry_tp_dist / price - FEE_RATE * 2
-            _lev = position_leverage(symbol, now)
             if per_unit > 0 and margin_left > 0.05 and ev_frac >= EV_MARGIN_REQ:
-                # ── V7-A (owner 2026-09-14): FIXED $33 clips replace the 8-way
-                # budget slice. One slot costs SLOT_COST_MARGIN ($3.30) of
-                # balance; slot COUNT is balance-scaled (n_slots, above). At
-                # 15x/20x re-tiers the same clip costs LESS margin ($2.20/$1.65)
-                # — tier upgrades buy headroom, never extra exposure. Below the
+                # ── V7-C (owner 2026-09-16): the clip is the $3 margin seat ×
+                # the pair's leverage tier, computed above before the TP math:
+                # 5x → $15, 10x → $30, 15x → $45, 20x → $60. Proven pairs
+                # COMMAND more notional on the same $3 seat; re-tiered-down
+                # pairs shrink automatically. HARD_SL_BY_LEV tightens with the
+                # tier, so added notional never buys added tail risk. Below the
                 # SAFE_DD wall the clip shrinks to RECOVERY_SIZE_FRAC (dust
                 # floor $1) so the account keeps trading at quarter size.
-                notional = FIXED_NOTIONAL_USD
-                if safe_on:
-                    notional = max(notional * RECOVERY_SIZE_FRAC, 1.0)
                 # Full clip or nothing: if the remaining margin cannot seat the
                 # clip, WAIT for a slot to close — partial clips break the
-                # owner's per-slot economics ($3.30 in, 10–15 cents out).
+                # owner's per-slot economics ($3 in, $0.15 out).
                 if notional > margin_left * _lev:
                     notional = 0.0
                 aligned = (bias != "none" and want == ("long" if bias == "bull" else "short"))
