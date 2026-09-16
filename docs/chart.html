@@ -34,6 +34,7 @@ main{flex:1;display:flex;min-height:0}
 #replaybtn:hover{background:#35383d}
 #statsbar{position:absolute;left:12px;bottom:44px;display:flex;align-items:center;gap:14px;
   background:rgba(18,21,26,.92);border:1px solid #2a2f38;border-radius:10px;padding:8px 14px;z-index:5}
+#statsbar[hidden]{display:none}
 #statsbar .stat{display:flex;flex-direction:column;gap:2px}
 #statsbar label{font-size:9px;letter-spacing:.12em;color:#9aa0a6;font-weight:600}
 #statsbar b{font-size:13px;color:#e8eaed;font-variant-numeric:tabular-nums}
@@ -532,7 +533,7 @@ function tradeBubbles(t) {
   out.push(`<div class="bub"><div class="av">C</div><div class="bd">` +
     `<span class="tm">${fmtT(t.entry_time)}</span>` +
     `<b class="dir ${dir ? "long" : "short"}">${dir ? "▲ LONG" : "▼ SHORT"}</b> @ ${fmtP(t.entry_price)}` +
-    `<div class="expl">${t.reason_entry || ""}${t.engine ? " · " + t.engine : ""}</div></div></div>`);
+    `<div class="expl">${t.reason_entry || ""}${t.engine && !(t.reason_entry||"").includes(t.engine) ? " · " + t.engine : ""}</div></div></div>`);
   // bubble 3: exit / live status
   if (t.exit_time) {
     const win = t.status === "WIN_TP_HIT";
