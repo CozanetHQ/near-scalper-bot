@@ -179,7 +179,7 @@ const candles2m = new Map();          // bucketMs -> {open,high,low,close}
 let bars = [], barsDirty = true;      // sorted 2m bars cache
 let TZ = localStorage.getItem("cozy.tz") || "Africa/Lagos";   // owner: NG (WAT) default
 $("tz").value = [...$("tz").options].some(o=>o.value===TZ) ? TZ : "Africa/Lagos";
-let markers = [], livePrice = null, loadingBar = false;
+let livePrice = null, loadingBar = false;
 
 /* ── data: trades JSON (REST contract, section 5) ── */
 async function loadTrades() {
@@ -388,23 +388,8 @@ function draw() {
     ctx.fillRect(cx - bodyW/2, top, bodyW, hgt);
   }
 
-  /* markers (layer 3) */
-  ctx.font = "600 10px -apple-system,sans-serif"; ctx.textAlign = "center";
-  for (const m of markers) {
-    const cx = t2x(m.ts);
-    if (cx < -20 || cx > plotW + 20) continue;
-    let b = null;                       // nearest bar for marker y
-    for (const vb of vis) if (vb.ts >= m.ts - 60 && vb.ts <= m.ts + 120) { b = vb; break; }
-    const base = b ? (m.pos === "above" ? y(b.h) : y(b.l)) : plotH/2;
-    const dir = m.pos === "above" ? -1 : 1;
-    ctx.fillStyle = m.color;
-    ctx.beginPath();
-    ctx.moveTo(cx, base + dir*7);
-    ctx.lineTo(cx - 4.5, base + dir*14);
-    ctx.lineTo(cx + 4.5, base + dir*14);
-    ctx.closePath(); ctx.fill();
-    ctx.fillText(m.text, cx, base + dir*26);
-  }
+  /* trades (layer 3): right-angle entry→exit brackets at real prices */
+  drawTradeConnectors(t2x, y, plotW, plotH);
 
   /* zones for selected trade / zone event (layers 2 & 4) */
   const selT = selTrade && (TRADES[curSym]||[]).find(x => x.trade_id === selTrade);
@@ -617,21 +602,75 @@ cv.addEventListener("wheel", e => {
 }, {passive: false});
 cv.addEventListener("dblclick", fitAll);
 
-/* ── markers (layer 3, drawn by engine above) ── */
-function renderMarkers() {
-  markers = filtered().flatMap(t => {
-    const m = [{ts: t.entry_time, pos: t.direction==="LONG" ? "below" : "above",
-      color: t.direction==="LONG" ? "#22c55e" : "#ef4444",
-      text: (t.direction==="LONG" ? "BUY" : "SELL") + (t.engine==="sovereign-v6" ? " ★" : "")}];
-    if (t.exit_time) {
-      const win = t.status==="WIN_TP_HIT";
-      m.push({ts: t.exit_time, pos: t.direction==="LONG" ? "above" : "below",
-        color: win ? "#22c55e" : "#ef4444", text: win ? "TP ✓" : "SL ✗"});
+/* ── trades (layer 3, drawn inside draw() by drawTradeConnectors) ── */
+const EXIT_TAGS = { MAKER_TP_FILLED:"TP", SL_TAKER_STOP:"SL", BE_STOP:"BE",
+  PROTECTED:"PROT", MAE_KILL:"KILL", HARD_SL:"HARD", MAX_AGE:"AGE",
+  EOD:"EOD", LIQ:"LIQ", TIME_STOP:"TIME" };
+function exitTag(r) { return EXIT_TAGS[r] || (r || "EXIT").slice(0, 4); }
+
+/* TradingView-style brackets: a horizontal line AT the entry price from the
+   entry bar to the exit bar, a vertical leg to the exit price (the right
+   angle), and a tag saying WHY it closed. green = profit, red = loss;
+   the arrow shape gives direction (▲ up = LONG, ▼ down = SHORT). */
+function drawTradeConnectors(t2x, y, plotW, plotH) {
+  const nowS = Math.floor(Date.now() / 1000);
+  ctx.save();
+  ctx.beginPath(); ctx.rect(0, 0, plotW, plotH); ctx.clip();
+  ctx.font = "700 9px -apple-system,sans-serif";
+  for (const t of filtered()) {
+    const xa = t2x(t.entry_time);
+    const endT = t.exit_time || nowS;
+    const xb = t2x(endT);
+    if (xb < -40 || xa > plotW + 40) continue;
+    const eY = y(t.entry_price);
+    const xY = t.exit_price != null ? y(t.exit_price) : null;
+    const win = (t.net_pnl || 0) >= 0;
+    const col = win ? "#22c55e" : "#f4645f";
+    const long = t.direction === "LONG";
+
+    /* entry price level, entry bar → exit bar */
+    ctx.strokeStyle = col; ctx.lineWidth = 1.25;
+    ctx.globalAlpha = .9; ctx.setLineDash([]);
+    const x0 = Math.max(-40, xa), x1 = Math.min(plotW + 40, xb);
+    if (x1 > x0 && eY > -plotH && eY < plotH * 2) {
+      ctx.beginPath(); ctx.moveTo(x0, eY); ctx.lineTo(x1, eY); ctx.stroke();
     }
-    return m;
-  }).sort((a,b)=>a.ts-b.ts);
-  draw();
+
+    /* entry arrow — points AT the entry price; shape = direction */
+    if (xa >= -8 && xa <= plotW + 8 && eY > -20 && eY < plotH + 20) {
+      ctx.fillStyle = col;
+      const dir = long ? 1 : -1;                 /* ▲ below for LONG, ▼ above for SHORT */
+      ctx.beginPath();
+      ctx.moveTo(xa, eY);
+      ctx.lineTo(xa - 4, eY + dir * 8);
+      ctx.lineTo(xa + 4, eY + dir * 8);
+      ctx.closePath(); ctx.fill();
+    }
+
+    if (!t.exit_time) continue;                  /* still open: level line is enough */
+
+    /* exit right angle: vertical entry→exit price + horizontal tick */
+    if (xY != null && xb >= -8 && xb <= plotW + 8) {
+      ctx.globalAlpha = .95;
+      ctx.beginPath(); ctx.moveTo(xb, eY); ctx.lineTo(xb, xY); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(xb - 5, xY); ctx.lineTo(xb + 5, xY); ctx.stroke();
+
+      /* WHY it closed — tag parked clear of the bracket leg */
+      const tag = exitTag(t.reason_exit);
+      const below = xY >= eY;                    /* exited below entry (SHORT win / LONG loss) */
+      const ty = below ? Math.min(xY + 15, plotH - 2) : Math.max(xY - 13, 11);
+      const tw = ctx.measureText(tag).width + 8;
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = win ? "rgba(34,197,94,.18)" : "rgba(244,100,95,.18)";
+      ctx.fillRect(xb - tw / 2, ty - 9, tw, 12);
+      ctx.fillStyle = col; ctx.textAlign = "center";
+      ctx.fillText(tag, xb, ty);
+    }
+  }
+  ctx.restore();
+  ctx.globalAlpha = 1;
 }
+function renderMarkers() { draw(); }             /* connectors now drawn by draw() itself */
 function filtered() { return (TRADES[curSym]||[]).filter(t=>filter==="ALL"||t.status===filter); }
 
 /* ── replay: stats bar (price lines are drawn by the engine) ── */

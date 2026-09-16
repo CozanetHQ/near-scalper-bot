@@ -125,7 +125,17 @@ def record_close(trade_id, closed_at_iso, exit_px, status, reason_exit, net_pnl=
 
 
 def _reason_exit_of(reason):
-    return "MAKER_TP_FILLED" if reason == "TP" else "SL_TAKER_STOP"
+    """Owner 2026-09-16: keep the engine's REAL exit reason so the chart can
+    show WHY each trade closed (TP / BE_STOP / PROTECTED / MAE_KILL / ...).
+    Legacy v5 vocabulary (TP/SL) maps to its old labels for continuity;
+    every other reason code passes through verbatim."""
+    if reason in (None, ""):
+        return "TIME_STOP"
+    if reason == "TP":
+        return "MAKER_TP_FILLED"
+    if reason == "SL":
+        return "SL_TAKER_STOP"
+    return str(reason)
 
 
 def record_zone_event(symbol, ts_ms, kind, side, level=None, fvg_top=None,
