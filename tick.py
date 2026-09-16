@@ -913,7 +913,18 @@ def process_tick(state):
     except (ValueError, TypeError):
         riskoff_prev_day = None
     daily_risk_off = DAILY_LOSS_LIMIT > 0 and riskoff_prev_day == today
-    if (not daily_risk_off and DAILY_LOSS_LIMIT > 0 and day_start > 0
+    if daily_risk_off:
+        # BUG FIX 2026-09-16 (owner: alert repeating every tick instead of once,
+        # never resetting): state["_riskoff_day"] was ONLY set inside the
+        # newly-tripped branch below. Every tick after the trip skipped that
+        # branch entirely (already risk-off), so "_riskoff_day" stayed unset on
+        # this fresh state object -> the persist line below wrote drd="" ->
+        # erased the flag -> NEXT tick re-tripped from scratch -> alert fired
+        # again -> erase -> re-trip -> alert... forever, once per tick, for
+        # every tripped pair. Re-affirm the flag every tick it's still true so
+        # the persisted "drd" never gets erased while still the same UTC day.
+        state["_riskoff_day"] = today
+    elif (DAILY_LOSS_LIMIT > 0 and day_start > 0
             and balance <= day_start * (1 - DAILY_LOSS_LIMIT)):
         daily_risk_off = True
         state["_riskoff_day"] = today
