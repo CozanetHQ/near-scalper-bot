@@ -74,6 +74,9 @@ aside h2{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--
 .bub.sys .av{background:var(--panel2);color:var(--teal);border:1px solid var(--teal)}
 .bub.sys .bd{border-color:rgba(0,206,202,.35)}
 .anal{color:var(--teal)}
+.pairtag{display:inline-block;background:rgba(0,206,202,.13);border:1px solid rgba(0,206,202,.4);
+         color:var(--teal);font-size:9px;font-weight:700;padding:0 5px;border-radius:3px;
+         margin-right:6px;letter-spacing:.4px;text-transform:uppercase}
 .expl{color:var(--dim);font-size:10px;margin-top:2px;font-family:var(--mono)}
 .errbanner{background:var(--red);color:#fff;text-align:center;padding:6px;font-size:12px;display:none}
 /* mobile-first: full-width chart, chat as drawer */
@@ -131,7 +134,7 @@ aside.open{transform:none}
   </div>
   <aside id="aside">
     <div class="ahead">
-      <h2>Execution chat · bot log</h2>
+      <h2>Execution chat · <span id="chatpair">—</span></h2>
       <div class="chips">
         <button class="chip on" data-f="ALL">All</button>
         <button class="chip" data-f="OPEN">Open</button>
@@ -177,7 +180,13 @@ const pairToSymbol = p => p.replace("/", "");           // NEAR/USDT -> NEARUSDT
 
 /* ── state ── */
 let TRADES = {}, ZONEV = {}, symbols = [], curSym = null, filter = "ALL", selTrade = null, selZone = null;
-const candles2m = new Map();          // bucketMs -> {open,high,low,close}
+let candles2m = new Map();              // bucketMs -> {open,high,low,close} (bound per pair)
+const CANDLE_CACHE = {};               // pair -> Map (owner 2026-09-16: switching back to a
+                                       //  pair reuses its candles — no refetch, instant chart)
+function bindCandles(sym) {
+  candles2m = CANDLE_CACHE[sym] || (CANDLE_CACHE[sym] = new Map());
+  barsDirty = true;
+}
 let bars = [], barsDirty = true;      // sorted 2m bars cache
 let TZ = localStorage.getItem("cozy.tz") || "Africa/Lagos";   // owner: NG (WAT) default
 $("tz").value = [...$("tz").options].some(o=>o.value===TZ) ? TZ : "Africa/Lagos";
@@ -734,7 +743,7 @@ function tradeBubbles(t) {
   }
   out.push(`<div class="bub"><div class="av">C</div><div class="bd">` +
     `<span class="tm">${fmtT(t.entry_time)}</span>` +
-    `<b class="dir ${dir ? "long" : "short"}">${dir ? "▲ LONG" : "▼ SHORT"}</b> @ ${fmtP(t.entry_price)}` +
+    `<span class="pairtag">${curSym}</span><b class="dir ${dir ? "long" : "short"}">${dir ? "▲ LONG" : "▼ SHORT"}</b> @ ${fmtP(t.entry_price)}` +
     `<div class="expl">${t.reason_entry || ""}${t.engine && !(t.reason_entry||"").includes(t.engine) ? " · " + t.engine : ""}</div></div></div>`);
   if (t.exit_time) {
     const win = t.status === "WIN_TP_HIT";
@@ -770,13 +779,14 @@ function zoneBubbles(z) {
     title = `◇ trigger vetoed`;
   } else { title = z.kind; }
   return `<div class="bub sys"><div class="av" style="background:#0d2b3f">${bull ? "▲" : "▼"}</div><div class="bd">` +
-    `<span class="tm">${fmtT(z.ts)}</span><span class="anal">${title}</span>` +
+    `<span class="tm">${fmtT(z.ts)}</span><span class="pairtag">${z.pair || curSym}</span><span class="anal">${title}</span>` +
     `<div class="expl">${expl} · sovereign-v6</div></div></div>`;
 }
 function renderRows() {
   const trades = filtered().map(t => ({ kind: "t", ts: t.entry_time, t }));
   const zones = (filter === "ALL" ? (ZONEV[curSym]||[]) : []).map(z => ({ kind: "z", ts: z.ts, z }));
   const list = trades.concat(zones).sort((a, b) => b.ts - a.ts);
+  $("chatpair").textContent = curSym;
   const pnl = (TRADES[curSym]||[]).reduce((a,t)=>a+(t.net_pnl||0),0);
   $("pnlpill").innerHTML = `P&L <b style="color:${pnl>=0?"var(--green)":"var(--red)"}">${pnl>=0?"+":""}${pnl.toFixed(3)} USDT</b>`;
   if (!list.length) {
@@ -840,7 +850,12 @@ async function selectTrade(tid) {
 $("symbol").onchange = async () => {
   curSym = $("symbol").value; selTrade = null; selZone = null;
   clearReplay();
-  candles2m.clear(); barsDirty = true; VW = {t1:0, t2:0};
+  bindCandles(curSym); VW = {t1:0, t2:0};
+  /* INSTANT (owner 2026-09-16: "if I select eth it should show only its
+     trades") — the chat used to sit on the PREVIOUS pair's trades for the
+     whole candle backfill (10-60s on mobile). Render the new pair NOW;
+     candles backfill behind the render. Old pair's candles stay cached. */
+  renderRows(); draw();
   await bootCandles();
   renderRows(); draw();
 };
@@ -901,6 +916,7 @@ async function bootCandles() {
     catch(e) { $("err").style.display="block"; await new Promise(r=>setTimeout(r,5000)); }
   }
   resize();
+  bindCandles(curSym);
   await bootCandles();
   renderRows(); draw();
   tickLoop();
