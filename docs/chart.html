@@ -406,7 +406,14 @@ function drawOverlay() {
     // span (owner ref 2026-09-16 mock) — green box entry->TP, maroon box
     // SL->entry — plus a star at the candle that actually touched TP/SL.
     if (isSel && t.tp_price > 0 && t.sl_price > 0) {
-      const eY = P(t.entry_price), tpY = P(t.tp_price), slY = P(t.sl_price);
+      // BUGFIX 09-16: priceToCoordinate returns null once a level (e.g. the
+      // 6% kill-switch SL) sits outside the CURRENTLY VISIBLE price scale —
+      // that silently no-op'd the whole fillRect and the box never showed.
+      // Clamp off-scale levels to just past the canvas edge (fillRect clips
+      // naturally) instead of skipping the box.
+      const above = p => p > t.entry_price;
+      const P2 = p => { const y = P(p); return (y == null || Number.isNaN(y)) ? (above(p) ? -60 : wrap.clientHeight + 60) : y; };
+      const eY = P(t.entry_price), tpY = P2(t.tp_price), slY = P2(t.sl_price);
       octx.setLineDash([6,4]); octx.lineWidth = 1.5;
       const loT = Math.min(eY, tpY), hiT = Math.max(eY, tpY);
       octx.fillStyle = "rgba(34,197,94,.16)"; octx.fillRect(xa, loT, xb-xa, hiT-loT);
