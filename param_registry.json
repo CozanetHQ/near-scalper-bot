@@ -247,11 +247,25 @@
    "rationale": "V7-C: every slot occupies the same $3.00 of balance and the pair's live leverage tier (position_leverage, conclusive 14d evidence only) commands the notional: 5x\u2192$15, 10x\u2192$30, 15x\u2192$45, 20x\u2192$60. Proven pairs scale exposure on the same $3 seat; re-tiered-down pairs shrink automatically. TP stays a flat $0.15 hunt net of fees (bigger clip \u2192 closer price target). Supersedes the V7-A FIXED_NOTIONAL_USD/SLOT_COST_MARGIN model where tier upgrades bought headroom, never exposure. HARD_SL_BY_LEV tightens with the tier (20x \u2192 3% price = 60% of slot margin), so added notional never buys added tail risk. Slot count = floor(balance/$3.00)."
   },
   "WIN_TARGET_DOLLARS": {
-   "value": 0.15,
+   "value": 0.2,
    "locked": "2026-09-16",
-   "locked_at": "2026-09-16T11:20:00+00:00",
-   "locked_by": "owner (defined 2026-09-15, wired 2026-09-15, locked a priori with V7-C 2026-09-16)",
-   "rationale": "Owner 2026-09-15: flat $0.15 per-slot win target (was defined 09-07 but never read; wins landed ~$0.05). The entry TP NETS this target: target_frac = WIN_TARGET_DOLLARS/notional + 2\u00d7FEE_RATE, floored by 1.6\u00d7ATR and MIN_TP_DIST_FRAC. V7-C keeps it dollar-flat across leverage tiers \u2014 a 20x clip hunts ~0.37% of price, a 10x clip ~0.62%. Ledger 2026-09-16 (n=157 BE_STOP): median BE trade runs 67% of the TP distance then reverses \u2014 closer targets on higher tiers convert those half-runners."
+   "locked_at": "2026-09-16T14:53:00+00:00",
+   "locked_by": "owner (a priori with V7-D, before any results observed under it)",
+   "rationale": "Owner 2026-09-16: 'still collecting trades at 0.05 \u2014 set the bot's TP to 0.20.' Flat $0.20 PER-TRADE TOTAL: with the V7-D second TP (bank 60% of the clip at 60% of the move), the TP distance is divided by (P*L + 1-P) = 0.76 so a full run (TP1 bank + TP2 remainder) nets $0.20 total. Supersedes the V7-C $0.15 lock (2026-09-16, no results observed under it)."
+  },
+  "PARTIAL_TP_FRAC": {
+   "value": 0.6,
+   "locked": "2026-09-16",
+   "locked_at": "2026-09-16T14:53:00+00:00",
+   "locked_by": "owner (a priori with V7-D)",
+   "rationale": "Owner 2026-09-16: 'set up a second TP at 60% move.' TP1 sits 60% of the way from entry to the full TP; when MFE reaches it, PARTIAL_CLOSE_FRAC of the clip is banked to balance (reason TP1_PARTIAL, maker fee leg) and floor+BE protection is force-armed for the remainder \u2014 'trades that want to go back to BE' exit breakeven with the bank kept."
+  },
+  "PARTIAL_CLOSE_FRAC": {
+   "value": 0.6,
+   "locked": "2026-09-16",
+   "locked_at": "2026-09-16T14:53:00+00:00",
+   "locked_by": "owner (a priori with V7-D)",
+   "rationale": "Owner 2026-09-16: close 60% of the clip at TP1 (the 60%-move second TP), remainder 40% rides to the full $0.20 hunt protected at BE/floor. PARTIAL_CLOSE_FRAC=0 disables partials and restores divisor 1.0 (pre-V7-D behaviour)."
   }
  },
  "known_gaps_not_claimed": [

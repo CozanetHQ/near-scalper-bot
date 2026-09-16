@@ -21,7 +21,9 @@ def serialize_positions(positions, max_positions, default_symbol):
          "me": round(p.get("mae_frac") or 0.0, 6),
          "sc": p.get("advisory_score"), "wr": p.get("wall_ratio"),
          "rg": p.get("regime_at_entry"), "av": p.get("atr_frac_at_entry"),
-         "lv": p.get("leverage") or 10, "hs": p.get("hard_sl") or 0.06}
+         "lv": p.get("leverage") or 10, "hs": p.get("hard_sl") or 0.06,
+         "pd": 1 if p.get("partial_done") else 0, "pp": round(p.get("partial_pnl") or 0.0, 6),
+         "px": p.get("partial_exit_price") or 0}
         for p in positions[:max_positions]
     ]
     return {"last_error": json.dumps(compact, separators=(",", ":"))}
@@ -56,6 +58,9 @@ def parse_positions(state, default_symbol=None):
                     "atr_frac_at_entry": (float(p["av"]) if p.get("av") is not None else None),
                     "leverage": int(p.get("lv") or 10),
                     "hard_sl": float(p.get("hs") or 0.06),
+                    "partial_done": bool(p.get("pd")),
+                    "partial_pnl": float(p.get("pp") or 0.0),
+                    "partial_exit_price": float(p.get("px") or 0.0),
                 })
         except (KeyError, TypeError, ValueError):
             continue

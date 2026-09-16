@@ -53,8 +53,18 @@ TRADES_FILE = os.environ.get("TRADES_FILE", os.path.join(_REPO, "data", "trades.
 ATR_PERIOD = 14
 SL_ATR_MULT = 4.0     # GRID SEARCH WINNER (1152 configs): wide stop, rarely hit
 TP_SL_RATIO = 1.5     # most exits are 20-min drift-capture time stops
-WIN_TARGET_DOLLARS = 0.15  # OWNER 09-15: flat $0.15 per-slot win target. Set WIN_TARGET_PCT>0 to
-                           # switch to percentage-compounding (1.67% of balance: $0.05 at $3, $0.15 at $9)
+WIN_TARGET_DOLLARS = 0.20  # OWNER 09-16: flat $0.20 PER-TRADE total win target (was $0.15 — owner angry at
+                           # $0.05 crumb PROTECTED/BE_STOP exits). "Set the bot's TP to 0.20": the TP distance is
+                           # now sized so a FULL run (TP1 bank + TP2 remainder) nets $0.20; see V7-D below.
+WIN_TARGET_PCT = float(os.environ.get("WIN_TARGET_PCT", "0"))  # 0 = flat WIN_TARGET_DOLLARS (owner 09-15)
+# ── V7-D SECOND TP (owner 2026-09-16): "still collecting trades at 0.05 — set up a
+# second TP at 60% move, trades that want to go back to BE exit breakeven, set TP to 0.20."
+# At 60% of the entry→TP move, bank 60% of the clip (real profit to balance, TP1_PARTIAL);
+# the remaining 40% rides to the full TP with floor+BE protection force-armed, so a
+# reversal exits the remainder at ~breakeven WITH the bank kept — crumbs become banks.
+# Full run total: (P*L + 1-P) x full-clip TP distance = 0.76 x D is sized to $0.20 total.
+PARTIAL_TP_FRAC = float(os.environ.get("PARTIAL_TP_FRAC", "0.60"))     # TP1 sits 60% of the way to TP
+PARTIAL_CLOSE_FRAC = float(os.environ.get("PARTIAL_CLOSE_FRAC", "0.60"))  # close 60% of the clip at TP1
 WIN_TARGET_PCT = float(os.environ.get("WIN_TARGET_PCT", "0"))  # 0 = flat WIN_TARGET_DOLLARS (owner 09-15)
 SLIP_PCT = float(os.environ.get("SLIP_PCT", "0"))  # owner 09-08 stress lab: extra per-side execution cost (slippage/spread/failed fills)
 TRANSITION_GATE = os.environ.get("TRANSITION_GATE", "0")  # owner 09-08: yellow-state — closed 4H vs forming 4H+15m disagree = pause OLD-direction entries  # OWNER 09-08: speak percentages — target = 1.67% of balance (=$0.05 at $3), auto-compounds with the account; 0 = fixed dollars
@@ -711,6 +721,11 @@ def close_position(pos, exit_price, reason, now, balance):
     exit_fee_rate = MAKER_FEE_RATE if (MAKER_EXITS and reason in MAKER_EXIT_REASONS) else FEE_RATE
     fees = notional * (FEE_RATE + exit_fee_rate)
     net = gross - fees - (notional * SLIP_PCT * 2)  # stress: slippage both sides
+    # V7-D partial TP: the bank was already credited to balance at TP1 time; the
+    # LEDGER trade's net_pnl totals both legs so the owner sees the full result
+    # (+$0.20-class wins, not the $0.05 crumbs that made them angry).
+    _part = pos.get("partial_pnl") or 0.0
+    net_total = net + _part
     new_balance = balance + net
     # Owner spec 2026-09-11, principle 2: trade failure (immediately wrong) and
     # target failure (moved substantially toward TP, then failed) are DIFFERENT
@@ -741,7 +756,9 @@ def close_position(pos, exit_price, reason, now, balance):
         "hard_sl": pos.get("hard_sl") or HARD_SL_FRAC,
         "gross_pnl": round(gross, 6),
         "fees": round(fees, 6),
-        "net_pnl": round(net, 6),
+        "net_pnl": round(net_total, 6),
+        "partial_pnl": round(_part, 6),
+        "partial_exit_price": pos.get("partial_exit_price") or 0,
         "reason": reason,
         "balance_after": round(new_balance, 6),
         "aligned": pos.get("aligned", None),
@@ -789,6 +806,8 @@ def registry_check():
             "MARGIN_BUDGET": MARGIN_BUDGET,
             "SLOT_MARGIN_USD": SLOT_MARGIN_USD,
             "WIN_TARGET_DOLLARS": WIN_TARGET_DOLLARS,
+            "PARTIAL_TP_FRAC": PARTIAL_TP_FRAC,
+            "PARTIAL_CLOSE_FRAC": PARTIAL_CLOSE_FRAC,
         }
         mismatches = []
         for k, v in live.items():
@@ -1001,7 +1020,41 @@ def process_tick(state):
             # Events: PROTECTION_ARMED logged once per run per position;
             # PROTECTION_TRIGGERED/PROTECTION_EXIT logged at close with the
             # full evidence trail the owner spec requires.
-            if DYN_FLOOR == "1" and _tp_frac > 0 and _mfe >= PROTECT_ARM_FRAC * _tp_frac:
+            # ── V7-D TP1_PARTIAL — the second TP (owner 2026-09-16). Bank
+            # PARTIAL_CLOSE_FRAC of the clip at PARTIAL_TP_FRAC of the move.
+            # Realized to balance NOW; the ledger trade's net_pnl totals both
+            # legs at final close. Remainder keeps riding to the full TP with
+            # floor+BE protection force-armed below.
+            if (DYN_SL == "1" and DYN_FLOOR == "1" and tp > 0
+                    and not pos.get("partial_done") and _tp_frac > 0
+                    and _mfe >= PARTIAL_TP_FRAC * _tp_frac):
+                _tp1 = (pos["entry_price"] * (1 + PARTIAL_TP_FRAC * _tp_frac)) if is_long \
+                    else (pos["entry_price"] * (1 - PARTIAL_TP_FRAC * _tp_frac))
+                _cn = pos["notional"] * PARTIAL_CLOSE_FRAC
+                _diff = (_tp1 - pos["entry_price"]) if is_long else (pos["entry_price"] - _tp1)
+                _gross = _diff * (_cn / pos["entry_price"])
+                _fees = _cn * (FEE_RATE + MAKER_FEE_RATE)   # resting TP1 fill -> maker exit leg
+                _slip = _cn * SLIP_PCT * 2                    # same stress model as close_position
+                _net = _gross - _fees - _slip
+                balance = balance + _net                      # credited now, once
+                pos["notional"] = pos["notional"] - _cn
+                pos["margin"] = pos["margin"] * (1 - PARTIAL_CLOSE_FRAC)
+                pos["partial_done"] = True
+                pos["partial_pnl"] = round(_net, 6)
+                pos["partial_exit_price"] = round(_tp1, 8)
+                log(
+                    "TP1_PARTIAL " + symbol + " " + pos["side"] +
+                    " entry=" + str(pos["entry_price"]) + " tp1=" + str(round(_tp1, 8)) +
+                    " tp=" + str(tp) + " closed_frac=" + str(PARTIAL_CLOSE_FRAC) +
+                    " realized=" + str(round(_net, 6)) +
+                    " remain_notional=" + str(round(pos["notional"], 6)) + " ts=" + now)
+                _pt(
+                    f"\U0001F3E6 *TP1 — {pos['side'].upper()} banked at the second TP (60% move)*\n"
+                    f"Closed {PARTIAL_CLOSE_FRAC*100:.0f}% of the clip @ ${round(_tp1, 4)} — kept ${_net:.4f}\n"
+                    f"Remainder rides to the ${WIN_TARGET_DOLLARS:.2f} hunt, protected at breakeven"
+                )
+            if DYN_FLOOR == "1" and _tp_frac > 0 and (_mfe >= PROTECT_ARM_FRAC * _tp_frac
+                                                      or pos.get("partial_done")):
                 # clamp to the cost floor (lab floor_frac_of): protection can
                 # NEVER lock a guaranteed loss once fees+slip are paid — at very
                 # tight TP distances the 55% floor sits below costs, so it rides
@@ -1055,7 +1108,7 @@ def process_tick(state):
                             f"PnL ${trade['net_pnl']:.4f} | Balance ${balance:.4f}"
                         )
                         continue
-            if _tp_frac > 0 and _mfe >= BE_TRIGGER_FRAC * _tp_frac:
+            if _tp_frac > 0 and (_mfe >= BE_TRIGGER_FRAC * _tp_frac or pos.get("partial_done")):
                 if is_long:
                     _be = pos["entry_price"] * (1 + BE_BUFFER_FRAC)
                     if price <= _be:
@@ -1264,7 +1317,15 @@ def process_tick(state):
             if safe_on:
                 notional = max(notional * RECOVERY_SIZE_FRAC, 1.0)
             target_usd = WIN_TARGET_PCT * balance if WIN_TARGET_PCT > 0 else WIN_TARGET_DOLLARS
-            target_frac = (target_usd / notional) + FEE_RATE * 2 if not safe_on else 0.0
+            # V7-D: the TP distance is sized so the WHOLE trade (TP1 bank at 60% of the
+            # move on PARTIAL_CLOSE_FRAC of the clip + the remainder riding to TP) nets
+            # target_usd. divisor = P*L + (1-P) = 0.76 at the owner's 60/60 config; = 1.0
+            # with PARTIAL_CLOSE_FRAC=0 (partial off, old behaviour).
+            _pdiv = PARTIAL_CLOSE_FRAC * PARTIAL_TP_FRAC + (1 - PARTIAL_CLOSE_FRAC)
+            # leg cost model, exactly as the legs charge it: entry taker on the
+            # full clip + maker exit legs + slip both sides per leg.
+            _legcost = FEE_RATE + MAKER_FEE_RATE + 2 * SLIP_PCT
+            target_frac = (target_usd / notional + _legcost) / _pdiv if not safe_on else 0.0
             tp_dist = max(SCALP_TP_ATR * (atr or 0.003 * price), MIN_TP_DIST_FRAC * price,
                           target_frac * price)
             entry_tp_dist = tp_dist
