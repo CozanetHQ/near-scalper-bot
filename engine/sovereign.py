@@ -38,6 +38,15 @@ import json
 import os
 from datetime import datetime, timezone
 
+
+def _zone_event(symbol, ts, kind, side, **kw):
+    """Owner 2026-09-16: maker-zone lifecycle events -> execution chat."""
+    try:
+        from engine import ui_store
+        ui_store.record_zone_event(symbol, ts, kind, side, **kw)
+    except Exception:
+        pass
+
 from engine import live as LIVE_EXEC
 
 # ── locked parameters (spec + lab report) ───────────────────────────────────
@@ -427,6 +436,9 @@ def process_pair(state):
                 # up to 15 min before arming fires at the arming candle)
                 sv = {"phase": "ARMED", "dir": d, "armed_ms": ts, "sweep_scan_ms": ts - 900_000, "walk_ms": ts}
                 action, details = "armed", f"{d} FVG zone"
+                _az = find_zone(bull_zones if d == "bull" else bear_zones, ts, px) or {}
+                _zone_event(symbol, ts, "fvg_zone", d, fvg_top=_az.get("high"),
+                            fvg_bottom=_az.get("low"), note="1H imbalance zone armed")
             else:
                 sv["walk_ms"] = ts
             continue
@@ -436,6 +448,7 @@ def process_pair(state):
         if sv.get("phase") == "ARMED" and not in_zone and ts - sv.get("armed_ms", ts) > READY_TIMEOUT_H * 3600_000:
             sv = {"phase": "FLAT", "walk_ms": ts}
             action, details = "expired", "armed timeout"
+            _zone_event(symbol, ts, "expired", sv.get("dir") or d, note="armed timeout")
             continue
 
         # gate 3 — 15m sweep: scan each closed 15m candle EXACTLY once.
@@ -456,6 +469,8 @@ def process_pair(state):
                                        "swept_level": ref})
                             _pt(f"sovereign READY — 15m sweep @ {ref:.6g} reclosed ({d})")
                             action, details = "ready", "15m sweep"
+                            _zone_event(symbol, ts, "sweep", d, level=ref,
+                                        note="15m liquidity sweep reclosed")
                         elif sv.get("swept_level") is not None and c15c["close"] < sv["swept_level"]:
                             sv.update({"phase": "ARMED", "swept_level": None})
                 else:
@@ -467,6 +482,8 @@ def process_pair(state):
                                        "swept_level": ref})
                             _pt(f"sovereign READY — 15m sweep @ {ref:.6g} reclosed ({d})")
                             action, details = "ready", "15m sweep"
+                            _zone_event(symbol, ts, "sweep", d, level=ref,
+                                        note="15m liquidity sweep reclosed")
                         elif sv.get("swept_level") is not None and c15c["close"] > sv["swept_level"]:
                             sv.update({"phase": "ARMED", "swept_level": None})
             sv["walk_ms"] = ts
@@ -479,6 +496,7 @@ def process_pair(state):
         if ts - sv.get("sweep_ms", ts) > SWEEP_VALID_H * 3600_000:
             sv.update({"phase": "ARMED", "swept_level": None, "walk_ms": ts})
             action, details = "expired", "sweep validity"
+            _zone_event(symbol, ts, "expired", d, note="sweep validity window elapsed")
             continue
 
         # gate 4 — CHOCH beyond the post-sweep pullback fractal
@@ -506,6 +524,8 @@ def process_pair(state):
             sv.update({"phase": "ARMED", "swept_level": None, "walk_ms": ts})
             _pt(f"sovereign trigger vetoed: ATR {atr_frac*100:.3f}% below friction floor {ATR_FLOOR*100:.1f}%")
             action, details = "veto", "ATR below friction floor"
+            _zone_event(symbol, ts, "veto", d, level=level,
+                        note=f"ATR {atr_frac*100:.3f}% below friction floor")
             continue
 
         # L2 imbalance gate (spec: approved ONLY if I_L2 >= 1.5)
@@ -514,6 +534,8 @@ def process_pair(state):
             if ratio is not None and ratio < L2_MIN:
                 sv["walk_ms"] = ts
                 action, details = "veto-l2", f"I_L2 {ratio:.2f} < {L2_MIN}"
+                _zone_event(symbol, ts, "veto", d, level=level,
+                            note=f"L2 imbalance {ratio:.2f} < {L2_MIN}")
                 continue
 
         if live_mode:
@@ -523,6 +545,10 @@ def process_pair(state):
             ok, msg = _live_place(T, live_cli, symbol, d, level, atr_frac, equity, sv, iso, _pt)
             if ok:
                 action, details = "armed-limit-live", f"live retest limit @ {level}"
+                _zone_event(symbol, ts, "choch_limit", d, level=level,
+                            fvg_top=_z.get("high"), fvg_bottom=_z.get("low"),
+                            sweep_price=sv.get("swept_level") or level,
+                            note="POST_ONLY retest limit armed (live)")
             else:
                 sv.update({"phase": "ARMED", "swept_level": None})
                 action, details = "skip-live", msg
@@ -542,6 +568,10 @@ def process_pair(state):
         sv["walk_ms"] = ts
         action, details = "armed-limit", f"retest limit @ {level}"
         _pt(f"sovereign TRIGGER {d}: POST_ONLY retest limit @ {level:.6g} (3h expiry, ATR {atr_frac*100:.3f}%)")
+        _zone_event(symbol, ts, "choch_limit", d, level=level,
+                    fvg_top=zone.get("high"), fvg_bottom=zone.get("low"),
+                    sweep_price=sv.get("swept_level") or level,
+                    note="POST_ONLY retest limit armed (3h expiry)")
         continue
 
     # ── live-price touch checks between candle closes (intra-tick safety;

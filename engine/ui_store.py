@@ -41,6 +41,20 @@ CREATE TABLE IF NOT EXISTS trades (
     engine      TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_trades_symbol_time ON trades(symbol, entry_time);
+CREATE TABLE IF NOT EXISTS zone_events (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    symbol      TEXT NOT NULL,
+    ts          INTEGER NOT NULL,
+    kind        TEXT NOT NULL,
+    side        TEXT,
+    level       REAL,
+    fvg_top     REAL,
+    fvg_bottom  REAL,
+    sweep_price REAL,
+    note        TEXT,
+    engine      TEXT DEFAULT 'sovereign-v6'
+);
+CREATE INDEX IF NOT EXISTS idx_zone_symbol_ts ON zone_events(symbol, ts);
 """
 
 
@@ -114,6 +128,25 @@ def _reason_exit_of(reason):
     return "MAKER_TP_FILLED" if reason == "TP" else "SL_TAKER_STOP"
 
 
+def record_zone_event(symbol, ts_ms, kind, side, level=None, fvg_top=None,
+                      fvg_bottom=None, sweep_price=None, note=None,
+                      engine="sovereign-v6"):
+    """Engine hook: every maker-zone lifecycle event (FVG zone armed, 15m
+    sweep, CHOCH POST_ONLY limit armed, expiry/veto) lands here so the
+    execution chat can show what the maker saw, when it saw it."""
+    try:
+        ts = int(ts_ms / 1000) if (ts_ms or 0) > 1e11 else int(ts_ms or 0)
+        with _LOCK, _con() as con:
+            con.execute(
+                """INSERT INTO zone_events
+                   (symbol, ts, kind, side, level, fvg_top, fvg_bottom,
+                    sweep_price, note, engine) VALUES (?,?,?,?,?,?,?,?,?,?)""",
+                (symbol, ts, kind, side, level, fvg_top, fvg_bottom,
+                 sweep_price, note, engine))
+    except Exception:
+        pass
+
+
 def record_trade(tr):
     """Hook for the sync() choke point: every CLOSED trade from every engine
     (v5 + sovereign) lands here. Sovereign rows were opened via record_open —
@@ -181,7 +214,18 @@ def export_ui_json():
                           reason_entry, reason_exit, fvg_top, fvg_bottom,
                           sweep_price, net_pnl, engine
                    FROM trades ORDER BY entry_time""").fetchall()
+        zrows = con.execute(
+            """SELECT symbol, ts, kind, side, level, fvg_top, fvg_bottom,
+                      sweep_price, note
+               FROM zone_events ORDER BY ts""").fetchall()
         out = {}
+        zout = {}
+        for z in zrows:
+            zout.setdefault(_pair_fmt(z[0]), []).append({
+                "id": f"z{z[1]}-{z[3] or ''}-{z[2]}", "ts": z[1], "kind": z[2],
+                "side": z[3], "level": z[4], "fvg_top": z[5], "fvg_bottom": z[6],
+                "sweep_price": z[7], "note": z[8],
+            })
         for r in rows:
             (tid, symbol, direction, entry_time, entry_price, tp, sl,
              exit_time, exit_price, status, reason_entry, reason_exit,
@@ -200,6 +244,7 @@ def export_ui_json():
         payload = {
             "updated": datetime.now(timezone.utc).isoformat(),
             "symbols": out,
+            "zones": zout,
         }
         os.makedirs(os.path.dirname(UI_JSON), exist_ok=True)
         with open(UI_JSON, "w") as f:

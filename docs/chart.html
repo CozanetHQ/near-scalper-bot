@@ -213,7 +213,7 @@ const candles = chart.addCandlestickSeries({
 const overlay = $("overlay"), octx = overlay.getContext("2d");
 
 /* state */
-let TRADES = {}, symbols = [], curSym = null, filter = "ALL", selTrade = null;
+let TRADES = {}, ZONEV = {}, symbols = [], curSym = null, filter = "ALL", selTrade = null, selZone = null;
 const candles2m = new Map();          // ts -> {open,high,low,close}
 let TZ = localStorage.getItem("cozy.tz") || "Africa/Lagos";   // owner: NG (WAT) default
 $("tz").value = [...$("tz").options].some(o=>o.value===TZ) ? TZ : "Africa/Lagos";
@@ -225,6 +225,7 @@ async function loadTrades() {
   if (!r.ok) throw new Error("trades_ui.json " + r.status);
   const j = await r.json();
   TRADES = j.symbols || {};
+  ZONEV = j.zones || {};
   const prev = curSym;
   symbols = Object.keys(TRADES).sort();
   const sel = $("symbol");
@@ -355,6 +356,7 @@ function drawOverlay() {
   const ts = chart.timeScale();
   const nowS = Math.floor(Date.now()/1000);
   const list = filtered().slice(-120);                       // perf cap
+  const selZ = selZone && (ZONEV[curSym]||[]).find(x => x.id === selZone);
   if (selTrade) {  // selected trade must always show its zones, even beyond the cap
     const st = (TRADES[curSym]||[]).find(x => x.trade_id === selTrade);
     if (st && !list.includes(st)) list.push(st);
@@ -406,6 +408,34 @@ function drawOverlay() {
       octx.fillStyle="rgba(245,158,11,.9)"; octx.fillText("SWEEP", sx1+4, sy-4);
     }
   }
+  if (selZ) {
+    const P = p => candles.priceToCoordinate(p);
+    const xs = ts.timeToCoordinate(selZ.ts);
+    const x0 = xs === null ? 0 : xs, x1 = wrap.clientWidth;
+    if (selZ.fvg_top != null && selZ.fvg_bottom != null) {
+      const yT = P(selZ.fvg_top), yB = P(selZ.fvg_bottom);
+      if (yT !== null && yB !== null) {
+        const yLo = Math.min(yT, yB);
+        octx.fillStyle = "rgba(0,206,202,.13)";
+        octx.fillRect(x0, yLo, x1-x0, Math.abs(yT-yB));
+        octx.strokeStyle = "rgba(0,206,202,.55)"; octx.lineWidth = 1;
+        octx.strokeRect(x0, yLo, x1-x0, Math.abs(yT-yB));
+        octx.fillStyle = "rgba(0,206,202,.95)"; octx.font = "600 10px -apple-system,sans-serif";
+        octx.fillText("FVG", x0+6, yLo-3);
+      }
+    }
+    for (const [lv, lbl, col] of [[selZ.level, "CHOCH", "rgba(231,236,243,.8)"],
+                                  [selZ.sweep_price, "SWEEP", "rgba(255,210,0,.85)"]]) {
+      if (lv == null) continue;
+      const y = P(lv);
+      if (y === null) continue;
+      octx.strokeStyle = col; octx.setLineDash([5,4]); octx.lineWidth = 1;
+      octx.beginPath(); octx.moveTo(x0, y); octx.lineTo(x1, y); octx.stroke();
+      octx.setLineDash([]);
+      octx.fillStyle = col; octx.font = "600 10px -apple-system,sans-serif";
+      octx.fillText(lbl, x0+6, y-3);
+    }
+  }
 }
 
 /* ── sidebar rows ── */
@@ -447,8 +477,35 @@ function tradeBubbles(t) {
   return out.join("");
 }
 
+function zoneBubbles(z) {
+  const bull = z.side === "bull";
+  let title, expl = z.note || "";
+  if (z.kind === "fvg_zone") {
+    title = `FVG ZONE ${z.fvg_bottom?fmtP(z.fvg_bottom):"?"}–${z.fvg_top?fmtP(z.fvg_top):"?"} armed`;
+    expl = `1H ${bull ? "bullish" : "bearish"} imbalance zone · watching for sweep`;
+  } else if (z.kind === "sweep") {
+    title = `SWEEP @ ${fmtP(z.level)} reclosed`;
+    expl = `15m ${bull ? "lows swept" : "highs swept"} and reclaimed · READY`;
+  } else if (z.kind === "choch_limit") {
+    title = `MAKER LIMIT @ ${fmtP(z.level)}`;
+    const bits = [];
+    if (z.fvg_bottom && z.fvg_top) bits.push(`FVG ${fmtP(z.fvg_bottom)}–${fmtP(z.fvg_top)}`);
+    if (z.sweep_price) bits.push(`sweep ${fmtP(z.sweep_price)}`);
+    expl = `${bits.join(" · ")} · ${z.note || "POST_ONLY"} · waiting for retest fill`;
+  } else if (z.kind === "expired") {
+    title = `◇ zone expired`;
+  } else if (z.kind === "veto") {
+    title = `◇ trigger vetoed`;
+  } else { title = z.kind; }
+  return `<div class="bub sys"><div class="av" style="background:#0d2b3f">${bull ? "▲" : "▼"}</div><div class="bd">` +
+    `<span class="tm">${fmtT(z.ts)}</span><span class="anal">${title}</span>` +
+    `<div class="expl">${expl} · sovereign-v6</div></div></div>`;
+}
+
 function renderRows() {
-  const list = filtered().slice().reverse();
+  const trades = filtered().map(t => ({ kind: "t", ts: t.entry_time, t }));
+  const zones = (filter === "ALL" ? (ZONEV[curSym]||[]) : []).map(z => ({ kind: "z", ts: z.ts, z }));
+  const list = trades.concat(zones).sort((a, b) => b.ts - a.ts);
   const pnl = (TRADES[curSym]||[]).reduce((a,t)=>a+(t.net_pnl||0),0);
   $("pnlpill").innerHTML = `P&L <b style="color:${pnl>=0?"var(--green)":"var(--red)"}">${pnl>=0?"+":""}${pnl.toFixed(3)} USDT</b>`;
   if (!list.length) {
@@ -456,20 +513,47 @@ function renderRows() {
     renderMarkers(); return;
   }
   let html = "", lastDay = "";
-  for (const t of list) {
-    const d = dayFmt.format(new Date(t.entry_time*1000));
+  for (const it of list) {
+    const d = dayFmt.format(new Date(it.ts * 1000));
     if (d !== lastDay) { html += `<div class="day">${d}</div>`; lastDay = d; }
-    html += `<div class="tgroup${t.trade_id === selTrade ? " sel" : ""}" data-tid="${t.trade_id}">` +
-            tradeBubbles(t) + `</div>`;
+    if (it.kind === "t") {
+      const t = it.t;
+      html += `<div class="tgroup${t.trade_id === selTrade ? " sel" : ""}" data-tid="${t.trade_id}">` +
+              tradeBubbles(t) + `</div>`;
+    } else {
+      const z = it.z;
+      html += `<div class="tgroup${z.id === selZone ? " sel" : ""}" data-zid="${z.id}">` +
+              zoneBubbles(z) + `</div>`;
+    }
   }
   $("rows").innerHTML = html;
-  document.querySelectorAll(".tgroup").forEach(el => el.onclick = () => selectTrade(el.dataset.tid));
+  document.querySelectorAll(".tgroup[data-tid]").forEach(el => el.onclick = () => selectTrade(el.dataset.tid));
+  document.querySelectorAll(".tgroup[data-zid]").forEach(el => el.onclick = () => selectZone(el.dataset.zid));
   renderMarkers();
+}
+
+async function selectZone(zid) {
+  try {
+  const z = (ZONEV[curSym]||[]).find(x => x.id === zid);
+  if (!z) return;
+  selZone = zid; selTrade = null;
+  clearReplay();
+  await ensureCandles(z.ts - 7200, z.ts + 7200);
+  chart.timeScale().setVisibleRange({
+    from: Math.max(0, z.ts - 5400),
+    to: z.ts + 2700,
+  });
+  renderRows(); drawOverlay();
+  if (window.innerWidth<=920) $("aside").classList.remove("open");
+  } catch (e) {
+    const b = document.getElementById("err");
+    if (b) { b.textContent = "Zone replay error: " + (e.message || e); b.style.display = "block"; }
+  }
 }
 
 async function selectTrade(tid) {
   try {
-  selTrade = tid;
+  selTrade = tid; selZone = null;
   const t = (TRADES[curSym]||[]).find(x=>x.trade_id===tid);
   if (!t) return;
   await ensureCandles(t.entry_time, t.exit_time||Math.floor(Date.now()/1000));
@@ -492,7 +576,7 @@ async function selectTrade(tid) {
 
 /* ── wiring ── */
 $("symbol").onchange = async () => {
-  curSym = $("symbol").value; selTrade = null;
+  curSym = $("symbol").value; selTrade = null; selZone = null;
   clearReplay();
   candles2m.clear();
   try { await ensureCandles(Math.floor(Date.now()/1000)-86400, Math.floor(Date.now()/1000)); }
