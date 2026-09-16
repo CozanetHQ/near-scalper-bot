@@ -388,115 +388,124 @@ function drawOverlay() {
   octx.setTransform(dpr,0,0,dpr,0,0);
   octx.clearRect(0,0,wrap.clientWidth,wrap.clientHeight);
   const ts = chart.timeScale();
-  const nowS = Math.floor(Date.now()/1000);
-  const list = filtered().slice(-120);                       // perf cap
+  const H = wrap.clientHeight;
+
+  // CLEAN REBUILD (owner 2026-09-16): unselected trades draw NOTHING on
+  // the canvas — only their lightweight-charts entry/exit markers. All
+  // the old per-trade bands/FVG/sweep clutter made the chart unreadable.
+  // The selected trade gets the reference-mock treatment: dashed TP/SL
+  // zone boxes + entry dot + touch star + FVG band + sweep line.
+  const selT = selTrade && (TRADES[curSym]||[]).find(x => x.trade_id === selTrade);
+  if (selT) drawTradeZones(selT, ts);
+
   const selZ = selZone && (ZONEV[curSym]||[]).find(x => x.id === selZone);
-  if (selTrade) {  // selected trade must always show its zones, even beyond the cap
-    const st = (TRADES[curSym]||[]).find(x => x.trade_id === selTrade);
-    if (st && !list.includes(st)) list.push(st);
-  }
-  for (const t of list) {
-    const endT = (t.exit_time||nowS) + (t.exit_time?0:900);
-    const x1 = ts.timeToCoordinate(t.entry_time), x2 = ts.timeToCoordinate(endT);
-    if (x2 === null || x1 === null) { if (x1===null && x2===null) continue; }
-    const xa = x1===null?0:x1, xb = x2===null?wrap.clientWidth:x2;
-    const P = p => candles.priceToCoordinate(p);
-    const isSel = selTrade && t.trade_id === selTrade;
-    // Selected trade: dashed-border TP/SL zone boxes clipped to the trade
-    // span (owner ref 2026-09-16 mock) — green box entry->TP, maroon box
-    // SL->entry — plus a star at the candle that actually touched TP/SL.
-    if (isSel && t.tp_price > 0 && t.sl_price > 0) {
-      // BUGFIX 09-16: priceToCoordinate returns null once a level (e.g. the
-      // 6% kill-switch SL) sits outside the CURRENTLY VISIBLE price scale —
-      // that silently no-op'd the whole fillRect and the box never showed.
-      // Clamp off-scale levels to just past the canvas edge (fillRect clips
-      // naturally) instead of skipping the box.
-      const above = p => p > t.entry_price;
-      const P2 = p => { const y = P(p); return (y == null || Number.isNaN(y)) ? (above(p) ? -60 : wrap.clientHeight + 60) : y; };
-      const eY = P(t.entry_price), tpY = P2(t.tp_price), slY = P2(t.sl_price);
-      octx.setLineDash([6,4]); octx.lineWidth = 1.5;
-      const loT = Math.min(eY, tpY), hiT = Math.max(eY, tpY);
-      octx.fillStyle = "rgba(34,197,94,.16)"; octx.fillRect(xa, loT, xb-xa, hiT-loT);
-      octx.strokeStyle = "rgba(34,197,94,.75)"; octx.strokeRect(xa, loT, xb-xa, hiT-loT);
-      const loS = Math.min(eY, slY), hiS = Math.max(eY, slY);
-      octx.fillStyle = "rgba(127,29,29,.32)"; octx.fillRect(xa, loS, xb-xa, hiS-loS);
-      octx.strokeStyle = "rgba(239,68,68,.75)"; octx.strokeRect(xa, loS, xb-xa, hiS-loS);
-      octx.setLineDash([]);
-      // entry dot (blue, matches the reference mock's filled circle)
-      octx.fillStyle = "#2979ff";
-      octx.beginPath(); octx.arc(xa, eY, 4, 0, Math.PI*2); octx.fill();
-      // star/x at the candle that actually touched TP or SL
-      const win = t.exit_time && (t.net_pnl || 0) >= 0;
-      const touch = win ? findTouch(t, t.tp_price, t.direction === "LONG")
-                         : (t.exit_time ? findTouch(t, t.sl_price, t.direction !== "LONG") : null);
-      if (touch) {
-        const tx = ts.timeToCoordinate(touch.ts), ty = P(touch.price);
-        if (tx !== null && ty !== null) {
-          octx.font = "16px -apple-system,sans-serif";
-          octx.fillStyle = win ? "#2dd4a7" : "#f4645f";
-          octx.textAlign = "center"; octx.textBaseline = "middle";
-          octx.fillText(win ? "★" : "✕", tx, ty);
-          octx.textAlign = "left"; octx.textBaseline = "alphabetic";
-        }
+  if (selZ) drawZoneEvent(selZ, ts);
+}
+
+// off-scale levels (priceToCoordinate -> null) clamp just past the canvas
+// edge; fillRect/strokeRect clip naturally so the box still reads.
+function yOf(p, entry, H) {
+  const y = candles.priceToCoordinate(p);
+  return (y == null || Number.isNaN(y)) ? (p > entry ? -60 : H + 60) : y;
+}
+
+function drawTradeZones(t, ts) {
+  const wrap = $("chartwrap"), H = wrap.clientHeight, W = wrap.clientWidth;
+  const nowS = Math.floor(Date.now()/1000);
+  const endT = (t.exit_time||nowS) + (t.exit_time?0:900);
+  let xa = ts.timeToCoordinate(t.entry_time), xb = ts.timeToCoordinate(endT);
+  if (xa === null && xb === null) return;
+  if (xa === null) xa = 0;
+  if (xb === null) xb = W;
+  const eY = yOf(t.entry_price, t.entry_price, H);
+  const win = t.exit_time && (t.net_pnl || 0) >= 0;
+
+  if (t.tp_price > 0 && t.sl_price > 0) {
+    const tpY = yOf(t.tp_price, t.entry_price, H);
+    const slY = yOf(t.sl_price, t.entry_price, H);
+    octx.setLineDash([6,4]); octx.lineWidth = 1.5;
+    // TP zone (green, entry -> TP)
+    const loT = Math.min(eY,tpY), hiT = Math.max(eY,tpY);
+    octx.fillStyle = "rgba(34,197,94,.15)"; octx.fillRect(xa, loT, xb-xa, hiT-loT);
+    octx.strokeStyle = "rgba(34,197,94,.8)"; octx.strokeRect(xa, loT, xb-xa, hiT-loT);
+    // SL zone (maroon, SL -> entry)
+    const loS = Math.min(eY,slY), hiS = Math.max(eY,slY);
+    octx.fillStyle = "rgba(127,29,29,.35)"; octx.fillRect(xa, loS, xb-xa, hiS-loS);
+    octx.strokeStyle = "rgba(244,100,95,.8)"; octx.strokeRect(xa, loS, xb-xa, hiS-loS);
+    octx.setLineDash([]);
+    octx.font = "700 10px -apple-system,sans-serif";
+    octx.fillStyle = "rgba(34,197,94,.95)"; octx.fillText("TP", xa+6, loT-4 < 0 ? hiT+12 : loT-4);
+    octx.fillStyle = "rgba(244,100,95,.95)"; octx.fillText("SL", xa+6, loS-4 < 0 ? hiS+12 : loS-4);
+    // star / x at the candle that actually touched TP or SL
+    const touch = win ? findTouch(t, t.tp_price, t.direction === "LONG")
+                       : (t.exit_time ? findTouch(t, t.sl_price, t.direction !== "LONG") : null);
+    if (touch) {
+      const tx = ts.timeToCoordinate(touch.ts), ty = yOf(touch.price, t.entry_price, H);
+      if (tx !== null && ty !== null && ty >= 0 && ty <= H) {
+        octx.font = "15px -apple-system,sans-serif"; octx.textAlign = "center"; octx.textBaseline = "middle";
+        octx.fillStyle = win ? "#2dd4a7" : "#f4645f";
+        octx.fillText(win ? "★" : "✕", tx, ty);
+        octx.textAlign = "left"; octx.textBaseline = "alphabetic";
       }
     }
-    const solid = t.tp_price>0 && t.sl_price>0 && !isSel;
-    if (solid) {
-      const eY=P(t.entry_price), tpY=P(t.tp_price), slY=P(t.sl_price);
-      const lo = Math.min(eY,tpY), hi=Math.max(eY,tpY);
-      octx.fillStyle = "rgba(34,197,94,.14)"; octx.fillRect(xa,lo,xb-xa,hi-lo);
-      octx.strokeStyle = "rgba(34,197,94,.55)"; octx.lineWidth=1; octx.strokeRect(xa,lo,xb-xa,hi-lo);
-      const lo2=Math.min(eY,slY), hi2=Math.max(eY,slY);
-      octx.fillStyle = "rgba(239,68,68,.12)"; octx.fillRect(xa,lo2,xb-xa,hi2-lo2);
-      octx.strokeStyle = "rgba(239,68,68,.5)"; octx.strokeRect(xa,lo2,xb-xa,hi2-lo2);
-      octx.fillStyle = "rgba(231,236,243,.75)"; octx.font="600 10px -apple-system,sans-serif";
-      octx.fillText("TP", xb-24, lo-3); octx.fillText("SL", xb-24, hi2+11);
-    }
-    if (t.fvg_top!=null && t.fvg_bottom!=null) {
-      const fx1 = ts.timeToCoordinate(t.entry_time - 3600*2) ?? xa;
-      const fy1=P(t.fvg_top), fy2=P(t.fvg_bottom);
-      const lo=Math.min(fy1,fy2), hi=Math.max(fy1,fy2);
-      octx.fillStyle="rgba(0,206,202,.13)"; octx.fillRect(fx1,lo,xb-fx1,hi-lo);
-      octx.strokeStyle="rgba(0,206,202,.5)"; octx.setLineDash([]);
-      octx.strokeRect(fx1,lo,xb-fx1,hi-lo);
-      octx.fillStyle="rgba(0,206,202,.85)"; octx.fillText("FVG", fx1+5, lo+11);
-      octx.setLineDash([]);
-    }
-    if (t.sweep_price!=null) {
-      const sy=P(t.sweep_price);
-      const sx1 = ts.timeToCoordinate(t.entry_time-1800) ?? xa;
-      octx.strokeStyle="rgba(245,158,11,.8)"; octx.setLineDash([4,4]); octx.lineWidth=1.5;
-      octx.beginPath(); octx.moveTo(sx1,sy); octx.lineTo(xb,sy); octx.stroke(); octx.setLineDash([]);
-      octx.fillStyle="rgba(245,158,11,.9)"; octx.fillText("SWEEP", sx1+4, sy-4);
+  }
+  // entry dot
+  if (eY >= 0 && eY <= H) {
+    octx.fillStyle = "#2979ff";
+    octx.beginPath(); octx.arc(xa, eY, 4, 0, Math.PI*2); octx.fill();
+  }
+  // FVG band for this trade (teal, ends at entry)
+  if (t.fvg_top != null && t.fvg_bottom != null) {
+    const fx1 = ts.timeToCoordinate(t.entry_time - 3600*2);
+    const fy1 = yOf(t.fvg_top, t.entry_price, H), fy2 = yOf(t.fvg_bottom, t.entry_price, H);
+    const lo = Math.min(fy1,fy2), hi = Math.max(fy1,fy2);
+    const x0 = fx1 === null ? 0 : fx1;
+    octx.fillStyle = "rgba(0,206,202,.12)"; octx.fillRect(x0, lo, xa-x0, hi-lo);
+    octx.strokeStyle = "rgba(0,206,202,.55)"; octx.lineWidth = 1; octx.strokeRect(x0, lo, xa-x0, hi-lo);
+    octx.fillStyle = "rgba(0,206,202,.9)"; octx.font = "700 10px -apple-system,sans-serif";
+    octx.fillText("FVG", x0+5, lo+12);
+  }
+  // liquidity sweep line (amber dashed, 30m before entry)
+  if (t.sweep_price != null) {
+    const sy = yOf(t.sweep_price, t.entry_price, H);
+    const sx1 = ts.timeToCoordinate(t.entry_time-1800);
+    const x0 = sx1 === null ? 0 : sx1;
+    if (sy >= 0 && sy <= H) {
+      octx.strokeStyle = "rgba(245,158,11,.85)"; octx.setLineDash([4,4]); octx.lineWidth = 1.5;
+      octx.beginPath(); octx.moveTo(x0,sy); octx.lineTo(xa,sy); octx.stroke(); octx.setLineDash([]);
+      octx.fillStyle = "rgba(245,158,11,.9)"; octx.font = "700 10px -apple-system,sans-serif";
+      octx.fillText("SWEEP", x0+4, sy-5);
     }
   }
-  if (selZ) {
-    const P = p => candles.priceToCoordinate(p);
-    const xs = ts.timeToCoordinate(selZ.ts);
-    const x0 = xs === null ? 0 : xs, x1 = wrap.clientWidth;
-    if (selZ.fvg_top != null && selZ.fvg_bottom != null) {
-      const yT = P(selZ.fvg_top), yB = P(selZ.fvg_bottom);
-      if (yT !== null && yB !== null) {
-        const yLo = Math.min(yT, yB);
-        octx.fillStyle = "rgba(0,206,202,.13)";
-        octx.fillRect(x0, yLo, x1-x0, Math.abs(yT-yB));
-        octx.strokeStyle = "rgba(0,206,202,.55)"; octx.lineWidth = 1;
-        octx.strokeRect(x0, yLo, x1-x0, Math.abs(yT-yB));
-        octx.fillStyle = "rgba(0,206,202,.95)"; octx.font = "600 10px -apple-system,sans-serif";
-        octx.fillText("FVG", x0+6, yLo-3);
-      }
+}
+
+function drawZoneEvent(z, ts) {
+  const wrap = $("chartwrap"), H = wrap.clientHeight, W = wrap.clientWidth;
+  const P = p => candles.priceToCoordinate(p);
+  const xs = ts.timeToCoordinate(z.ts);
+  const x0 = xs === null ? 0 : xs, x1 = W;
+  if (z.fvg_top != null && z.fvg_bottom != null) {
+    const yT = P(z.fvg_top), yB = P(z.fvg_bottom);
+    if (yT !== null && yB !== null) {
+      const yLo = Math.min(yT, yB);
+      octx.fillStyle = "rgba(0,206,202,.13)";
+      octx.fillRect(x0, yLo, x1-x0, Math.abs(yT-yB));
+      octx.strokeStyle = "rgba(0,206,202,.55)"; octx.lineWidth = 1;
+      octx.strokeRect(x0, yLo, x1-x0, Math.abs(yT-yB));
+      octx.fillStyle = "rgba(0,206,202,.95)"; octx.font = "700 10px -apple-system,sans-serif";
+      octx.fillText("FVG", x0+6, yLo-3);
     }
-    for (const [lv, lbl, col] of [[selZ.level, "CHOCH", "rgba(231,236,243,.8)"],
-                                  [selZ.sweep_price, "SWEEP", "rgba(255,210,0,.85)"]]) {
-      if (lv == null) continue;
-      const y = P(lv);
-      if (y === null) continue;
-      octx.strokeStyle = col; octx.setLineDash([5,4]); octx.lineWidth = 1;
-      octx.beginPath(); octx.moveTo(x0, y); octx.lineTo(x1, y); octx.stroke();
-      octx.setLineDash([]);
-      octx.fillStyle = col; octx.font = "600 10px -apple-system,sans-serif";
-      octx.fillText(lbl, x0+6, y-3);
-    }
+  }
+  for (const [lv, lbl, col] of [[z.level, "CHOCH", "rgba(231,236,243,.8)"],
+                                [z.sweep_price, "SWEEP", "rgba(255,210,0,.85)"]]) {
+    if (lv == null) continue;
+    const y = P(lv);
+    if (y === null) continue;
+    octx.strokeStyle = col; octx.setLineDash([5,4]); octx.lineWidth = 1;
+    octx.beginPath(); octx.moveTo(x0, y); octx.lineTo(x1, y); octx.stroke();
+    octx.setLineDash([]);
+    octx.fillStyle = col; octx.font = "700 10px -apple-system,sans-serif";
+    octx.fillText(lbl, x0+6, y-3);
   }
 }
 
