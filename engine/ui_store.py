@@ -131,6 +131,18 @@ def record_trade(tr):
         if tid:
             cur = record_close(tid, tr.get("closed_at"), tr.get("exit_price"),
                                status, _reason_exit_of(reason), tr.get("net_pnl"))
+        # Owner 2026-09-16: v5 trades record TP distance (tp_frac) and the
+        # locked kill switch (hard_sl) as fractions, not prices — derive the
+        # prices so the chart can draw the TP zone and kill-switch line.
+        _entry = tr.get("entry_price") or 0
+        _long = side == "LONG"
+        _tp = tr.get("tp_price") or 0
+        if (not _tp) and _entry and tr.get("tp_frac"):
+            _tp = round(_entry * (1 + (tr["tp_frac"] if _long else -tr["tp_frac"])), 6)
+        _sl = tr.get("sl_price") or 0
+        if (not _sl) and _entry and tr.get("hard_sl"):
+            _sl = round(_entry * (1 - (tr["hard_sl"] if _long else -tr["hard_sl"])), 6)
+        tr = {**tr, "tp_price": _tp, "sl_price": _sl}
         if not tid:
             with _LOCK, _con() as con:
                 exists = con.execute(
