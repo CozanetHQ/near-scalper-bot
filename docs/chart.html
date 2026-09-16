@@ -511,7 +511,8 @@ $("tz").onchange = () => {
 };
 $("replaybtn").addEventListener("click", () => {
   const list = TRADES[curSym] || [];
-  const tid = selTrade || (list.length ? list[0].trade_id : null);
+  const latest = list[list.length - 1];   // arrays are oldest-first
+  const tid = selTrade || (latest ? latest.trade_id : null);
   if (tid) selectTrade(tid);
 });
 $("sbClear").addEventListener("click", () => {
