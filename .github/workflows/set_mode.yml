@@ -18,18 +18,37 @@ on:
 # flag directly — tick.write_mode() hard-fails if called with an open
 # position, and nothing in the tick loop ever calls it.
 #
-# Queues behind any running tick (never races position state).
+# FIX 09-17: this workflow used to share the 'tick' concurrency group to
+# queue behind a running tick — but tick.yml has cancel-in-progress:true on
+# that same group, so the next chained tick CANCELED any queued mode switch
+# (seen live: the UI toggle's PAPER test dispatch was eaten mid-queue).
+# Own group (never canceled) + an explicit wait-for-tick step below gives
+# the same queue-behind semantics without being cancellable.
 concurrency:
-  group: tick
+  group: set-mode
   cancel-in-progress: false
 
 permissions:
   contents: write
+  actions: read
 
 jobs:
   set_mode:
     runs-on: ubuntu-latest
     steps:
+      - name: Wait for any running tick to finish (never flip mid-tick)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for i in $(seq 1 45); do
+            BUSY=$(curl -sf -H "Authorization: Bearer $GH_TOKEN" \
+              "https://api.github.com/repos/CozanetHQ/near-scalper-bot/actions/runs?per_page=15" \
+              | python3 -c "import json,sys; print(sum(1 for r in json.load(sys.stdin)['workflow_runs'] if r['name']=='NEAR Scalper Tick' and r['status'] in ('in_progress','queued')))")
+            echo "attempt $i: ticks in flight = $BUSY"
+            [ "$BUSY" = "0" ] && exit 0
+            sleep 20
+          done
+          echo "WARN: waited 15 min, proceeding anyway (force-close handles open positions)"
       - uses: actions/checkout@v4
       - name: Set up Python
         uses: actions/setup-python@v5
