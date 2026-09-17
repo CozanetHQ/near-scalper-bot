@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB_PATH = os.environ.get("TRADES_DB", os.path.join(_REPO, "data", "trades.db"))
 UI_JSON = os.path.join(_REPO, "data", "trades_ui.json")
+_STATE = os.path.join(_REPO, "state", "state.json")
 
 _LOCK = threading.Lock()
 
@@ -256,6 +257,31 @@ def _current_mode():
         return "PAPER"
 
 
+def _account_snapshot():
+    """Owner 09-17 (voice): the UI must reflect the Bitget live balance so he
+    never has to open the Bitget app. Read-only view over state/state.json —
+    ledger balance/peak from the account section, real-wallet equity from the
+    live probe (pairs.*.last_live_equity, written each tick while LIVE).
+    NEVER raises; any failure exports an empty section."""
+    try:
+        with open(_STATE) as f:
+            st = json.load(f)
+        acct = st.get("account") or {}
+        live_eq = None
+        for p in (st.get("pairs") or {}).values():
+            eq = p.get("last_live_equity")
+            if isinstance(eq, (int, float)) and eq > 0 and (live_eq is None or eq > live_eq):
+                live_eq = eq          # same wallet across pairs — freshest probe wins
+        return {
+            "balance": acct.get("balance"),
+            "peak_balance": acct.get("peak_balance"),
+            "mode": (acct.get("mode") or "PAPER").upper(),
+            "live_equity": live_eq,
+        }
+    except Exception:
+        return {}
+
+
 def export_ui_json():
     """Section-5 REST payload, keyed by pair, written for the chart frontend."""
     try:
@@ -305,6 +331,7 @@ def export_ui_json():
         payload = {
             "updated": datetime.now(timezone.utc).isoformat(),
             "mode": _current_mode(),
+            "account": _account_snapshot(),
             "symbols": out,
             "zones": zout,
         }

@@ -121,6 +121,7 @@ aside.open{transform:none}
   <select id="symbol" aria-label="Trading pair"></select>
   <span class="pill" id="pnlpill">P&L <b>—</b></span>
   <span class="pill" id="modepill" title="Trading mode — flips via the Set Trading Mode workflow">MODE ···</span>
+  <span class="pill" id="balpill" title="Bitget futures wallet — synced from the bot's live probe each tick">BITGET ···</span>
   
 <div id="modepanel">
   <h3>Trading Mode</h3>
@@ -253,6 +254,20 @@ async function loadTrades() {
   mp.textContent = "MODE " + (mode === "LIVE" ? "LIVE · real" : "PAPER");
   mp.className = "pill " + (mode === "LIVE" ? "mode-live" : "mode-paper");
   CUR_MODE = mode; syncModePanel();
+  // Owner 09-17 (voice): the UI must reflect the Bitget live balance so he
+  // never has to open the Bitget app. live_equity = the bot's probe of the
+  // REAL futures wallet (written to state every tick while LIVE); balance =
+  // the bot's internal ledger account.
+  const acct = j.account || {};
+  const bp = $("balpill");
+  const le = typeof acct.live_equity === "number" ? acct.live_equity : null;
+  if (le != null) {
+    bp.innerHTML = `BITGET <b>$${le.toFixed(2)}</b>` +
+      (mode === "LIVE" ? ` <span style="color:var(--green)">● live</span>` : "");
+    bp.className = "pill " + (mode === "LIVE" ? "mode-live" : "mode-paper");
+  } else {
+    bp.innerHTML = `LEDGER <b>$${(acct.balance != null ? acct.balance : 0).toFixed(2)}</b>`;
+  }
   const prev = curSym;
   symbols = Object.keys(TRADES).sort();
   const sel = $("symbol");
