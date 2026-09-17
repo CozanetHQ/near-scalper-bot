@@ -87,6 +87,27 @@ aside{position:fixed;right:0;top:0;bottom:0;width:min(94vw,380px);z-index:20;
       transform:translateX(100%);transition:transform .2s;box-shadow:-8px 0 30px rgba(0,0,0,.5)}
 aside.open{transform:none}
 #legend{display:none}
+
+/* ── Owner 09-17: Trading-mode toggle panel ── */
+#modepill{cursor:pointer;user-select:none}
+#modepanel{display:none;position:fixed;top:52px;right:12px;z-index:60;width:290px;
+  background:var(--panel);border:1px solid var(--line);border-radius:12px;
+  padding:14px;box-shadow:0 12px 40px rgba(0,0,0,.5)}
+#modepanel.open{display:block}
+#modepanel h3{font-size:12px;margin:0 0 4px;letter-spacing:.4px;color:var(--dim);
+  text-transform:uppercase}
+#modepanel .cur{font-size:16px;font-weight:600;margin:2px 0 10px}
+#modepanel input{width:100%;box-sizing:border-box;background:var(--panel2);color:var(--text);
+  border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:13px;margin:4px 0 8px}
+#modepanel button{width:100%;padding:10px;border:none;border-radius:8px;font-size:13px;
+  font-weight:600;cursor:pointer;color:#fff}
+#modebtn.live{background:#c2410c}
+#modebtn.paper{background:#33517a}
+#modebtn.confirm{background:var(--red)}
+#modepanel .note{font-size:11px;color:var(--dim);margin-top:8px;line-height:1.5}
+#modepanel .msg{font-size:11px;margin-top:8px;line-height:1.4;display:none}
+#modepanel .msg.ok{display:block;color:var(--green)}
+#modepanel .msg.err{display:block;color:var(--red)}
 @media(min-width:921px){
   #asidetoggle{display:none}
   aside{position:static;transform:none;box-shadow:none;width:380px}
@@ -100,7 +121,17 @@ aside.open{transform:none}
   <select id="symbol" aria-label="Trading pair"></select>
   <span class="pill" id="pnlpill">P&L <b>—</b></span>
   <span class="pill" id="modepill" title="Trading mode — flips via the Set Trading Mode workflow">MODE ···</span>
-  <span class="sub" id="updated"><span class="dot"></span>loading…</span>
+  
+<div id="modepanel">
+  <h3>Trading Mode</h3>
+  <div class="cur" id="modecur">···</div>
+  <div style="font-size:11px;color:var(--dim)">Owner key (asked once, saved in this browser)</div>
+  <input id="modekey" type="password" placeholder="Owner key" autocomplete="off">
+  <button id="modebtn" class="live">Switch to LIVE</button>
+  <div class="msg" id="modemsg"></div>
+  <div class="note">Runs the same audited switch as the GitHub workflow: open positions are force-closed first, then the flag flips. Queues behind a running tick. The MODE badge follows within one tick.</div>
+</div>
+<span class="sub" id="updated"><span class="dot"></span>loading…</span>
   <select id="tz" aria-label="Timezone">
     <option value="Africa/Lagos">WAT · Lagos</option>
     <option value="UTC">UTC</option>
@@ -221,6 +252,7 @@ async function loadTrades() {
   const mp = $("modepill");
   mp.textContent = "MODE " + (mode === "LIVE" ? "LIVE · real" : "PAPER");
   mp.className = "pill " + (mode === "LIVE" ? "mode-live" : "mode-paper");
+  CUR_MODE = mode; syncModePanel();
   const prev = curSym;
   symbols = Object.keys(TRADES).sort();
   const sel = $("symbol");
@@ -960,6 +992,72 @@ async function bootCandles() {
   tickLoop();
   setInterval(loadTrades, 60000);
 })();
+
+/* ── Owner 09-17: Trading-mode toggle (LIVE/PAPER) ──
+   Owner-only: requires the owner key, which lives only as a Vercel env
+   var. The AI has no path through this — the server side dispatches the
+   audited "Set Trading Mode" workflow; it never writes the flag itself. */
+let CUR_MODE = "PAPER";
+const MPANEL = () => $("modepanel");
+function syncModePanel() {
+  const p = MPANEL(), btn = $("modebtn"), cur = $("modecur");
+  if (!p) return;
+  cur.textContent = CUR_MODE === "LIVE" ? "LIVE · real money" : "PAPER · simulation";
+  btn.className = CUR_MODE === "LIVE" ? "paper" : "live";
+  btn.textContent = CUR_MODE === "LIVE" ? "Switch back to PAPER" : "Switch to LIVE (real money)";
+  btn.dataset.arm = "";
+}
+$("modepill").onclick = () => {
+  const p = MPANEL();
+  p.classList.toggle("open");
+  if (p.classList.contains("open")) {
+    $("modekey").value = localStorage.getItem("cozy.modekey") || "";
+    syncModePanel();
+  }
+};
+$("modebtn").onclick = async () => {
+  const btn = $("modebtn"), msg = $("modemsg");
+  const key = $("modekey").value.trim();
+  const target = CUR_MODE === "LIVE" ? "PAPER" : "LIVE";
+  msg.className = "msg"; msg.textContent = "";
+  if (!key) { msg.className = "msg err"; msg.textContent = "Enter the owner key first."; return; }
+  if (btn.dataset.arm !== target) {           // two-click confirm
+    btn.dataset.arm = target;
+    btn.className = "confirm";
+    btn.textContent = "CONFIRM: " + target + (target === "LIVE" ? " — REAL MONEY" : "");
+    setTimeout(() => { btn.dataset.arm = ""; syncModePanel(); }, 6000);
+    return;
+  }
+  btn.disabled = true; btn.textContent = "Sending…";
+  const API = location.hostname.endsWith("vercel.app")
+    ? "/api/set-mode" : "https://cozanet-scalper-chart.vercel.app/api/set-mode";
+  try {
+    const r = await fetch(API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key, mode: target, reason: "Owner UI toggle (chart)" }),
+    });
+    const j = await r.json();
+    if (r.ok && j.ok) {
+      localStorage.setItem("cozy.modekey", key);
+      msg.className = "msg ok";
+      msg.textContent = "✓ Switch to " + target + " queued. Positions force-closed first, then the flag flips — badge updates within one tick.";
+    } else {
+      msg.className = "msg err";
+      msg.textContent = j.error || ("HTTP " + r.status);
+    }
+  } catch (e) {
+    msg.className = "msg err";
+    msg.textContent = "Network error: " + (e.message || e);
+  }
+  btn.disabled = false; btn.dataset.arm = "";
+  setTimeout(syncModePanel, 200);
+};
+document.addEventListener("click", e => {
+  const p = MPANEL();
+  if (p.classList.contains("open") && !p.contains(e.target) && e.target !== $("modepill") && !$("modepill").contains(e.target))
+    p.classList.remove("open");
+});
 </script>
 </body>
 </html>
