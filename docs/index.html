@@ -413,7 +413,14 @@ let ANALYTICS_MODE = "session";
 let RANGE = "1D";
 let LOG_FILTER = null;
 let MODE_FILTER = "all";   // all | LIVE | PAPER — trade records carry a mode tag (2026-09-17)
+let MODE_FILTER_AUTO = true;   // owner 09-18: dashboard auto-follows account.mode until the owner
+                                // manually toggles the Logs "mode" chip (see mode-filter-btn below).
+                                // Was showing weeks of PAPER stats as if current the moment the
+                                // account flipped LIVE — every tile now defaults to LIVE-only once live.
 let LAST = {state:null, trades:[], reg:null};
+function filteredTrades(arr){
+  return MODE_FILTER === "all" ? arr : arr.filter(t => (t.mode || "PAPER").toUpperCase() === MODE_FILTER);
+}
 
 async function getJSON(path){
   const r = await fetch(BASE + path + "?t=" + Date.now(), {cache:"no-store"});
@@ -432,10 +439,10 @@ async function loadAll(){
 function sessionTrades(){
   const acct = (LAST.state||{}).account || {};
   const cut = tOf(acct.session_start_at) || 0;
-  return LAST.trades.filter(t => tOf(t.closed_at) >= cut);
+  return filteredTrades(LAST.trades.filter(t => tOf(t.closed_at) >= cut));
 }
 function analyticsTrades(){
-  return ANALYTICS_MODE === "all" ? LAST.trades.slice() : sessionTrades();
+  return ANALYTICS_MODE === "all" ? filteredTrades(LAST.trades.slice()) : sessionTrades();
 }
 function pairLeverage(pair){
   const pp = ((LAST.reg||{}).per_pair || {}).LEVERAGE || {};
@@ -472,7 +479,8 @@ const REASON_COLOR = {TP:"#2dd4a7", BE_STOP:"#38bdf8", FLOOR40:"#38bdf8", PROTEC
 
 function renderAll(){
   const s = LAST.state, acct = s.account || {};
-  const T = LAST.trades, sess = sessionTrades();
+  if(MODE_FILTER_AUTO) MODE_FILTER = (acct.mode||"PAPER").toUpperCase() === "LIVE" ? "LIVE" : "all";
+  const T = filteredTrades(LAST.trades), sess = sessionTrades();
   const positions = livePositions();
   const bal = Number(acct.balance) || 0;
   const sessBal = Number(acct.session_start_balance) || 10;
@@ -518,7 +526,7 @@ function renderOverview(sess, positions, acct, bal, sessBal){
   $("k-netpct").textContent = pct(sessBal ? net/sessBal : 0) + " vs session start";
 
   const todayKey = new Date().toISOString().slice(0,10);
-  const today = LAST.trades.filter(t => (t.closed_at||"").slice(0,10) === todayKey);
+  const today = filteredTrades(LAST.trades).filter(t => (t.closed_at||"").slice(0,10) === todayKey);
   const tnet = today.reduce((a,t)=>a+(t.net_pnl||0),0);
   const tKills = today.filter(t=>t.reason==="MAE_KILL"||t.reason==="HARD_SL").length;
   $("k-today").textContent = (tnet>=0?"+":"-") + "$" + Math.abs(tnet).toFixed(2);
@@ -593,7 +601,7 @@ function renderOverview(sess, positions, acct, bal, sessBal){
        <span class="fl-val ${totalNet>=0?'pos':'neg'}" style="font-size:13px">${(totalNet>=0?"+":"-")+"$"+Math.abs(totalNet).toFixed(2)}</span></div>`;
 
   // recent trades
-  const recent = LAST.trades.slice(-8).reverse();
+  const recent = filteredTrades(LAST.trades).slice(-8).reverse();
   $("ov-recent").innerHTML = recent.map(t => logRowHTML(t)).join("") || `<div class="empty">No trades yet.</div>`;
 }
 
@@ -661,7 +669,7 @@ function drawEqRange(){
   const bal = Number(acct.balance) || 0;
   const now = Date.now();
   const windowMs = {"1D":86400000,"1W":7*86400000,"1M":30*86400000,"ALL":Infinity}[RANGE];
-  const filtered = LAST.trades.filter(t => (now - tOf(t.closed_at)) <= windowMs);
+  const filtered = filteredTrades(LAST.trades).filter(t => (now - tOf(t.closed_at)) <= windowMs);
   let eq;
   if(filtered.length){
     const startBal = filtered[0].balance_after - (filtered[0].net_pnl||0);
@@ -844,8 +852,9 @@ document.querySelectorAll("#an-seg button").forEach(b => b.onclick = () => {
 });
 $("log-search").oninput = () => { if(LAST.state) renderLogs(); };
 $("mode-filter-btn").onclick = () => {
+  MODE_FILTER_AUTO = false;   // owner made an explicit choice — stop auto-following account.mode
   MODE_FILTER = MODE_FILTER === "all" ? "LIVE" : (MODE_FILTER === "LIVE" ? "PAPER" : "all");
-  if(LAST.state) renderLogs();
+  if(LAST.state) renderAll();   // now affects Overview/Analytics/equity too, not just Logs
 };
 const REASON_CYCLE = [null, "TP", "BE_STOP", "MAE_KILL", "MAX_AGE"];
 $("log-filter-btn").onclick = () => {
