@@ -27,6 +27,8 @@ select{background:var(--panel2);color:var(--text);border:1px solid var(--line);b
 .pill{font-size:11px;padding:5px 10px;border-radius:999px;background:var(--panel2);
       border:1px solid var(--line);color:var(--dim);white-space:nowrap}
 .pill b{color:var(--text)}
+.pill.mode-live{color:var(--mint);border-color:rgba(45,212,167,.45);background:rgba(45,212,167,.10)}
+.pill.mode-paper{color:var(--dim)}
 .dot{width:8px;height:8px;border-radius:50%;background:var(--green);display:inline-block;
      box-shadow:0 0 6px var(--green);margin-right:6px}
 main{flex:1;display:flex;min-height:0}
@@ -97,6 +99,7 @@ aside.open{transform:none}
   <h1><a href="index.html">NEAR SCALPER</a> · EXECUTION</h1>
   <select id="symbol" aria-label="Trading pair"></select>
   <span class="pill" id="pnlpill">P&L <b>—</b></span>
+  <span class="pill" id="modepill" title="Trading mode — flips via the Set Trading Mode workflow">MODE ···</span>
   <span class="sub" id="updated"><span class="dot"></span>loading…</span>
   <select id="tz" aria-label="Timezone">
     <option value="Africa/Lagos">WAT · Lagos</option>
@@ -211,6 +214,13 @@ async function loadTrades() {
   const j = await r.json();
   TRADES = j.symbols || {};
   ZONEV = j.zones || {};
+  // Owner 2026-09-17: the chart must declare WHICH mode produced the
+  // records it's stroking in (live vs paper). trades_ui.json re-exports
+  // every tick, so the badge follows a mode switch within one tick.
+  const mode = String(j.mode || "PAPER").toUpperCase();
+  const mp = $("modepill");
+  mp.textContent = "MODE " + (mode === "LIVE" ? "LIVE · real" : "PAPER");
+  mp.className = "pill " + (mode === "LIVE" ? "mode-live" : "mode-paper");
   const prev = curSym;
   symbols = Object.keys(TRADES).sort();
   const sel = $("symbol");

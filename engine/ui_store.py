@@ -245,6 +245,17 @@ def _fallback_id(tr):
     return f"{tr.get('pair')}-{tr.get('opened_at')}-{tr.get('side')}"
 
 
+def _current_mode():
+    """Best-effort read of the LIVE/PAPER flag from state (owner 2026-09-17:
+    the chart frontend must show which mode produced every record, and the
+    badge must flip the moment the Set Trading Mode workflow runs)."""
+    try:
+        with open(os.path.join(_REPO, "state", "state.json")) as f:
+            return ((json.load(f).get("account") or {}).get("mode") or "PAPER").upper()
+    except Exception:
+        return "PAPER"
+
+
 def export_ui_json():
     """Section-5 REST payload, keyed by pair, written for the chart frontend."""
     try:
@@ -253,7 +264,8 @@ def export_ui_json():
                 """SELECT trade_id, symbol, direction, entry_time, entry_price,
                           tp_price, sl_price, exit_time, exit_price, status,
                           reason_entry, reason_exit, fvg_top, fvg_bottom,
-                          sweep_price, net_pnl, engine
+                          sweep_price, net_pnl, engine, mode, session_regime,
+                          tp1_price, tp1_status, tp2_status, leverage_used
                    FROM trades ORDER BY entry_time""").fetchall()
         zrows = con.execute(
             """SELECT symbol, ts, kind, side, level, fvg_top, fvg_bottom,
@@ -270,7 +282,9 @@ def export_ui_json():
         for r in rows:
             (tid, symbol, direction, entry_time, entry_price, tp, sl,
              exit_time, exit_price, status, reason_entry, reason_exit,
-             fvg_top, fvg_bottom, sweep_price, net_pnl, engine) = r
+             fvg_top, fvg_bottom, sweep_price, net_pnl, engine,
+             mode, session_regime, tp1_price, tp1_status, tp2_status,
+             leverage_used) = r
             out.setdefault(_pair_fmt(symbol), []).append({
                 "trade_id": tid, "direction": direction,
                 "entry_time": entry_time, "entry_price": entry_price,
@@ -281,9 +295,16 @@ def export_ui_json():
                 "fvg_top": fvg_top, "fvg_bottom": fvg_bottom,
                 "sweep_price": sweep_price, "net_pnl": net_pnl,
                 "engine": engine,
+                "mode": (mode or "PAPER").upper(),
+                "session_regime": session_regime,
+                "tp1_price": tp1_price or 0,
+                "tp1_status": tp1_status or "PENDING",
+                "tp2_status": tp2_status or "PENDING",
+                "leverage_used": leverage_used,
             })
         payload = {
             "updated": datetime.now(timezone.utc).isoformat(),
+            "mode": _current_mode(),
             "symbols": out,
             "zones": zout,
         }

@@ -40,6 +40,8 @@ input{font:inherit;color:inherit;background:none;border:none;outline:none}
 .pill{font-size:10px;letter-spacing:.09em;font-weight:700;padding:4px 10px;border-radius:999px;text-transform:uppercase}
 .pill.live{color:var(--mint);background:rgba(45,212,167,.12);border:1px solid rgba(45,212,167,.3)}
 .pill.stale{color:var(--red);background:rgba(244,100,95,.12);border:1px solid rgba(244,100,95,.3)}
+.badge.livechip{color:var(--mint);background:rgba(45,212,167,.14);border:1px solid rgba(45,212,167,.3)}
+.badge.paperchip{color:var(--faint);background:rgba(136,146,166,.12);border:1px solid rgba(136,146,166,.25)}
 .icon-btn{width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;
   background:var(--card2);border:1px solid var(--line)}
 .icon-btn svg{width:16px;height:16px}
@@ -225,6 +227,7 @@ tr:last-child td{border-bottom:none}
       <div class="tb-sub" id="tb-sub">multi-pair · perp scalper</div>
     </div>
     <div class="tb-right">
+      <span class="pill stale" id="mode-pill" title="Trading mode — flips via the Set Trading Mode workflow">···</span>
       <span class="pill stale" id="status">···</span>
       <button class="icon-btn" id="btn-settings" aria-label="Settings">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -357,6 +360,7 @@ tr:last-child td{border-bottom:none}
         <input id="log-search" placeholder="Search pair…">
       </div>
       <button class="filter-chip" id="log-filter-btn">All exits</button>
+      <button class="filter-chip" id="mode-filter-btn">All modes</button>
     </div>
     <div id="log-list"></div>
   </div>
@@ -386,6 +390,7 @@ tr:last-child td{border-bottom:none}
     <h3>Engine settings</h3>
     <div class="row"><span class="rk">Engine</span><span class="rv">V7 · fixed clips</span></div>
     <div class="row"><span class="rk">Clip size</span><span class="rv" id="s-clip">—</span></div>
+    <div class="row"><span class="rk">Trading mode</span><span class="rv" id="s-mode">—</span></div>
     <div class="row"><span class="rk">Slot model</span><span class="rv" id="s-slots">—</span></div>
     <div class="row"><span class="rk">Daily loss limit</span><span class="rv">12%</span></div>
     <div class="row"><span class="rk">Drawdown wall</span><span class="rv">25% → ¼-size recovery</span></div>
@@ -407,6 +412,7 @@ const tOf = ts => Date.parse(String(ts||"").replace("Z",""));
 let ANALYTICS_MODE = "session";
 let RANGE = "1D";
 let LOG_FILTER = null;
+let MODE_FILTER = "all";   // all | LIVE | PAPER — trade records carry a mode tag (2026-09-17)
 let LAST = {state:null, trades:[], reg:null};
 
 async function getJSON(path){
@@ -479,6 +485,11 @@ function renderAll(){
   pill.textContent = live ? "LIVE" : "STALE " + Math.round(tickAge) + "m";
   pill.className = "pill " + (live ? "live" : "stale");
   $("tb-sub").textContent = Object.keys(s.pairs||{}).length + " pairs · " + positions.length + " open";
+  const mode = (acct.mode || "PAPER").toUpperCase();
+  const mp = $("mode-pill");
+  mp.textContent = mode;
+  mp.className = "pill " + (mode === "LIVE" ? "live" : "stale");
+  $("s-mode").textContent = mode + (mode === "LIVE" ? " · real orders" : " · paper/simulated");
 
   renderOverview(sess, positions, acct, bal, sessBal);
   renderPositions(positions, acct, bal);
@@ -604,7 +615,7 @@ function logRowHTML(t){
     <div class="log-time">${esc((t.closed_at||"").slice(11,16))}</div>
     <div class="log-main">
       <div class="log-pair">${esc(t.pair)} <span class="badge ${esc(t.side)}" style="font-size:8px">${esc(t.side)}</span></div>
-      <div class="log-meta"><span class="badge ${esc(t.reason)}">${esc(t.reason)}</span><span>${t.leverage?t.leverage+"x":""}</span></div>
+      <div class="log-meta"><span class="badge ${esc(t.reason)}">${esc(t.reason)}</span><span>${t.leverage?t.leverage+"x":""}</span>${t.mode?`<span class="badge ${t.mode==="LIVE"?"livechip":"paperchip"}" style="font-size:8px">${esc(String(t.mode).toUpperCase())}</span>`:""}</div>
     </div>
     <div class="log-right">
       <div class="log-pnl ${(t.net_pnl||0)>=0?'pos':'neg'}">${((t.net_pnl||0)>=0?"+":"-")+"$"+Math.abs(t.net_pnl||0).toFixed(3)}</div>
@@ -791,7 +802,9 @@ function renderLogs(){
   let T = LAST.trades.slice().reverse();
   if(q) T = T.filter(t => (t.pair||"").toUpperCase().includes(q));
   if(LOG_FILTER) T = T.filter(t => t.reason === LOG_FILTER);
+  if(MODE_FILTER !== "all") T = T.filter(t => (t.mode || "PAPER").toUpperCase() === MODE_FILTER);
   $("log-filter-btn").textContent = LOG_FILTER ? LOG_FILTER : "All exits";
+  $("mode-filter-btn").textContent = MODE_FILTER === "all" ? "All modes" : MODE_FILTER + " only";
 
   let html = "", lastDay = null, shown = 0;
   T.forEach(t => {
@@ -830,6 +843,10 @@ document.querySelectorAll("#an-seg button").forEach(b => b.onclick = () => {
   if(LAST.state) renderAnalytics();
 });
 $("log-search").oninput = () => { if(LAST.state) renderLogs(); };
+$("mode-filter-btn").onclick = () => {
+  MODE_FILTER = MODE_FILTER === "all" ? "LIVE" : (MODE_FILTER === "LIVE" ? "PAPER" : "all");
+  if(LAST.state) renderLogs();
+};
 const REASON_CYCLE = [null, "TP", "BE_STOP", "MAE_KILL", "MAX_AGE"];
 $("log-filter-btn").onclick = () => {
   const i = REASON_CYCLE.indexOf(LOG_FILTER);
