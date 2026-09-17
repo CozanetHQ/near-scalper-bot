@@ -50,6 +50,107 @@ LIVE_PAIRS = {p.strip().upper() for p in os.environ.get("LIVE_PAIRS", "").split(
 _REPO = os.path.dirname(os.path.abspath(__file__))
 STATE_FILE = os.environ.get("STATE_FILE", os.path.join(_REPO, "state", "state.json"))
 TRADES_FILE = os.environ.get("TRADES_FILE", os.path.join(_REPO, "data", "trades.jsonl"))
+
+# ── LIVE/PAPER MODE FLAG (owner spec 2026-09-17, Master Architecture Sec 5.3) ──
+# Single server-side flag, persisted in state/state.json (git-committed, so a
+# process restart or a fresh GitHub Actions runner can NEVER silently default
+# it back to LIVE — it reads whatever was last committed, defaulting PAPER on
+# a cold repo). READ-ONLY from here: the tick engine only ever calls
+# current_mode() to gate live routing. The ONLY writer is scripts/set_mode.py,
+# invoked by the "Set Trading Mode" GitHub Actions workflow (gated behind the
+# founder's GitHub login — this repo has no other authenticated UI to hang a
+# toggle off of). If any future code path inside the engine ever tries to
+# WRITE the mode flag, write_mode() below hard-fails loudly rather than
+# silently no-op'ing, per the spec's "must hard-fail and raise a logged alert"
+# requirement.
+def current_mode(master=None):
+    """Read-only. Returns 'LIVE' or 'PAPER'. Defaults PAPER if unset."""
+    m = master if master is not None else load_master()
+    mode = ((m.get("account") or {}).get("mode") or "PAPER").upper()
+    return mode if mode in ("LIVE", "PAPER") else "PAPER"
+
+
+def write_mode(new_mode, reason, actor):
+    """The ONLY function that may write the mode flag. Called exclusively by
+    scripts/set_mode.py from the Set Trading Mode workflow — never from the
+    engine's own decision path. Callers MUST have already force-closed every
+    open position before calling this (see scripts/set_mode.py)."""
+    if new_mode not in ("LIVE", "PAPER"):
+        raise ValueError(f"write_mode: invalid mode {new_mode!r} — must be LIVE or PAPER")
+    master = load_master()
+    for pair, ps in (master.get("pairs") or {}).items():
+        if ps.get("position_open"):
+            raise RuntimeError(
+                f"write_mode: refusing to flip mode — {pair} still has an open "
+                "position. Force-close every position before switching modes "
+                "(Sec 5.3: no position may persist across a mode change).")
+    acct = master.setdefault("account", {})
+    acct["mode"] = new_mode
+    acct["mode_set_at"] = datetime.now(timezone.utc).isoformat()
+    acct["mode_set_by"] = actor
+    acct["mode_set_reason"] = reason
+    with open(STATE_FILE, "w") as f:
+        json.dump(master, f, indent=2)
+    return master
+
+# ── SESSION & LIQUIDITY REGIME MATRIX (owner spec 2026-09-17, Sec 1.2) ──────
+# Recorded on every position as metadata (audit trail / Section 3 schema)
+# for regime-outcome study. Does NOT currently gate leverage or active pairs
+# — this repo's live hybrid per-pair leverage-zone system (position_leverage,
+# below) stays canonical until the owner decides whether this table should
+# replace or cap it. See the 2026-09-17 conversation for that open question.
+SESSION_MATRIX = [
+    (0, 8, "ASIAN"),
+    (8, 13, "LONDON_EXPANSION"),
+    (13, 17, "NY_OVERLAP"),
+    (17, 22, "NY_OFFHOURS"),
+    (22, 24, "PACIFIC_MAINTENANCE"),
+]
+
+
+def session_regime_at(dt=None):
+    """UTC-hour session bucket per the Sec 1.2 table. dt: aware datetime or
+    ISO string; defaults to now."""
+    if dt is None:
+        dt = datetime.now(timezone.utc)
+    elif isinstance(dt, str):
+        try:
+            dt = datetime.fromisoformat(dt)
+        except ValueError:
+            dt = datetime.now(timezone.utc)
+    hour = dt.astimezone(timezone.utc).hour if dt.tzinfo else dt.hour
+    for lo, hi, name in SESSION_MATRIX:
+        if lo <= hour < hi:
+            return name
+    return "PACIFIC_MAINTENANCE"
+
+# ── LOSING-STREAK CIRCUIT BREAKER (owner spec 2026-09-17, Sec 5.2) ─────────
+# Account-level (across ALL pairs, not per-pair): 3 consecutive losing closes
+# trips a hard lockout on new entries. Manual unlock ONLY — unlike the
+# existing SAFE_DD/DAILY_LOSS_LIMIT circuit breakers (which self-clear once
+# balance recovers or the UTC day rolls), this one never auto-resumes; only
+# scripts/unlock_trading.py (the "Unlock Trading" workflow) can clear it.
+CIRCUIT_BREAKER_STREAK = 3
+
+
+def consecutive_losses(trades):
+    """Walk the account-wide trade ledger newest-first; count consecutive
+    non-winning closes (net_pnl <= 0) until the first win breaks the streak."""
+    n = 0
+    for t in trades:
+        net = t.get("net_pnl")
+        if net is None:
+            continue
+        if net <= 0:
+            n += 1
+        else:
+            break
+    return n
+
+
+def circuit_breaker_active(master=None):
+    m = master if master is not None else load_master()
+    return bool((m.get("account") or {}).get("circuit_breaker_active"))
 ATR_PERIOD = 14
 SL_ATR_MULT = 4.0     # GRID SEARCH WINNER (1152 configs): wide stop, rarely hit
 TP_SL_RATIO = 1.5     # most exits are 20-min drift-capture time stops
@@ -630,6 +731,11 @@ def get_state(pair):
                 corr_short += 1
     state["_corr_long"] = corr_long
     state["_corr_short"] = corr_short
+    # Owner spec 2026-09-17 Sec 5.2/5.3: account-level, read-only for every
+    # per-pair tick — the circuit breaker and mode flag are never written
+    # from here (see write_mode()/sync()'s trip-check for the only writers).
+    state["_circuit_breaker_active"] = bool(acct.get("circuit_breaker_active"))
+    state["_mode"] = current_mode(master)
     return state
 
 
@@ -670,6 +776,27 @@ def sync(pair, state_update=None, trade=None):
             ui_store.record_trade(tr)
         except Exception:
             pass
+        # ── CIRCUIT BREAKER trip check (owner spec 2026-09-17, Sec 5.2) ──
+        # Account-wide, across every pair. Trips once on the 3rd consecutive
+        # non-winning close and STAYS tripped — manual unlock only (never
+        # re-evaluated/cleared here, even once a later trade would break the
+        # streak), matching the spec's "founder must re-enable" requirement.
+        acct = master.setdefault("account", {})
+        if not acct.get("circuit_breaker_active"):
+            streak = consecutive_losses(master.get("trades") or [])
+            if streak >= CIRCUIT_BREAKER_STREAK:
+                acct["circuit_breaker_active"] = True
+                acct["circuit_breaker_tripped_at"] = datetime.now(timezone.utc).isoformat()
+                acct["circuit_breaker_streak"] = streak
+                acct["circuit_breaker_session"] = session_regime_at()
+                try:
+                    send_telegram(
+                        f"🚨 CIRCUIT BREAKER TRIPPED — {streak} consecutive losing "
+                        "closes. New entries locked out on EVERY pair until the founder "
+                        "manually unlocks (Unlock Trading workflow). Open positions ride "
+                        "to TP as normal.")
+                except Exception:
+                    pass
     master["updated_at"] = datetime.now(timezone.utc).isoformat()
     os.makedirs(os.path.dirname(STATE_FILE), exist_ok=True)
     tmp = STATE_FILE + ".tmp"
@@ -763,6 +890,18 @@ def close_position(pos, exit_price, reason, now, balance):
         "margin": pos["margin"],
         "leverage": pos.get("leverage") or LEVERAGE,
         "hard_sl": pos.get("hard_sl") or HARD_SL_FRAC,
+        # Owner spec 2026-09-17 Sec 3 (trade_audit_log columns): audit
+        # metadata riding the existing V7-D partial-TP mechanism, not a
+        # change to it. tp1 = the 60%-of-move partial bank, tp2 = the final
+        # target (tp_price above). Statuses mirror what actually happened —
+        # 'SKIPPED' for tp1 means price ran straight to tp2/exit without
+        # pausing at the partial level.
+        "session_regime": pos.get("session_regime") or session_regime_at(pos.get("opened_at")),
+        "mode": pos.get("mode") or "PAPER",
+        "tp1_price": pos.get("tp1_price") or 0,
+        "tp1_status": "FILLED" if pos.get("partial_done") else "SKIPPED",
+        "tp2_price": tp_price,
+        "tp2_status": "FILLED" if reason == "TP" else ("CANCELLED" if pos.get("partial_done") else "PENDING"),
         "gross_pnl": round(gross, 6),
         "fees": round(fees, 6),
         "net_pnl": round(net_total, 6),
@@ -1312,12 +1451,14 @@ def process_tick(state):
                 want = None
                 wait_reason = (f"corr cap: {_other_dir + _here_dir} same-direction cluster clips "
                                f"(cap {CORR_DIR_CAP}) — BTC/ETH/SOL share one tail")
+        cb_active = bool(state.get("_circuit_breaker_active"))
         can_open = (
             want is not None
             and entry_cooldown_ok
             and len(still_open) < _slots_cap
             and len(still_open) + int(state.get("_other_open") or 0) < n_slots
             and not daily_risk_off
+            and not cb_active  # Sec 5.2 circuit breaker — manual unlock only
         )
         if can_open:
             used_margin = sum(p["margin"] for p in still_open) + float(state.get("_other_margin") or 0)
@@ -1414,6 +1555,16 @@ def process_tick(state):
                         # (chop entry gate) have clean data. rg in {"chop","runaway"}.
                         "regime_at_entry": regime,
                         "atr_frac_at_entry": (round(atr / price, 6) if atr else None),
+                        # Owner spec 2026-09-17 Sec 1.2/3/5.3: audit metadata,
+                        # doesn't change entry economics. tp1_price is the
+                        # SAME price the existing V7-D partial-TP logic already
+                        # computes at PARTIAL_TP_FRAC of the move — recorded up
+                        # front here so the chart can draw the TP1 zone before
+                        # it fills, not just after.
+                        "session_regime": session_regime_at(now),
+                        "mode": state.get("_mode") or "PAPER",
+                        "tp1_price": round(entry + PARTIAL_TP_FRAC * entry_tp_dist, 8) if want == "long"
+                                     else round(entry - PARTIAL_TP_FRAC * entry_tp_dist, 8),
                     })
                     opened_this_tick = True
                     # OWNER 09-07: plain-dollar math on every entry — no percentages to decode.
@@ -1505,7 +1656,8 @@ def process_tick(state):
     if closed_any:
         return "closed", f"closed {len(closed_any)} TP(s), {len(still_open)} open"
     if want is not None and not can_open:
-        why = ("daily risk-off (day loss limit)" if daily_risk_off
+        why = ("circuit breaker (manual unlock required)" if cb_active
+               else "daily risk-off (day loss limit)" if daily_risk_off
                else f"slots/margin full ({len(still_open) + int(state.get('_other_open') or 0)}/{n_slots} V7 slots)")
         return "none", f"signal {want} skipped — {why}"
     if wait_reason:

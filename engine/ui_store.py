@@ -38,7 +38,13 @@ CREATE TABLE IF NOT EXISTS trades (
     fvg_bottom  REAL,
     sweep_price REAL,
     net_pnl     REAL,
-    engine      TEXT
+    engine      TEXT,
+    mode          TEXT DEFAULT 'PAPER',
+    session_regime TEXT,
+    tp1_price     REAL,
+    tp1_status    TEXT DEFAULT 'PENDING',
+    tp2_status    TEXT DEFAULT 'PENDING',
+    leverage_used INTEGER
 );
 CREATE INDEX IF NOT EXISTS idx_trades_symbol_time ON trades(symbol, entry_time);
 CREATE TABLE IF NOT EXISTS zone_events (
@@ -65,10 +71,30 @@ def _iso_to_epoch_s(iso):
         return None
 
 
+# Owner spec 2026-09-17 Sec 3: additive migration for DBs created before
+# these columns existed. CREATE TABLE IF NOT EXISTS (in _SCHEMA above) never
+# adds columns to an existing table, so new columns need an explicit ALTER —
+# each wrapped individually and ignored if it already exists (idempotent,
+# safe to run on every connect).
+_MIGRATIONS = [
+    "ALTER TABLE trades ADD COLUMN mode TEXT DEFAULT 'PAPER'",
+    "ALTER TABLE trades ADD COLUMN session_regime TEXT",
+    "ALTER TABLE trades ADD COLUMN tp1_price REAL",
+    "ALTER TABLE trades ADD COLUMN tp1_status TEXT DEFAULT 'PENDING'",
+    "ALTER TABLE trades ADD COLUMN tp2_status TEXT DEFAULT 'PENDING'",
+    "ALTER TABLE trades ADD COLUMN leverage_used INTEGER",
+]
+
+
 def _con():
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     con = sqlite3.connect(DB_PATH, timeout=10)
     con.executescript(_SCHEMA)
+    for stmt in _MIGRATIONS:
+        try:
+            con.execute(stmt)
+        except sqlite3.OperationalError:
+            pass  # column already exists
     return con
 
 
@@ -197,15 +223,20 @@ def record_trade(tr):
                     """INSERT OR IGNORE INTO trades
                        (trade_id, symbol, direction, entry_time, entry_price,
                         tp_price, sl_price, exit_time, exit_price, status,
-                        reason_entry, reason_exit, net_pnl, engine)
-                       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                        reason_entry, reason_exit, net_pnl, engine,
+                        mode, session_regime, tp1_price, tp1_status,
+                        tp2_status, leverage_used)
+                       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                     (tr.get("trade_id") or _fallback_id(tr),
                      tr.get("pair"), side if side in ("LONG", "SHORT") else "LONG",
                      opened, tr.get("entry_price"), tr.get("tp_price") or 0,
                      tr.get("sl_price") or 0, closed, tr.get("exit_price"),
                      status, tr.get("reason_entry") or f"{tr.get('engine') or 'v5'} entry",
                      _reason_exit_of(reason) if reason else "TIME_STOP",
-                     tr.get("net_pnl"), tr.get("engine") or "v5"))
+                     tr.get("net_pnl"), tr.get("engine") or "v5",
+                     tr.get("mode") or "PAPER", tr.get("session_regime"),
+                     tr.get("tp1_price") or 0, tr.get("tp1_status") or "PENDING",
+                     tr.get("tp2_status") or "PENDING", tr.get("leverage")))
     except Exception:
         pass
 

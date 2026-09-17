@@ -232,7 +232,12 @@ def process_pair(state):
     su = {}                                   # (was created too late — live block wrote to it)
     live_mode = (getattr(T, "LIVE_TRADING", False)
                  and symbol in getattr(T, "LIVE_PAIRS", set())
-                 and LIVE_EXEC.keys_present())
+                 and LIVE_EXEC.keys_present()
+                 # Owner spec 2026-09-17 Sec 5.3: the mode flag is an
+                 # ADDITIONAL top-level gate on top of the existing
+                 # LIVE_TRADING/LIVE_PAIRS/keys checks — real orders require
+                 # ALL of them, not just this one.
+                 and getattr(T, "current_mode", lambda: "PAPER")() == "LIVE")
     live_cli, equity = None, None
     on_demo = sv.get("trading_env") == "DEMO_FALLBACK"
     if live_mode:

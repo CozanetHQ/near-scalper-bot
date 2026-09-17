@@ -21,12 +21,29 @@ Runs 24/7 via a self-chaining GitHub Actions tick (watchdog cron at :07).
   multi-pair terminal (balance, equity, per-pair regimes/WAITs, ledger).
 - **Resets**: v4 Sec 10.1 discipline — logged in `data/reset_log.jsonl`,
   dispatched via the "Reset Account" workflow (queues behind any running tick).
+- **Circuit breaker** (2026-09-17): 3 consecutive losing closes trips a
+  hard lockout on ALL new entries (account-wide) — the bot NEVER clears it
+  itself. Only the "Unlock Trading" workflow can, and only with a logged
+  reason. Audit trail: `data/circuit_breaker_log.jsonl`.
+- **Trading mode** (2026-09-17): LIVE/PAPER flag persisted in
+  `state/state.json` (`account.mode`, default PAPER). Switching via the
+  "Set Trading Mode" workflow force-closes every open v5 position at market
+  (tagged `MODE_SWITCH_FORCE_CLOSE`) first; it refuses if a sovereign pair
+  still holds a position. The flag is an ADDITIONAL gate on top of
+  LIVE_TRADING/LIVE_PAIRS/keys — sovereign real orders require all of them.
+  Audit trail: `data/mode_log.jsonl`. Every trade records `mode` and
+  `session_regime` (ASIAN/LONDON_EXPANSION/NY_OVERLAP/PACIFIC_MAINTENANCE)
+  in both the ledger and the UI trade store.
 
 ## Workflows
 
 - `tick.yml` — perpetual tick loop (~5 min cadence): run engine → commit state → chain next run.
 - `reset.yml` — logged account/pair reset through the engine's own sync path.
 - `diagnose.yml` — network + state health checks.
+- `set_mode.yml` — founder-authenticated LIVE/PAPER switch: force-closes all
+  open v5 positions, then flips the mode flag (Sec 5.3).
+- `unlock_trading.yml` — founder-authenticated manual circuit-breaker clear
+  (Sec 5.2); requires a reason, logs to the audit trail.
 
 ## Research
 

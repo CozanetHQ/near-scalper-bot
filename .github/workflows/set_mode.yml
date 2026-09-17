@@ -1,0 +1,52 @@
+name: Set Trading Mode
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Target mode"
+        required: true
+        type: choice
+        options: [LIVE, PAPER]
+      reason:
+        description: "Why this switch is happening (Sec 5.3 audit requirement)"
+        required: true
+
+# Owner spec 2026-09-17, Master Architecture Sec 5.3 (Live/Paper Mode Switch).
+# This IS the founder-authenticated toggle for this repo: running it requires
+# a GitHub login with push access to CozanetHQ/near-scalper-bot. The AI
+# reasoning layer has no code path to trigger this workflow or write the mode
+# flag directly — tick.write_mode() hard-fails if called with an open
+# position, and nothing in the tick loop ever calls it.
+#
+# Queues behind any running tick (never races position state).
+concurrency:
+  group: tick
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  set_mode:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Force-close every open position, then flip the mode flag
+        env:
+          SET_MODE: ${{ github.event.inputs.mode }}
+          SET_MODE_REASON: ${{ github.event.inputs.reason }}
+          SET_MODE_ACTOR: ${{ github.actor }}
+        run: python3 scripts/set_mode.py
+      - name: Commit mode switch (state + audit log)
+        run: |
+          git config user.email "fassdavid722@gmail.com"
+          git config user.name "CozyCrypto"
+          git add data state 2>/dev/null || true
+          git diff --cached --quiet && echo "nothing to commit" && exit 0
+          git commit -m "mode: switch to ${{ github.event.inputs.mode }} — ${{ github.event.inputs.reason }}"
+          git pull --rebase origin main || true
+          git push || echo "push failed, non-fatal"
