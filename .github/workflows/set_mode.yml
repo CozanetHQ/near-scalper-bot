@@ -18,37 +18,57 @@ on:
 # flag directly — tick.write_mode() hard-fails if called with an open
 # position, and nothing in the tick loop ever calls it.
 #
-# FIX 09-17: this workflow used to share the 'tick' concurrency group to
-# queue behind a running tick — but tick.yml has cancel-in-progress:true on
-# that same group, so the next chained tick CANCELED any queued mode switch
-# (seen live: the UI toggle's PAPER test dispatch was eaten mid-queue).
-# Own group (never canceled) + an explicit wait-for-tick step below gives
-# the same queue-behind semantics without being cancellable.
+# FIX 09-17 (v1): shared the 'tick' concurrency group to queue behind a
+# running tick — but tick.yml has cancel-in-progress:true on that group, so
+# the next chained tick CANCELED any queued mode switch (seen live).
+# FIX 09-17 (v2): moved to its own group + polled for "zero ticks in
+# flight" — but tick.yml perpetually self-chains with essentially zero gap
+# (dispatches its own successor before it finishes), so that idle moment
+# never actually occurs. The poll always burned the full 15-min timeout
+# before its escape-valve kicked in (reproduced live: owner's LIVE switch
+# sat for minutes with nothing visibly happening).
+# FIX 09-17 (v3, current): stop looking for a gap that structurally can't
+# exist. Instead PAUSE the chain ourselves — disable tick.yml so it can't
+# dispatch its next run — wait (briefly) for whichever tick is already
+# in-flight to finish on its own, do the mode flip, then re-enable tick.yml
+# and immediately redispatch it once to resume the perpetual chain.
 concurrency:
   group: set-mode
   cancel-in-progress: false
 
 permissions:
   contents: write
-  actions: read
+  actions: write
 
 jobs:
   set_mode:
     runs-on: ubuntu-latest
     steps:
-      - name: Wait for any running tick to finish (never flip mid-tick)
+      - name: Pause the perpetual tick chain (disable tick.yml)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          for i in $(seq 1 45); do
+          curl -sf -X PUT -H "Authorization: Bearer $GH_TOKEN" \
+            "https://api.github.com/repos/CozanetHQ/near-scalper-bot/actions/workflows/tick.yml/disable"
+          echo "tick.yml disabled — it can no longer chain a new run"
+
+      - name: Wait for the in-flight tick (if any) to finish on its own
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # No new tick can start now (disabled above), so this only ever
+          # waits out whichever single tick was already running — bounded
+          # by tick.yml's own 5-minute job timeout.
+          for i in $(seq 1 20); do
             BUSY=$(curl -sf -H "Authorization: Bearer $GH_TOKEN" \
-              "https://api.github.com/repos/CozanetHQ/near-scalper-bot/actions/runs?per_page=15" \
+              "https://api.github.com/repos/CozanetHQ/near-scalper-bot/actions/runs?per_page=10" \
               | python3 -c "import json,sys; print(sum(1 for r in json.load(sys.stdin)['workflow_runs'] if r['name']=='NEAR Scalper Tick' and r['status'] in ('in_progress','queued')))")
             echo "attempt $i: ticks in flight = $BUSY"
             [ "$BUSY" = "0" ] && exit 0
-            sleep 20
+            sleep 15
           done
-          echo "WARN: waited 15 min, proceeding anyway (force-close handles open positions)"
+          echo "WARN: waited 5 min, proceeding anyway (force-close handles open positions)"
+
       - uses: actions/checkout@v4
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -69,3 +89,15 @@ jobs:
           git commit -m "mode: switch to ${{ github.event.inputs.mode }} — ${{ github.event.inputs.reason }}"
           git pull --rebase origin main || true
           git push || echo "push failed, non-fatal"
+
+      - name: Resume the perpetual tick chain
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          curl -sf -X PUT -H "Authorization: Bearer $GH_TOKEN" \
+            "https://api.github.com/repos/CozanetHQ/near-scalper-bot/actions/workflows/tick.yml/enable"
+          curl -sf -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Content-Type: application/json" \
+            "https://api.github.com/repos/CozanetHQ/near-scalper-bot/actions/workflows/tick.yml/dispatches" \
+            -d '{"ref":"main"}'
+          echo "tick.yml re-enabled and chain kicked back off"
