@@ -634,6 +634,13 @@ def _fill(T, state, sv, pending, lvl, iso, symbol, _pt):
     dp = atr_frac * lvl
     qty = (RISK_FRAC * balance) / dp
     notional = qty * lvl
+    if notional < MIN_NOTIONAL and balance >= MIN_NOTIONAL:
+        # OWNER 09-17: a small wallet still trades — bump to the fixed
+        # $3-cash x 10x clip instead of skipping below the exchange floor.
+        clip = min(LIVE_EXEC.LIVE_MARGIN_USD * LEV_CAP, LEV_CAP * balance)
+        if clip >= MIN_NOTIONAL:
+            qty = clip / lvl
+            notional = qty * lvl
     if notional < MIN_NOTIONAL:
         sv["pending"] = None
         _pt("sovereign fill skipped: below Bitget $5 minimum")
@@ -752,14 +759,15 @@ def _live_place(T, live_cli, symbol, d, level, atr_frac, equity, sv, iso, _pt):
     dp = atr_frac * level
     try:
         info = live_cli.contract_info(symbol)
-        qty = live_cli.round_qty(symbol, (RISK_FRAC * equity) / dp)
+        # OWNER 09-17: entries commit a FIXED $3 of cash at 10x — notional
+        # is $3 x leverage (the $5 Bitget floor is cleared 6x over). If the
+        # wallet is too small to carry $3 at 10x, clamp to what it can carry.
+        cap = min(LIVE_EXEC.LIVE_MARGIN_USD * LEV_CAP, LEV_CAP * equity,
+                  LIVE_EXEC.LIVE_MAX_NOTIONAL)
+        qty = live_cli.round_qty(symbol, cap / level)
         notional = qty * level
         if qty < info["min_size"] or notional < max(MIN_NOTIONAL, info.get("min_usdt", LIVE_EXEC.LIVE_MIN_NOTIONAL)):
             return False, f"below Bitget minimum (qty {qty} @ {level:.6g})"
-        cap = min(LEV_CAP * equity, LIVE_EXEC.LIVE_MAX_NOTIONAL)
-        if notional > cap:
-            qty = live_cli.round_qty(symbol, cap / level)
-            notional = qty * level
         sl = level - dp if side == "long" else level + dp
         tp = level + RR * dp if side == "long" else level - RR * dp
         live_cli.set_leverage(symbol, LEV_CAP)
@@ -777,7 +785,7 @@ def _live_place(T, live_cli, symbol, d, level, atr_frac, equity, sv, iso, _pt):
         "sweep_price": ctx.get("sweep_price"),
     }
     sv["phase"] = "FLAT"
-    _pt(f"LIVE TRIGGER {d}: post-only limit @ {level:.6g} qty {qty} (sl {sl:.6g} / tp {tp:.6g}, risk 1.5% of ${equity:.2f})")
+    _pt(f"LIVE TRIGGER {d}: post-only limit @ {level:.6g} qty {qty} — cash ${notional / LEV_CAP:.2f} @ {LEV_CAP}x = ${notional:.2f} notional (sl {sl:.6g} / tp {tp:.6g})")
     return True, oid
 
 

@@ -52,7 +52,10 @@ jobs:
           LIVE_TRADING: '1'
           LIVE_PAIRS: 'NEARUSDT'
           LIVE_MAX_NOTIONAL: '50'
-          MIN_LIVE_EQUITY: '10'
+          # OWNER 09-17 ($4 live start): entries commit $3 cash at 10x; live
+          # floor lowered from $10 so the $4 wallet trades REAL, not demo.
+          LIVE_MARGIN_USD: '3'
+          MIN_LIVE_EQUITY: '3.5'
           LIVE_RECHECK_MINUTES: '60'
           BITGET_DEMO: '0'
           BITGET_API_KEY: ${{ secrets.BITGET_API_KEY }}

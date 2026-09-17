@@ -36,6 +36,10 @@ MARGIN_COIN = "USDT"
 LEV_CAP = 10
 LIVE_MAX_NOTIONAL = float(os.environ.get("LIVE_MAX_NOTIONAL", "50"))   # hard $ ceiling
 LIVE_MIN_NOTIONAL = float(os.environ.get("LIVE_MIN_NOTIONAL", "5"))    # Bitget minimum
+# OWNER 2026-09-17 (voice, verbatim intent): the CASH committed to an entry
+# is $3 at 10x leverage. Not the trade size — the cash. If leverage changes
+# the notional (say $20), he doesn't care; the constant is the $3 margin.
+LIVE_MARGIN_USD = float(os.environ.get("LIVE_MARGIN_USD", "3.0"))
 
 _KEYS = {
     "key": os.environ.get("BITGET_API_KEY", ""),
