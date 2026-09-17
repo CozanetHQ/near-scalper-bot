@@ -49,12 +49,12 @@ jobs:
           # live wallet equity < MIN_LIVE_EQUITY the pair trades Bitget demo
           # instead and re-probes the live wallet every LIVE_RECHECK_MINUTES
           # until it can fund trades again (then auto-switches back).
-          LIVE_TRADING: '0'
+          LIVE_TRADING: '1'
           LIVE_PAIRS: 'NEARUSDT'
           LIVE_MAX_NOTIONAL: '50'
           MIN_LIVE_EQUITY: '10'
           LIVE_RECHECK_MINUTES: '60'
-          BITGET_DEMO: '1'
+          BITGET_DEMO: '0'
           BITGET_API_KEY: ${{ secrets.BITGET_API_KEY }}
           BITGET_SECRET: ${{ secrets.BITGET_SECRET }}
           BITGET_PASSPHRASE: ${{ secrets.BITGET_PASSPHRASE }}
