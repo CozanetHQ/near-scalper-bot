@@ -14,6 +14,8 @@
 //     dispatch API. Neither secret is ever logged.
 //   • Same-origin + gh-pages origin only (CORS allowlist), so another site
 //     can't silently drive this from the owner's browser.
+import { timingSafeEqual } from "node:crypto";
+
 export default async function handler(req, res) {
   const ALLOWED_ORIGINS = [
     "https://cozanethq.github.io",
@@ -39,7 +41,7 @@ export default async function handler(req, res) {
   }
   // timing-safe compare
   const a = Buffer.from(key), b = Buffer.from(expected);
-  if (!crypto.timingSafeEqual(a, b)) {
+  if (!timingSafeEqual(a, b)) {
     return res.status(401).json({ error: "invalid key" });
   }
 
