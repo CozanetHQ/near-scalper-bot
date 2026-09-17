@@ -195,8 +195,16 @@ class BitgetPrivate:
         rows = self._req("GET", "/api/v2/mix/order/orders-history", {
             "symbol": symbol, "productType": PRODUCT,
         })
+        # 2026-09-18 fix: this endpoint's data is {"entrustedList": [...], "endId": ...}
+        # (verified against Bitget docs), NOT a bare list — same shape as the
+        # orders-plan fallback below, which already unwraps it correctly.
+        # Iterating the raw dict was yielding its string keys ("entrustedList",
+        # "endId") instead of order rows -> "'str' object has no attribute 'get'"
+        # on every LIVE reconcile tick, spamming Telegram and skipping close
+        # reconciliation for the whole tick (exception raised before block c).
+        rows = (rows or {}).get("entrustedList", []) if isinstance(rows, dict) else (rows or [])
         best = None
-        for r in rows or []:
+        for r in rows:
             if (r.get("tradeSide") or "") != "close":
                 continue
             ts = int(r.get("cts") or r.get("uTime") or 0)
@@ -231,6 +239,10 @@ class BitgetPrivate:
         rows = self._req("GET", "/api/v2/mix/order/orders-pending", {
             "symbol": symbol, "productType": PRODUCT,
         })
+        # 2026-09-18 fix: same wrapped-dict shape as orders-history above —
+        # data is {"entrustedList": [...], "endId": ...}, not a bare list.
+        if isinstance(rows, dict):
+            return rows.get("entrustedList", []) or []
         return rows or []
 
     # ── formatting ──
