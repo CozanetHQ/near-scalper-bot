@@ -10,9 +10,14 @@ on:
 # Breaker). The bot NEVER clears this on its own — no timer, no session-block
 # rollover. Only this manual, founder-authenticated workflow can.
 #
-# Queues behind any running tick (never races position/account state).
+# 2026-09-18 fix: group "tick" was fatal — the perpetual tick chain keeps a
+# pending member in that group ~always, and tick.yml's cancel-in-progress:true
+# cancels pending runs in the group, so run 35297846066 (unlock) was killed by
+# the 02:05:38 tick before it ever started. Own group now; the tick-out race on
+# state/state.json is handled by the rebase-retry in the commit step below and
+# by the script's idempotency (refuses to act if the breaker isn't tripped).
 concurrency:
-  group: tick
+  group: unlock
   cancel-in-progress: false
 
 permissions:
@@ -32,12 +37,24 @@ jobs:
           UNLOCK_REASON: ${{ github.event.inputs.reason }}
           UNLOCK_ACTOR: ${{ github.actor }}
         run: python3 scripts/unlock_trading.py
-      - name: Commit unlock (state + audit log)
+      - name: Commit unlock (state + audit log, race-safe vs concurrent ticks)
         run: |
           git config user.email "fassdavid722@gmail.com"
           git config user.name "CozyCrypto"
-          git add data state 2>/dev/null || true
-          git diff --cached --quiet && echo "nothing to commit" && exit 0
-          git commit -m "unlock: circuit breaker cleared — ${{ github.event.inputs.reason }}"
-          git pull --rebase origin main || true
-          git push || echo "push failed, non-fatal"
+          for i in 1 2 3; do
+            git add data state 2>/dev/null || true
+            git diff --cached --quiet && echo "nothing to commit" && exit 0
+            git commit -m "unlock: circuit breaker cleared — ${{ github.event.inputs.reason }}"
+            if git pull --rebase origin main; then
+              if git push; then exit 0; fi
+            else
+              # a tick committed concurrently and the rebase conflicted —
+              # rebuild the unlock on top of fresh state (script is idempotent)
+              git rebase --abort
+              git reset --soft HEAD~1
+              git checkout origin/main -- state data
+              UNLOCK_REASON="${{ github.event.inputs.reason }}" UNLOCK_ACTOR="${{ github.actor }}" python3 scripts/unlock_trading.py || true
+            fi
+            sleep 20
+          done
+          echo "::warning::push failed after 3 attempts — breaker likely already cleared or tick racing; re-dispatch"
