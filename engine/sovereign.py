@@ -607,7 +607,7 @@ def process_pair(state):
         try:
             _live_reconcile(T, live_cli, state, symbol, sv, su, now_iso, _pt)
         except Exception as e:
-            _pt(f"LIVE reconcile error: {e} — exchange stays source of truth")
+            _pt(f"EXECUTION_ERROR reconcile {symbol}: {type(e).__name__}: {str(e)[:160]} — exchange stays source of truth")
 
     # ── persist: mirror position for budget/dashboard, save machine state ──
     pos = sv.get("pos")
@@ -729,6 +729,7 @@ def _close(T, state, pos, exit_px, reason, symbol, sv, su, iso, _pt):
     })
     _pt(f"sovereign CLOSE {reason} {side} @ {exit_px:.6g} | net {net:+.4f} | balance ${new_balance:.2f}")
     T.sync(symbol, state_update=su, trade=trade)
+    return trade
 
 
 def _mirror(pos, symbol):
@@ -756,9 +757,17 @@ def _mirror(pos, symbol):
 
 # ── live execution helpers (owner 2026-09-15) ───────────────────────────────
 def _live_place(T, live_cli, symbol, d, level, atr_frac, equity, sv, iso, _pt):
-    """Place the REAL post-only retest limit with exchange-side TP/SL."""
+    """Place the REAL post-only retest limit with exchange-side TP/SL.
+
+    Alert sequence (owner spec 2026-09-19): a strategy signal is NEVER
+    reported as a trade. Real-exchange stages get distinct labels:
+    LIVE_SIGNAL -> ORDER_SUBMITTED -> ORDER_ACCEPTED -> ORDER_FILLED ->
+    PROTECTION_CONFIRMED -> POSITION_DETECTED -> POSITION_CLOSED.
+    Any failed stage reports itself (ORDER_REJECTED / EXECUTION_ERROR)."""
     side = "long" if d == "bull" else "short"
     dp = atr_frac * level
+    _pt(f"LIVE_SIGNAL {d} {symbol}: all gates passed — retest level {level:.6g} "
+        f"(ATR {atr_frac*100:.3f}%); constructing live order")
     try:
         info = live_cli.contract_info(symbol)
         # OWNER 09-17: entries commit a FIXED $3 of cash at 10x — notional
@@ -769,12 +778,23 @@ def _live_place(T, live_cli, symbol, d, level, atr_frac, equity, sv, iso, _pt):
         qty = live_cli.round_qty(symbol, cap / level)
         notional = qty * level
         if qty < info["min_size"] or notional < max(MIN_NOTIONAL, info.get("min_usdt", LIVE_EXEC.LIVE_MIN_NOTIONAL)):
+            _pt(f"LIVE_SIGNAL {d} {symbol}: order NOT submitted — below Bitget "
+                f"minimum (qty {qty} @ {level:.6g}); re-armed, no trade")
             return False, f"below Bitget minimum (qty {qty} @ {level:.6g})"
         sl = level - dp if side == "long" else level + dp
         tp = level + RR * dp if side == "long" else level - RR * dp
         live_cli.set_leverage(symbol, LEV_CAP)
+        _pt(f"ORDER_SUBMITTED {symbol} {side}: post-only limit @ {level:.6g} "
+            f"qty {qty} — cash ${notional / LEV_CAP:.2f} @ {LEV_CAP}x = "
+            f"${notional:.2f} notional (sl {sl:.6g} / tp {tp:.6g}), TP/SL preset with order")
         oid = live_cli.place_entry_limit(symbol, side, qty, level, sl, tp)
+    except LIVE_EXEC.BitgetError as e:
+        _pt(f"ORDER_REJECTED {symbol} {side}: Bitget code {getattr(e, 'code', '?')} — "
+            f"{str(e)[:160]} (entry {level:.6g}) — NO trade opened, re-armed")
+        return False, f"place failed: {e}"
     except Exception as e:
+        _pt(f"EXECUTION_ERROR {symbol} {side} place: {type(e).__name__}: "
+            f"{str(e)[:160]} — NO trade opened, re-armed")
         return False, f"place failed: {e}"
     now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
     ctx = sv.pop("_trig_ctx", {}) or {}
@@ -787,7 +807,8 @@ def _live_place(T, live_cli, symbol, d, level, atr_frac, equity, sv, iso, _pt):
         "sweep_price": ctx.get("sweep_price"),
     }
     sv["phase"] = "FLAT"
-    _pt(f"LIVE TRIGGER {d}: post-only limit @ {level:.6g} qty {qty} — cash ${notional / LEV_CAP:.2f} @ {LEV_CAP}x = ${notional:.2f} notional (sl {sl:.6g} / tp {tp:.6g})")
+    _pt(f"ORDER_ACCEPTED {symbol} {side}: Bitget accepted — order id {oid} "
+        f"(post-only limit resting @ {level:.6g})")
     return True, oid
 
 
@@ -828,10 +849,16 @@ def _live_reconcile(T, live_cli, state, symbol, sv, su, now_iso, _pt):
             except Exception:
                 pass
             sv["pending"] = None
-            _pt(f"LIVE FILLED {pending['side']} @ {entry:.6g} (sl {sv['pos']['sl']:.6g} / tp {sv['pos']['tp']:.6g} attached exchange-side)")
+            _pt(f"ORDER_FILLED {pending['side']} {symbol} @ {entry:.6g} qty "
+                f"{sv['pos']['qty']} — order {pending['order_id']} (avg price from Bitget)")
+            if od["sl"] and od["tp"]:
+                sv["pos"]["protection_sent"] = True
+                _pt(f"PROTECTION_CONFIRMED {symbol}: exchange-side TP {od['tp']:.6g} / "
+                    f"SL {od['sl']:.6g} read back from Bitget on the filled order")
         elif st == "canceled":
             sv["pending"] = None
-            _pt("LIVE entry order canceled by exchange (would have crossed book) — re-armed")
+            _pt(f"ORDER_REJECTED {symbol} {pending['side']}: Bitget canceled the "
+                f"post-only entry (would have crossed book, order {pending['order_id']}) — NO trade, re-armed")
         elif now_ms > pending["expires_ms"]:
             try:
                 live_cli.cancel_order(symbol, pending["order_id"])
@@ -879,16 +906,34 @@ def _live_reconcile(T, live_cli, state, symbol, sv, su, now_iso, _pt):
         if exit_px is None:
             exit_px = pos["tp"] if abs((pos.get("tp") or 0)) else pos["sl"]
             reason = "TP" if exit_px == pos.get("tp") else "SL"
-        _close(T, state, pos, exit_px, reason, symbol, sv, su, now_iso, _pt)
+        trade = _close(T, state, pos, exit_px, reason, symbol, sv, su, now_iso, _pt)
         try:
             su["balance"] = round(live_cli.account_equity(), 6)
         except Exception:
             pass
-        _pt(f"LIVE position closed {reason} @ {exit_px:.6g} — booked from exchange fills")
+        _pt(f"POSITION_CLOSED {symbol} {reason} @ {exit_px:.6g} — confirmed closed on Bitget"
+            + (f", realized {trade['net_pnl']:+.4f} USDT (net of fees)" if trade else ""))
     elif pos and ex:
         if ex["entry"]:
             pos["entry"] = ex["entry"]
         pos["qty"] = ex["size"]
+        if not pos.get("detected_sent"):
+            pos["detected_sent"] = True
+            _pt(f"POSITION_DETECTED {ex['side']} {symbol} @ {ex['entry']:.6g} "
+                f"size {ex['size']} lev {ex['leverage']}x — reconcile confirms open position on Bitget")
+        if not pos.get("protection_sent"):
+            try:
+                plan = live_cli.orders_plan_profit_loss(symbol)
+                if plan:
+                    trig = ", ".join(f"{(p.get('triggerType') or '?')}@{p.get('triggerPrice')}"
+                                     for p in plan[:2])
+                    pos["protection_sent"] = True
+                    _pt(f"PROTECTION_CONFIRMED {symbol}: exchange-side TP/SL plan present ({trig})")
+                else:
+                    pos["protection_sent"] = True   # report once, not every tick
+                    _pt(f"PROTECTION_UNCONFIRMED {symbol}: no exchange-side TP/SL plan found — verify in Bitget app")
+            except Exception:
+                pass    # transient read; retry on the next tick
     elif not pos and ex:
         # orphan position (crash between fill and state commit) — adopt
         sv["pos"] = {
@@ -899,4 +944,6 @@ def _live_reconcile(T, live_cli, state, symbol, sv, su, now_iso, _pt):
             "exec_mode": ("DEMO" if sv.get("trading_env") == "DEMO_FALLBACK" else "LIVE"),
             "opened_at": now_iso, "mfe_frac": 0.0, "mae_frac": 0.0,
         }
-        _pt(f"LIVE adopted orphan {ex['side']} position @ {ex['entry']:.6g} — exchange-side TP/SL active, verify in Bitget app")
+        sv["pos"]["detected_sent"] = True
+        _pt(f"POSITION_DETECTED {ex['side']} {symbol} @ {ex['entry']:.6g} size {ex['size']} "
+            f"lev {ex.get('leverage') or LEV_CAP}x — orphan adopted (exchange-side TP/SL active, verify in Bitget app)")

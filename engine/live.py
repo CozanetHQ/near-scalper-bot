@@ -56,7 +56,12 @@ def keys_present():
 
 
 class BitgetError(RuntimeError):
-    pass
+    """Exchange-returned failure. `.code` = Bitget error code (e.g. '400014')
+    so rejection alerts can name the exact code; None for transport errors."""
+
+    def __init__(self, msg, code=None):
+        super().__init__(msg)
+        self.code = code
 
 
 class BitgetPrivate:
@@ -100,7 +105,8 @@ class BitgetPrivate:
         with urllib.request.urlopen(req, timeout=10) as res:
             data = json.loads(res.read().decode())
         if data.get("code") != "00000":
-            raise BitgetError(f"bitget {path}: {data.get('code')} {data.get('msg')}")
+            raise BitgetError(f"bitget {path}: {data.get('code')} {data.get('msg')}",
+                              code=data.get("code"))
         return data.get("data")
 
     # ── account / instruments ──
@@ -119,13 +125,20 @@ class BitgetPrivate:
                         {"productType": PRODUCT, "symbol": symbol})
         r = (rows or [{}])[0]
         # verified against the live endpoint (2026-09-15): USDT-FUTURES uses
-        # sizeMultiplier (base qty step) + minTradeNum + minTradeUSDT;
-        # prices accept 4 decimals (confirmed via live order book depth)
+        # sizeMultiplier (base qty step) + minTradeNum + minTradeUSDT.
+        # 2026-09-19 fix (owner-authorized): price precision is PER SYMBOL.
+        # Bitget "pricePlace" = max price decimals (BTC=1, ETH=2, SOL=3,
+        # NEAR=4, XRP=4), "priceEndStep" = tick mantissa (tick = endstep *
+        # 10^-pricePlace). The old hardcoded 4dp produced off-tick TP/SL for
+        # BTC/ETH/SOL, which Bitget rejects — entry/TP/SL must snap to the
+        # symbol's actual tick.
+        dp = int(float(r.get("pricePlace") or 4))
         info = {
             "size_step": float(r.get("sizeMultiplier") or 1),
             "min_size": float(r.get("minTradeNum") or 1),
             "min_usdt": float(r.get("minTradeUSDT") or 5),
-            "price_dp": 4,
+            "price_dp": dp,
+            "price_tick": float(r.get("priceEndStep") or 1) * (10 ** -dp),
         }
         self._contracts[symbol] = info
         return info
@@ -316,7 +329,14 @@ class BitgetPrivate:
         return f"{qty:g}"
 
     def _fmt_price(self, symbol, price):
-        return f"{round(price, 4):.4f}"
+        """Snap entry/TP/SL to the symbol's actual Bitget tick
+        (pricePlace decimals; tick = priceEndStep x 10^-pricePlace), so the
+        exchange always accepts the price. No universal 4dp."""
+        info = self.contract_info(symbol)
+        dp = info["price_dp"]
+        tick = info.get("price_tick") or (10 ** -dp)
+        snapped = round(round(price / tick) * tick, dp)
+        return f"{snapped:.{dp}f}"
 
 
 _CLIENTS = {}
