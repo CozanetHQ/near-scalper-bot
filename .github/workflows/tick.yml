@@ -36,21 +36,26 @@ jobs:
           # Sovereign v6 (owner 2026-09-15): NEAR runs the new top-down MTF
           # engine; the other pairs keep v5 untouched.
           SOVEREIGN_V6: '1'
-          # BTC promoted to v6 paper (owner 2026-09-16): 94% win rate, only
-          # pair with solidly positive paper PnL (+0.478). LIVE stays NEAR-only
-          # until Futures permission + audit gates clear.
-          SOVEREIGN_PAIRS: 'NEARUSDT,BTCUSDT'
+          # ALL-PAIRS PROMOTION (owner 2026-09-18 ~08:50 Lagos): every pair
+          # runs sovereign v6 — live execution only exists in the sovereign
+          # engine, so "all live" requires all sovereign. ETH/SOL/XRP open v5
+          # paper positions were force-closed first (PROMOTION_FORCE_CLOSE in
+          # the ledger) — sovereign cannot manage a v5 position.
+          # NOTE: ETH/SOL/XRP have no sovereign v6 track record yet; BTC was
+          # +0.478 paper, ETH was -2.04 on v5 paper. Auto-fallback covers the
+          # shared $4 wallet: pairs whose probe finds equity < MIN_LIVE_EQUITY
+          # trade Bitget demo until the wallet can fund them.
+          SOVEREIGN_PAIRS: 'NEARUSDT,BTCUSDT,ETHUSDT,SOLUSDT,XRPUSDT'
           # ── LIVE TRADING (owner 2026-09-15) ──
-          # LIVE_TRADING stays '0' until the Bitget key has Futures
-          # permissions confirmed (40014 without them) AND the NEAR
-          # out-of-sample audit is done. Flip order: BITGET_DEMO='1' first,
-          # verify orders in the Bitget app, then '0' for real money.
           # AUTO-FALLBACK (owner 2026-09-15): with BITGET_DEMO='0', if the
           # live wallet equity < MIN_LIVE_EQUITY the pair trades Bitget demo
           # instead and re-probes the live wallet every LIVE_RECHECK_MINUTES
           # until it can fund trades again (then auto-switches back).
           LIVE_TRADING: '1'
-          LIVE_PAIRS: 'NEARUSDT'
+          # ALL PAIRS LIVE (owner 2026-09-18): NEAR+BTC+ETH+SOL+XRP. Each
+          # entry commits $3 at 10x off the shared real wallet; pairs the
+          # wallet can't fund auto-fall back to Bitget demo per the rule above.
+          LIVE_PAIRS: 'NEARUSDT,BTCUSDT,ETHUSDT,SOLUSDT,XRPUSDT'
           LIVE_MAX_NOTIONAL: '50'
           # OWNER 09-17 ($4 live start): entries commit $3 cash at 10x; live
           # floor lowered from $10 so the $4 wallet trades REAL, not demo.
