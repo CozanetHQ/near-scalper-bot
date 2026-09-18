@@ -122,6 +122,7 @@ aside.open{transform:none}
   <span class="pill" id="pnlpill">P&L <b>—</b></span>
   <span class="pill" id="modepill" title="Trading mode — flips via the Set Trading Mode workflow">MODE ···</span>
   <span class="pill" id="balpill" title="Bitget futures wallet — synced from the bot's live probe each tick">BITGET ···</span>
+  <span class="pill" id="manualpill" style="display:none;background:rgba(245,158,11,.12);color:#f59e0b;border-color:rgba(245,158,11,.4)" title="">MANUAL</span>
   
 <div id="modepanel">
   <h3>Trading Mode</h3>
@@ -157,6 +158,7 @@ aside.open{transform:none}
       <div class="lrow"><span class="sw" style="background:rgba(239,68,68,.22);border:1px solid var(--red)"></span>Stop-loss zone</div>
       <div class="lrow"><span class="sw" style="background:rgba(0,206,202,.16);border:1px solid var(--teal)"></span>Fair Value Gap</div>
       <div class="lrow"><span style="border-top:2px dotted var(--amber);width:14px;display:inline-block"></span>Liquidity sweep</div>
+      <div class="lrow"><span style="border-top:2px dotted #f59e0b;width:14px;display:inline-block"></span>Manual position (separate ledger)</div>
     </div>
     <div id="statsbar" hidden>
       <span class="stat"><label>ENTRY</label><b id="sbEntry">—</b></span>
@@ -291,6 +293,29 @@ async function loadTrades() {
   }
   $("updated").innerHTML = `<span class="dot"></span>updated ${new Intl.DateTimeFormat([], {timeZone:TZ, hour:"2-digit", minute:"2-digit", hour12:false}).format(new Date(j.updated))} ${TZ.split("/").pop().replace("_"," ")}`;
   renderRows(); draw();
+}
+
+/* ── manual positions (owner 2026-09-18): live feed of the manual manager.
+   Positions the owner opens from his phone — auto-managed TPs, separate
+   PnL ledger, NEVER mixed into strategy stats. Drawn amber, always on. */
+let MANUAL = [];
+async function loadManual() {
+  try {
+    const r = await fetch(RAW + "data/manual_manager.json?t=" + Date.now(), {cache:"no-store"});
+    if (!r.ok) return;
+    const j = await r.json();
+    MANUAL = Object.values(j.positions || {});
+    const mp = $("manualpill");
+    if (MANUAL.length) {
+      mp.style.display = "";
+      mp.textContent = "MANUAL ×" + MANUAL.length;
+      mp.title = MANUAL.map(m =>
+        `${m.symbol} ${String(m.side||"").toUpperCase()} ${m.size} @ ${m.entry}` +
+        (m.tp_price ? ` · TP ${m.tp_price}` : "") +
+        ` · ${m.status || "?"}`).join("\n");
+    } else mp.style.display = "none";
+    draw();
+  } catch (e) { /* feed absent = no manual positions — fine */ }
 }
 
 /* ── candles: Bitget 1m -> 2m ── */
@@ -509,6 +534,28 @@ function draw() {
     mk(selT.entry_price, "#2979ff", "Entry");
     mk(selT.tp_price, "#22c55e", "TP");
     mk(selT.sl_price, "#f4645f", "SL");
+  }
+  /* manual position levels (owner 2026-09-18): amber, left-tagged so they
+     never collide with the strategy's right-axis tags. Always on. */
+  {
+    const sym = pairToSymbol(curSym);
+    for (const m of MANUAL) {
+      if (m.symbol !== sym) continue;
+      const mk = (p, title) => {
+        if (!p || p <= 0 || p < pMin || p > pMax) return;
+        const yy = y(p);
+        ctx.strokeStyle = "#f59e0b"; ctx.setLineDash([2,3]); ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(plotW, yy); ctx.stroke(); ctx.setLineDash([]);
+        const lbl = title + " " + fmtP(p);
+        const w = ctx.measureText(lbl).width + 10;
+        ctx.fillStyle = "#f59e0b";
+        ctx.fillRect(0, yy - 8, w, 16);
+        ctx.fillStyle = "#0b0e14"; ctx.textAlign = "left";
+        ctx.fillText(lbl, 5, yy);
+      };
+      mk(m.entry, "MANUAL " + String(m.side || "").toUpperCase() + " entry");
+      mk(m.tp_price, "MANUAL TP");
+    }
   }
   /* live price line */
   if (livePrice != null && livePrice >= pMin && livePrice <= pMax) {
@@ -1005,7 +1052,9 @@ async function bootCandles() {
   await bootCandles();
   renderRows(); draw();
   tickLoop();
+  loadManual();
   setInterval(loadTrades, 60000);
+  setInterval(loadManual, 30000);
 })();
 
 /* ── Owner 09-17: Trading-mode toggle (LIVE/PAPER) ──

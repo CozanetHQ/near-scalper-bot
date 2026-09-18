@@ -384,17 +384,13 @@ tr:last-child td{border-bottom:none}
     <div id="log-list"></div>
   </div>
 
-  <div class="view" id="view-chat">
-    <div class="sec-title" style="display:flex;justify-content:space-between;align-items:center">
-      <span>CozanetOS</span>
-      <span id="chat-live-hint" style="font-size:9px;color:var(--faint);font-weight:500;text-transform:none;letter-spacing:0">sees live + manual positions</span>
-    </div>
+  <div class="view" id="view-chart">
     <div class="card" style="padding:0;overflow:hidden">
-      <iframe id="chat-frame" src="https://cozanet-chat-push.vercel.app"
-        style="width:100%;height:calc(100vh - 190px);min-height:420px;border:0;display:block"
-        allow="clipboard-write; microphone"
-        title="CozanetOS chat"></iframe>
+      <iframe id="chart-frame" data-src="./chart.html"
+        style="width:100%;height:calc(100vh - 150px);min-height:480px;border:0;display:block;background:#0a0e17"
+        title="Execution chart"></iframe>
     </div>
+    <div class="s" style="margin-top:6px">Custom canvas engine · live + manual positions · replay, pan, pinch-zoom</div>
   </div>
 
   <div class="bottomnav">
@@ -414,9 +410,9 @@ tr:last-child td{border-bottom:none}
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 13h6M9 17h6"/></svg>
       <span>Logs</span>
     </button>
-    <button class="navbtn" data-view="chat">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-      <span>Chat</span>
+    <button class="navbtn" data-view="chart">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m7 14 4-4 3 3 5-6"/></svg>
+      <span>Chart</span>
     </button>
   </div>
 
@@ -958,6 +954,10 @@ document.querySelectorAll(".navbtn").forEach(btn => btn.onclick = () => {
   document.querySelectorAll(".view").forEach(v => v.classList.remove("on"));
   btn.classList.add("on");
   $("view-" + btn.dataset.view).classList.add("on");
+  // Execution chart is heavy (canvas engine + candle history) — load its
+  // iframe only on first visit so the other tabs stay instant.
+  const cf = document.getElementById("chart-frame");
+  if (btn.dataset.view === "chart" && cf && !cf.src) cf.src = cf.dataset.src;
   window.scrollTo(0,0);
 });
 $("view-all-link").onclick = (e) => { e.preventDefault(); document.querySelector('.navbtn[data-view="logs"]').click(); };
