@@ -1,0 +1,41 @@
+# 2026-09-18: a cancelled/hung tick run held the "tick" concurrency slot for
+# 68 minutes (run 4748 — runner cleanup hung on an orphan python process; the
+# queued chain run 4749 could not start, the hourly cron watchdog was absorbed
+# by the same group, and the bot silently stopped trading). This reaper runs
+# OUTSIDE the tick group and force-cancels any tick run older than 8 minutes
+# (a healthy tick is 4 min + chain; anything older is stuck), so the slot
+# always frees and the chain restarts. Worst-case bot downtime: ~15 min.
+name: Tick Reaper
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: reaper
+  cancel-in-progress: false
+
+permissions:
+  actions: write
+
+jobs:
+  reap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Cancel stuck tick runs (>8 min old)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          now=$(date -u +%s)
+          gh api "repos/CozanetHQ/near-scalper-bot/actions/runs?per_page=30" \
+            --jq '.workflow_runs[] | select(.name=="NEAR Scalper Tick" and .status=="in_progress") | [.id, .created_at] | @tsv' \
+          | while IFS=$'\t' read -r id created; do
+              age=$(( now - $(date -u -d "$created" +%s) ))
+              echo "tick run $id age ${age}s"
+              if [ "$age" -gt 480 ]; then
+                echo "::warning::cancelling stuck tick run $id (age ${age}s)"
+                gh api -X POST "repos/CozanetHQ/near-scalper-bot/actions/runs/$id/cancel" || true
+              fi
+            done
+          echo "reap pass complete"
