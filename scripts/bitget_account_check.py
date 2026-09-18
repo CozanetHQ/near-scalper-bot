@@ -125,5 +125,29 @@ def main():
     print("\nDONE")
 
 
+    # 4) POSITION MODE (owner pre-order verification 2026-09-19) — read-only.
+    # posMode: "one_way_mode" | "hedge_mode". The production order path
+    # (engine/live.py place_entry_limit) sends tradeSide:"open", which is
+    # ONLY valid in hedge mode.
+    try:
+        d = signed("GET", "/api/v2/mix/account/account-setting",
+                   {"productType": "USDT-FUTURES"})
+        rows = show("FUTURES position mode /mix/account/account-setting (REAL account)", d)
+        if isinstance(rows, dict):
+            print(f"  posMode = {rows.get('posMode')}   "
+                  f"(one_way_mode | hedge_mode)")
+        elif isinstance(rows, list):
+            for r in rows:
+                print(f"  posMode = {r.get('posMode')}")
+    except urllib.error.HTTPError as e:
+        print(f"\n=== POSITION MODE === HTTP {e.code}")
+        try:
+            print(json.dumps(json.loads(e.read().decode()))[:300])
+        except Exception:
+            print("(no body)")
+    except Exception as e:
+        print(f"\n=== POSITION MODE === ERROR {type(e).__name__}: {str(e)[:200]}")
+
+
 if __name__ == "__main__":
     main()
