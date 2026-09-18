@@ -1749,6 +1749,16 @@ def main():
                 except Exception as e2:
                     log(f"[{pair}] ERROR updating state: {e2}")
 
+        # Manual Position Auto-Management layer (owner spec 2026-09-18) —
+        # ADDITIVE, fully guarded: detects manually-opened Bitget positions
+        # and manages their TP. A failure here must never interrupt trading.
+        # Config default OFF (detect+alert only) until the owner flips it.
+        try:
+            from engine import manual_manager
+            manual_manager.run_tick(sys.modules[__name__])
+        except Exception as _mm_e:
+            log(f"manual-manager cycle skipped: {_mm_e}")
+
         elapsed = time.time() - start
         if elapsed < MAX_RUNTIME:
             time.sleep(max(1, POLL_INTERVAL - elapsed % POLL_INTERVAL))

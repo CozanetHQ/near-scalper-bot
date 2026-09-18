@@ -281,6 +281,15 @@ tr:last-child td{border-bottom:none}
       <div class="empty" id="ov-pos-empty" style="display:none">No open positions — engine waiting for signal + EV clearance</div>
     </div>
 
+    <div class="card" id="manual-card" style="display:none">
+      <div class="row" style="justify-content:space-between;align-items:center">
+        <div class="lbl">Manual positions (auto-managed, separate ledger)</div>
+        <span id="mm-config-badge" class="badge" style="font-size:8px">—</span>
+      </div>
+      <div id="mm-positions" style="margin-top:6px"></div>
+      <div class="s" id="mm-closed" style="margin-top:4px"></div>
+    </div>
+
     <div class="sec-title">Key metrics</div>
     <div class="card">
       <div class="kmet-grid" id="kmets"></div>
@@ -478,12 +487,45 @@ async function getJSON(path){
   if(!r.ok) throw new Error(path + " " + r.status);
   return r.json();
 }
+
+function renderManual(){
+  const el = $("manual-card"); if(!el) return;
+  const mm = LAST.manual || {};
+  const cfg = mm.config || {};
+  const ps = mm.positions || {};
+  const closed = mm.closed || [];
+  const rows = Object.values(ps);
+  if(!rows.length && !closed.length && !cfg.enabled){ el.style.display = "none"; return; }
+  el.style.display = "";
+  const badge = $("mm-config-badge");
+  const on = cfg.enabled === true;
+  const kill = cfg.kill === true;
+  badge.textContent = kill ? "KILL SWITCH" : (on ? "AUTO-MANAGE ON" : "DETECT ONLY");
+  badge.className = "badge " + (kill ? "stale" : (on ? "livechip" : "paperchip"));
+  $("mm-positions").innerHTML = rows.length ? rows.map(r => {
+    const st = r.status === "MANUAL_IGNORED" ? "paperchip" : "livechip";
+    const tp = r.tp_price ? " · TP $" + Number(r.tp_price).toPrecision(6) : "";
+    const pct = r.expected_tp_pct != null ? " · exp " + r.expected_tp_pct.toFixed(2) + "%" : "";
+    return `<div class="log-meta" style="padding:3px 0;border-bottom:1px solid var(--line)">
+      <b>${esc(r.symbol.replace("USDT",""))}</b>
+      <span class="badge ${esc(r.side)}">${esc(r.side.toUpperCase())}</span>
+      <span class="badge ${st}" style="font-size:8px">${esc((r.status||"").replace("MANUAL_",""))}</span>
+      entry ${esc(Number(r.entry).toPrecision(6))} · size ${esc(r.size)}${tp}${pct}
+    </div>`;
+  }).join("") : `<div class="s">No open manual positions</div>`;
+  $("mm-closed").textContent = closed.length
+    ? closed.length + " closed manual trade(s) — PnL kept separate from strategy stats (data/manual_trades.jsonl)"
+    : "";
+}
+
 async function loadAll(){
-  const [state, reg] = await Promise.all([getJSON("state/state.json"), getJSON("param_registry.json")]);
+  const [state, reg, mm] = await Promise.all([getJSON("state/state.json"), getJSON("param_registry.json"),
+      getJSON("data/manual_manager.json").catch(()=>({}))]);
+  LAST.manual = mm || {};
   const txt = await (await fetch(BASE + "data/trades.jsonl?t=" + Date.now(), {cache:"no-store"})).text();
   const trades = txt.trim().split("\n").filter(l => l.startsWith("{")).map(l => { try{return JSON.parse(l)}catch(e){return null} }).filter(Boolean);
   trades.sort((a,b) => tOf(a.closed_at) - tOf(b.closed_at));
-  LAST = {state, trades, reg};
+  LAST = {state, trades, reg, manual: LAST.manual};
   renderAll();
 }
 
@@ -529,6 +571,7 @@ function exitMixOf(T){
 const REASON_COLOR = {TP:"#2dd4a7", BE_STOP:"#38bdf8", FLOOR40:"#38bdf8", PROTECTED:"#38bdf8", MAE_KILL:"#f4645f", HARD_SL:"#f4645f", LIQ:"#f4645f", MAX_AGE:"#8892a6", EOD:"#8892a6"};
 
 function renderAll(){
+  try{ renderManual(); }catch(e){} 
   const s = LAST.state, acct = s.account || {};
   if(MODE_FILTER_AUTO) MODE_FILTER = (acct.mode||"PAPER").toUpperCase() === "LIVE" ? "LIVE" : "all";
   const T = filteredTrades(LAST.trades), sess = sessionTrades();

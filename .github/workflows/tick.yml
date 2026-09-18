@@ -62,6 +62,12 @@ jobs:
           LIVE_MARGIN_USD: '3'
           MIN_LIVE_EQUITY: '3.5'
           LIVE_RECHECK_MINUTES: '60'
+          # ── Manual Position Auto-Management (owner spec 2026-09-18) ──
+          # DEFAULT OFF (detect + Telegram alert only, no TP placement).
+          # Runtime override lives in data/manual_manager.json config block
+          # (set via scripts/set_manual_manager.py / manual-manager.yml).
+          AUTO_MANAGE_MANUAL_POSITIONS: '0'
+          MANUAL_MANAGER_KILL_SWITCH: '0'
           BITGET_DEMO: '0'
           BITGET_API_KEY: ${{ secrets.BITGET_API_KEY }}
           BITGET_SECRET: ${{ secrets.BITGET_SECRET }}

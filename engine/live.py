@@ -245,6 +245,65 @@ class BitgetPrivate:
             return rows.get("entrustedList", []) or []
         return rows or []
 
+    # ── manual-position manager endpoints (owner spec 2026-09-18; additive,
+    # used ONLY by engine/manual_manager.py — no existing call path changes) ──
+    def all_positions(self):
+        """Every open USDT-FUTURES position on this account, one-way or hedge.
+        Normalized rows: symbol/side/size/entry/leverage/unrealized_pl/
+        margin_mode/created_ms."""
+        rows = self._req("GET", "/api/v2/mix/position/all-position", {
+            "productType": PRODUCT, "marginCoin": MARGIN_COIN,
+        })
+        out = []
+        for r in rows or []:
+            total = float(r.get("total") or 0)
+            if total == 0:
+                continue
+            side = (r.get("holdSide") or "").lower()
+            if side not in ("long", "short"):
+                side = "long" if total > 0 else "short"
+            out.append({
+                "symbol": r.get("symbol"), "side": side, "size": abs(total),
+                "entry": float(r.get("avgPrice") or 0),
+                "leverage": int(float(r.get("leverage") or 10)),
+                "unrealized_pl": float(r.get("unrealizedPL") or 0),
+                "margin_mode": (r.get("marginMode") or "isolated"),
+                "created_ms": int(r.get("cTime") or 0),
+            })
+        return out
+
+    def orders_plan_profit_loss(self, symbol):
+        """Resting profit/loss plan (TP/SL trigger) orders for a symbol."""
+        rows = self._req("GET", "/api/v2/mix/order/orders-plan", {
+            "symbol": symbol, "productType": PRODUCT, "planType": "profit_loss",
+        })
+        if isinstance(rows, dict):
+            return rows.get("entrustedList", []) or []
+        return rows or []
+
+    def place_reduce_limit(self, symbol, side, qty, price, margin_mode="isolated"):
+        """Reduce-only GTC limit (a standing TP for an open position).
+        side = 'sell' closes a long, 'buy' closes a short."""
+        body = {
+            "symbol": symbol, "productType": PRODUCT,
+            "marginMode": "isolated" if (margin_mode or "isolated") == "isolated" else "crossed",
+            "marginCoin": MARGIN_COIN,
+            "size": self._fmt_size(symbol, qty),
+            "side": side,
+            "tradeSide": "close",
+            "orderType": "limit",
+            "force": "gtc",
+            "reduceOnly": "YES",
+            "price": self._fmt_price(symbol, price),
+        }
+        try:
+            data = self._req("POST", "/api/v2/mix/order/place-order", body=body)
+        except BitgetError:
+            # some Bitget revision may reject reduceOnly alongside tradeSide
+            body.pop("reduceOnly", None)
+            data = self._req("POST", "/api/v2/mix/order/place-order", body=body)
+        return (data or {}).get("orderId")
+
     # ── formatting ──
     def round_qty(self, symbol, qty):
         step = self.contract_info(symbol)["size_step"]

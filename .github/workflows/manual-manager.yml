@@ -1,0 +1,61 @@
+name: Manual Manager Toggle
+on:
+  workflow_dispatch:
+    inputs:
+      state:
+        description: "AUTO_MANAGE_MANUAL_POSITIONS"
+        required: true
+        type: choice
+        options: ["on", "off"]
+      kill:
+        description: "MANUAL_MANAGER_KILL_SWITCH (read-only mode)"
+        required: false
+        type: choice
+        default: ""
+        options: ["", "on", "off"]
+      reason:
+        description: "Why (audit trail)"
+        required: true
+
+# Owner spec 2026-09-18: the manual-position manager's authenticated toggle.
+# Data-file edit only — NEVER touches engine code, strategy, or state.json.
+# Editing only data/manual_manager.json means there is no tick-restart race to
+# guard (each tick re-reads the file), so unlike set_mode.yml there is no need
+# to pause the tick chain: the next tick picks the new config up mid-loop.
+concurrency:
+  group: manual-manager-toggle
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  toggle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Apply toggle
+        env:
+          SET_MANUAL_MANAGER: ${{ inputs.state }}
+          SET_MANUAL_KILL: ${{ inputs.kill }}
+          SET_MANUAL_ACTOR: ${{ github.actor }}
+          SET_MANUAL_REASON: ${{ inputs.reason }}
+        run: python scripts/set_manual_manager.py
+
+      - name: Commit config
+        run: |
+          git config user.email "fassdavid722@gmail.com"
+          git config user.name "CozyCrypto"
+          git add data/manual_manager.json data/manual_manager_log.jsonl
+          if git diff --cached --quiet; then echo "no change"; exit 0; fi
+          git commit -m "manual-manager: ${{ inputs.state }}${{ inputs.kill && format(' kill={0}', inputs.kill) || '' }} (${{ github.actor }})"
+          git pull --rebase origin main || true
+          git push || echo "push failed — retry next toggle"
