@@ -59,6 +59,13 @@ input{font:inherit;color:inherit;background:none;border:none;outline:none}
 
 /* performance grid */
 .perf-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.mkt-strip{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.mkt-chip{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:9px 11px;
+  display:flex;flex-direction:column;gap:1px;min-width:0}
+.mkt-pair{font-size:10px;letter-spacing:.06em;color:var(--faint);font-weight:700;text-transform:uppercase}
+.mkt-px{font-size:15px;font-weight:700;color:var(--txt);font-variant-numeric:tabular-nums}
+.mkt-chg{font-size:10.5px;font-weight:600}
+.mkt-chg.pos{color:var(--mint)} .mkt-chg.neg{color:var(--red)}
 .perf-tile{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px 15px}
 .perf-tile .v{font-size:21px;font-weight:800;margin-top:7px;letter-spacing:-.01em}
 .perf-tile .s{font-size:10.5px;color:var(--faint);margin-top:4px}
@@ -238,6 +245,9 @@ tr:last-child td{border-bottom:none}
   <!-- ============ OVERVIEW ============ -->
   <div class="view on" id="view-overview">
     <div class="errbanner" id="err-ov">Data fetch failed — retrying…</div>
+
+    <div class="sec-title">Market · Bitget live <span id="mkt-age" style="text-transform:none;letter-spacing:.02em;font-weight:400"></span></div>
+    <div class="mkt-strip" id="mkt-strip"><div class="mkt-chip"><span class="mkt-pair">—</span><span class="mkt-px">loading Bitget…</span></div></div>
 
     <div class="sec-title">Performance (session)</div>
     <div class="perf-grid">
@@ -422,6 +432,47 @@ function filteredTrades(arr){
   return MODE_FILTER === "all" ? arr : arr.filter(t => (t.mode || "PAPER").toUpperCase() === MODE_FILTER);
 }
 
+// ── live market prices straight from Bitget (owner 09-18) ──────────────
+// Same proxy the execution chart uses: on *.vercel.app the /api/ticker
+// serverless fn relays api.bitget.com (browser CORS blocks it direct);
+// served anywhere else we hit Bitget's public ticker directly.
+const HAS_TICKER_PROXY = location.hostname.endsWith("vercel.app");
+let MKT = {};   // pair ("NEARUSDT") -> {last, chg, t}
+async function fetchTicker(pair){
+  const url = HAS_TICKER_PROXY
+    ? "api/ticker?symbol=" + encodeURIComponent(pair)
+    : "https://api.bitget.com/api/v2/mix/market/ticker?symbol=" + encodeURIComponent(pair) + "&productType=USDT-FUTURES";
+  const j = await (await fetch(url, {cache:"no-store"})).json();
+  if(j && j.code === "00000" && j.data && j.data[0]){
+    const d = j.data[0];
+    const last = +d.lastPr, open = +d.open24h;
+    // prefer deriving 24h change from open24h (change24h units are ambiguous
+    // across Bitget doc revisions; open->last is unambiguous)
+    const chg = (open > 0 && last > 0) ? (last - open) / open : (+d.change24h || 0) / 100;
+    MKT[pair] = {last, chg, t: Date.now()};
+  }
+}
+async function refreshMarket(){
+  const pairs = Object.keys(((LAST.state||{}).pairs) || {});
+  await Promise.all(pairs.map(p => fetchTicker(p).catch(()=>{})));
+  renderMarket();
+  if(LAST.state) renderOverview(sessionTrades(), livePositions(), LAST.state.account || {},
+      Number(LAST.state.account.balance)||0, Number(LAST.state.account.session_start_balance)||10);
+}
+function renderMarket(){
+  const el = $("mkt-strip"); if(!el) return;
+  const pairs = Object.keys(((LAST.state||{}).pairs) || {});
+  if(!pairs.length) return;
+  el.innerHTML = pairs.map(p => {
+    const m = MKT[p];
+    const nm = p.replace("USDT", "/USDT");
+    if(!m) return `<div class="mkt-chip"><span class="mkt-pair">${esc(nm)}</span><span class="mkt-px">—</span><span class="mkt-chg">…</span></div>`;
+    const cls = m.chg >= 0 ? "pos" : "neg";
+    return `<div class="mkt-chip"><span class="mkt-pair">${esc(nm)}</span><span class="mkt-px">${m.last.toPrecision(6)}</span><span class="mkt-chg ${cls}">${(m.chg>=0?"+":"")+(m.chg*100).toFixed(2)}% 24h</span></div>`;
+  }).join("");
+  const ts = Object.values(MKT).map(m => m.t);
+  if(ts.length) $("mkt-age").textContent = "· updated " + new Date(Math.max(...ts)).toISOString().slice(11,19) + " UTC";
+}
 async function getJSON(path){
   const r = await fetch(BASE + path + "?t=" + Date.now(), {cache:"no-store"});
   if(!r.ok) throw new Error(path + " " + r.status);
@@ -610,7 +661,7 @@ function posCardHTML(q){
   return `<div class="poscard">
     <div class="pc-main">
       <span class="pc-pair">${esc(q.pr)}</span> <span class="badge ${esc(q.s)}">${esc(q.s)}</span>
-      <div class="pc-meta">entry ${Number(q.e).toPrecision(6)} · ${q.lv?q.lv+"x":"—"} · ${fmt(q.n)} notional</div>
+      <div class="pc-meta">entry ${Number(q.e).toPrecision(6)}${MKT[q.pr] ? " · now " + MKT[q.pr].last.toPrecision(6) : ""} · ${q.lv?q.lv+"x":"—"} · ${fmt(q.n)} notional</div>
     </div>
     <div class="pc-right">
       <div class="pc-pnl pos">${pct(q.mf,2)}</div>
@@ -867,7 +918,7 @@ $("sheet-bg").onclick = () => { $("sheet-bg").classList.remove("on"); $("sheet")
 
 let lastErr = 0;
 async function tick(){
-  try{ await loadAll(); $("err-ov").style.display="none"; }
+  try{ await loadAll(); $("err-ov").style.display="none"; refreshMarket(); setInterval(refreshMarket, 20000); }
   catch(e){ lastErr = Date.now(); $("err-ov").style.display="block";
     $("err-ov").textContent = "Data fetch failed — last attempt " + new Date(lastErr).toISOString().slice(11,19) + " UTC, retrying in 60s"; }
 }
