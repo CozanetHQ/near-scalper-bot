@@ -82,16 +82,40 @@ class BitgetPrivate:
         return base64.b64encode(mac.digest()).decode()
 
     def _req(self, method, path, params=None, body=None):
+        """GET is retried on transient network faults (2026-09-19 fix: the
+        live account probe / reconcile reads were single-attempt, so one
+        "Connection reset by peer" aborted the whole tick for that pair —
+        that was the actual live-trading blocker, not a Bitget rejection).
+        POST (place/cancel/leverage) stays single-attempt, unchanged: an
+        order-placement call must NEVER be blindly retried — a reset can
+        happen after Bitget already accepted the order, and retrying could
+        submit a duplicate. GETs are read-only and safe to retry."""
         if not keys_present():
             raise BitgetError("live trading keys missing")
+        is_get = method.upper() == "GET"
+        attempts = 3 if is_get else 1
+        last_exc = None
+        for attempt in range(attempts):
+            try:
+                return self._do_req(method, path, params, body)
+            except BitgetError:
+                raise   # exchange-returned error code — not transient, don't retry
+            except Exception as e:
+                last_exc = e
+                if attempt < attempts - 1:
+                    time.sleep(0.5 * (2 ** attempt))   # 0.5s, 1s
+                    continue
+                raise
+        raise last_exc
+
+    def _do_req(self, method, path, params=None, body=None):
         params = params or {}
-        if params:
-            path = path + "?" + urllib.parse.urlencode(params)
+        req_path = path + ("?" + urllib.parse.urlencode(params) if params else "")
         body_str = json.dumps(body) if body else ""
         ts = str(int(time.time() * 1000))
         headers = {
             "ACCESS-KEY": _KEYS["key"],
-            "ACCESS-SIGN": self._sign(ts, method.upper(), path, body_str),
+            "ACCESS-SIGN": self._sign(ts, method.upper(), req_path, body_str),
             "ACCESS-TIMESTAMP": ts,
             "ACCESS-PASSPHRASE": _KEYS["passphrase"],
             "Content-Type": "application/json",
@@ -99,7 +123,7 @@ class BitgetPrivate:
         }
         if self.demo:
             headers["pap"] = "1"   # Bitget demo trading
-        url = API + path
+        url = API + req_path
         req = urllib.request.Request(url, data=(body_str.encode() if body_str else None),
                                      headers=headers, method=method.upper())
         with urllib.request.urlopen(req, timeout=10) as res:
