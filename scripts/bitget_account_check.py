@@ -131,7 +131,7 @@ def main():
     # ONLY valid in hedge mode.
     try:
         d = signed("GET", "/api/v2/mix/account/account",
-                   {"productType": "USDT-FUTURES", "marginCoin": "USDT"})
+                   {"productType": "USDT-FUTURES", "marginCoin": "USDT", "symbol": "NEARUSDT"})
         rows = show("FUTURES position mode /mix/account/account (REAL account)", d)
         if isinstance(rows, dict):
             print(f"  posMode = {rows.get('posMode')}   "
