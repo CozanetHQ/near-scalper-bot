@@ -675,6 +675,7 @@ def _fill(T, state, sv, pending, lvl, iso, symbol, _pt):
     except Exception:
         pass
     sv["pending"] = None
+    pos["exec_mode"] = "PAPER"   # 2026-09-18: trade mode tag = execution truth
     sv["pos"] = pos
     _pt(f"sovereign FILLED {side} @ {lvl:.6g} (maker retest) | SL {pos['sl']:.6g} TP {pos['tp']:.6g}")
     return "opened"
@@ -713,6 +714,7 @@ def _close(T, state, pos, exit_px, reason, symbol, sv, su, iso, _pt):
         "reason": reason, "balance_after": new_balance,
         "atr_frac_at_entry": pos["atr_frac_at_entry"], "regime_at_entry": "sovereign-v6",
         "opened_at": pos["opened_at"], "closed_at": iso,
+        "mode": pos.get("exec_mode", "PAPER"),   # execution truth, not account flag (2026-09-18)
     }
     wins = (state.get("wins") or 0) + (1 if net > 0 else 0)
     losses = (state.get("losses") or 0) + (0 if net > 0 else 1)
@@ -808,6 +810,7 @@ def _live_reconcile(T, live_cli, state, symbol, sv, su, now_iso, _pt):
                 "margin": pending.get("margin", 0),
                 "sl": od["sl"] or pending["sl"], "tp": od["tp"] or pending["tp"],
                 "atr_frac_at_entry": pending["atr_frac"], "entry_mode": "maker-live",
+                "exec_mode": ("DEMO" if sv.get("trading_env") == "DEMO_FALLBACK" else "LIVE"),
                 "opened_at": now_iso, "mfe_frac": 0.0, "mae_frac": 0.0,
                 "trade_id": None, "fvg_top": pending.get("fvg_top"),
                 "fvg_bottom": pending.get("fvg_bottom"),
@@ -893,6 +896,7 @@ def _live_reconcile(T, live_cli, state, symbol, sv, su, now_iso, _pt):
             "notional": ex["size"] * ex["entry"], "margin": ex["size"] * ex["entry"] / max(ex.get("leverage") or LEV_CAP, 1),
             "sl": 0.0, "tp": 0.0,
             "atr_frac_at_entry": 0.0, "entry_mode": "maker-live",
+            "exec_mode": ("DEMO" if sv.get("trading_env") == "DEMO_FALLBACK" else "LIVE"),
             "opened_at": now_iso, "mfe_frac": 0.0, "mae_frac": 0.0,
         }
         _pt(f"LIVE adopted orphan {ex['side']} position @ {ex['entry']:.6g} — exchange-side TP/SL active, verify in Bitget app")

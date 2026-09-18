@@ -567,9 +567,20 @@ function renderAll(){
 }
 
 function renderOverview(sess, positions, acct, bal, sessBal){
-  $("k-bal").textContent = fmt(bal);
-  const peakBal = Number(acct.peak_balance) || bal;
-  $("k-dd").textContent = "peak " + fmt(peakBal) + " · dd " + pct(peakBal ? (peakBal-bal)/peakBal : 0);
+  // 2026-09-18: in LIVE mode the headline balance is the REAL Bitget wallet
+  // (acct.live_equity, probed by the engine each tick), not the paper ledger —
+  // the owner must never have to guess which number is real money again.
+  const liveEq = Number(acct.live_equity) || 0;
+  const isLive = (acct.mode || "PAPER").toUpperCase() === "LIVE";
+  if(isLive && liveEq > 0){
+    $("k-bal").textContent = fmt(liveEq);
+    const eqAt = acct.live_equity_at ? " · " + String(acct.live_equity_at).slice(11,19) + " UTC" : "";
+    $("k-dd").textContent = "REAL Bitget wallet" + eqAt + " · paper ledger " + fmt(bal) + " (sim)";
+  } else {
+    $("k-bal").textContent = fmt(bal);
+    const peakBal = Number(acct.peak_balance) || bal;
+    $("k-dd").textContent = "peak " + fmt(peakBal) + " · dd " + pct(peakBal ? (peakBal-bal)/peakBal : 0);
+  }
 
   const net = sess.reduce((a,t) => a + (t.net_pnl||0), 0);
   $("k-net").textContent = (net>=0?"+":"-") + "$" + Math.abs(net).toFixed(2);
@@ -660,7 +671,7 @@ function posCardHTML(q){
   const held = q.o ? Math.round((Date.now()-tOf(q.o))/60000) : null;
   return `<div class="poscard">
     <div class="pc-main">
-      <span class="pc-pair">${esc(q.pr)}</span> <span class="badge ${esc(q.s)}">${esc(q.s)}</span>
+      <span class="pc-pair">${esc(q.pr)}</span> <span class="badge ${esc(q.s)}">${esc(q.s)}</span> <span class="badge ${(q.md||"PAPER")==="LIVE"?"livechip":"paperchip"}" style="font-size:8px" title="Execution truth: LIVE = real Bitget order, PAPER = simulated fill">${esc(String(q.md||"PAPER").toUpperCase())}</span>
       <div class="pc-meta">entry ${Number(q.e).toPrecision(6)}${MKT[q.pr] ? " · now " + MKT[q.pr].last.toPrecision(6) : ""} · ${q.lv?q.lv+"x":"—"} · ${fmt(q.n)} notional</div>
     </div>
     <div class="pc-right">

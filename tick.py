@@ -93,6 +93,40 @@ def write_mode(new_mode, reason, actor):
         json.dump(master, f, indent=2)
     return master
 
+
+def _live_keys_present():
+    """True iff Bitget API credentials are actually in env (mirrors the
+    sovereign engine's keys_present() gate)."""
+    try:
+        from engine import live as _L
+        return _L.keys_present()
+    except Exception:
+        return False
+
+
+def pair_exec_mode(pair, master=None):
+    """(2026-09-18 integrity fix) The ACTUAL execution mode for THIS pair:
+    "LIVE" only when this pair's orders really go to Bitget, else "PAPER".
+
+    Background: overnight (03:14-07:05 UTC 09-18) ETH/SOL paper fills were
+    tagged mode=LIVE in the ledger because the open path copied the
+    ACCOUNT-level mode flag — the owner then correctly expected to find
+    those trades on Bitget and they weren't there. A trade's mode tag must
+    reflect execution truth, never the account flag alone.
+
+    Live execution exists ONLY in the sovereign engine (v5 tick has no
+    real-order path), and requires every gate of sovereign's live_mode
+    check: SOVEREIGN_V6 + LIVE_TRADING + pair in BOTH SOVEREIGN_PAIRS and
+    LIVE_PAIRS + Bitget keys present + account mode LIVE. Anything else is
+    a paper fill and is tagged PAPER.
+    """
+    if not (SOVEREIGN_V6 and LIVE_TRADING
+            and pair in SOVEREIGN_PAIRS and pair in LIVE_PAIRS):
+        return "PAPER"
+    if not _live_keys_present():
+        return "PAPER"
+    return current_mode(master)
+
 # ── SESSION & LIQUIDITY REGIME MATRIX (owner spec 2026-09-17, Sec 1.2) ──────
 # Recorded on every position as metadata (audit trail / Section 3 schema)
 # for regime-outcome study. Does NOT currently gate leverage or active pairs
@@ -745,6 +779,12 @@ def sync(pair, state_update=None, trade=None):
     master = load_master()
     acct = master.setdefault("account", {})
     su = state_update or {}
+    if "last_live_equity" in su:   # real Bitget wallet probe (2026-09-18)
+        try:
+            acct["live_equity"] = float(su["last_live_equity"])
+            acct["live_equity_at"] = su.get("last_live_check") or acct.get("live_equity_at")
+        except (TypeError, ValueError):
+            pass
     if "balance" in su:
         acct["balance"] = su["balance"]
         try:
@@ -1562,7 +1602,7 @@ def process_tick(state):
                         # front here so the chart can draw the TP1 zone before
                         # it fills, not just after.
                         "session_regime": session_regime_at(now),
-                        "mode": state.get("_mode") or "PAPER",
+                        "mode": pair_exec_mode(symbol),
                         "tp1_price": round(entry + PARTIAL_TP_FRAC * entry_tp_dist, 8) if want == "long"
                                      else round(entry - PARTIAL_TP_FRAC * entry_tp_dist, 8),
                     })
