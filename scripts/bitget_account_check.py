@@ -130,9 +130,9 @@ def main():
     # (engine/live.py place_entry_limit) sends tradeSide:"open", which is
     # ONLY valid in hedge mode.
     try:
-        d = signed("GET", "/api/v2/mix/account/account-setting",
-                   {"productType": "USDT-FUTURES"})
-        rows = show("FUTURES position mode /mix/account/account-setting (REAL account)", d)
+        d = signed("GET", "/api/v2/mix/account/account",
+                   {"productType": "USDT-FUTURES", "marginCoin": "USDT"})
+        rows = show("FUTURES position mode /mix/account/account (REAL account)", d)
         if isinstance(rows, dict):
             print(f"  posMode = {rows.get('posMode')}   "
                   f"(one_way_mode | hedge_mode)")
