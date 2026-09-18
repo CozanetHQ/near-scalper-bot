@@ -1,5 +1,7 @@
 {
-  "config": {},
+  "config": {
+    "_api_err_alerted": 1789774962.3634007
+  },
   "positions": {},
   "closed": []
 }
