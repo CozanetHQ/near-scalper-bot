@@ -384,6 +384,19 @@ tr:last-child td{border-bottom:none}
     <div id="log-list"></div>
   </div>
 
+  <div class="view" id="view-chat">
+    <div class="sec-title" style="display:flex;justify-content:space-between;align-items:center">
+      <span>CozanetOS</span>
+      <span id="chat-live-hint" style="font-size:9px;color:var(--faint);font-weight:500;text-transform:none;letter-spacing:0">sees live + manual positions</span>
+    </div>
+    <div class="card" style="padding:0;overflow:hidden">
+      <iframe id="chat-frame" src="https://cozanet-chat-push.vercel.app"
+        style="width:100%;height:calc(100vh - 190px);min-height:420px;border:0;display:block"
+        allow="clipboard-write; microphone"
+        title="CozanetOS chat"></iframe>
+    </div>
+  </div>
+
   <div class="bottomnav">
     <button class="navbtn on" data-view="overview">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5 12 3l9 6.5V20a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1Z"/></svg>
@@ -400,6 +413,10 @@ tr:last-child td{border-bottom:none}
     <button class="navbtn" data-view="logs">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 13h6M9 17h6"/></svg>
       <span>Logs</span>
+    </button>
+    <button class="navbtn" data-view="chat">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      <span>Chat</span>
     </button>
   </div>
 
