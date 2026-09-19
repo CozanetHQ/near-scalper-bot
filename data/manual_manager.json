@@ -2,6 +2,26 @@
   "config": {
     "_api_err_alerted": 1789774962.3634007
   },
-  "positions": {},
+  "positions": {
+    "XRPUSDT:short": {
+      "symbol": "XRPUSDT",
+      "side": "short",
+      "entry": 0.0,
+      "size": 19.0,
+      "leverage": 10,
+      "margin_mode": "crossed",
+      "created_ms": 1789786636944,
+      "detected_at": "2026-09-19T02:57:23.844924+00:00",
+      "status": "MANUAL_IGNORED",
+      "note": "no matching bot footprint; TP compute failed: HTTP Error 400: Bad Request",
+      "tp_price": null,
+      "tp_order_id": null,
+      "atr_frac": null,
+      "expected_tp_pct": null,
+      "last_seen_size": 19.0,
+      "key": "XRPUSDT:short",
+      "last_checked": "2026-09-19T02:57:53.662150+00:00"
+    }
+  },
   "closed": []
 }
