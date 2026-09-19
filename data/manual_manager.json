@@ -2,7 +2,27 @@
   "config": {
     "enabled": true
   },
-  "positions": {},
+  "positions": {
+    "BTWUSDT:short": {
+      "symbol": "BTWUSDT",
+      "side": "short",
+      "entry": 0.578415,
+      "size": 20.0,
+      "leverage": 5,
+      "margin_mode": "isolated",
+      "created_ms": 1789825930574,
+      "detected_at": "2026-09-19T13:52:19.566463+00:00",
+      "status": "MANUAL_MANAGED",
+      "note": "no matching bot footprint",
+      "tp_price": 0.5704,
+      "tp_order_id": null,
+      "atr_frac": 0.00693637336103219,
+      "expected_tp_pct": 1.387274672206438,
+      "last_seen_size": 20.0,
+      "key": "BTWUSDT:short",
+      "last_checked": "2026-09-19T13:52:34.550657+00:00"
+    }
+  },
   "closed": [
     {
       "symbol": "XRPUSDT",
