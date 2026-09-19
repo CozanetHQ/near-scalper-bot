@@ -338,7 +338,13 @@ class BitgetPrivate:
                 side = "long" if total > 0 else "short"
             out.append({
                 "symbol": r.get("symbol"), "side": side, "size": abs(total),
-                "entry": float(r.get("avgPrice") or 0),
+                # 2026-09-19 fix (mirror of the single-position fix): the
+                # all-position rows expose "averageOpenPrice"/"openPriceAvg",
+                # not "avgPrice" -- manual positions were adopted with entry
+                # 0.0, which broke the manual manager's TP compute
+                # (non-positive TP) and any downstream per-unit math.
+                "entry": float(r.get("averageOpenPrice") or r.get("openPriceAvg")
+                               or r.get("avgPrice") or 0),
                 "leverage": int(float(r.get("leverage") or 10)),
                 "unrealized_pl": float(r.get("unrealizedPL") or 0),
                 "margin_mode": (r.get("marginMode") or "isolated"),

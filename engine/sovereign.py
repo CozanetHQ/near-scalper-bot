@@ -370,10 +370,18 @@ def process_pair(state):
             p = sv.get("pos")
             if p:
                 side = p["side"]
-                adv = (c["high"] - p["entry"]) / p["entry"] if side == "long" else (p["entry"] - c["low"]) / p["entry"]
-                bad = (c["low"] - p["entry"]) / p["entry"] if side == "long" else (p["entry"] - c["high"]) / p["entry"]
-                p["mfe_frac"] = round(max(p.get("mfe_frac") or 0.0, max(adv, 0)), 6)
-                p["mae_frac"] = round(max(p.get("mae_frac") or 0.0, max(bad, 0)), 6)
+                # 2026-09-19 P0 fix: an orphan-adopted position (opened manually
+                # on Bitget, adopted with entry unknown -> 0.0 under the old
+                # avgPrice field bug) crashed EVERY tick here with float
+                # division by zero — the walk never reached reconcile, so the
+                # pair froze in "position still open" (NEAR/XRP stuck since
+                # 02:47 UTC). Excursions are meaningless without an entry —
+                # skip them; _live_reconcile owns booking the real close.
+                if p.get("entry"):
+                    adv = (c["high"] - p["entry"]) / p["entry"] if side == "long" else (p["entry"] - c["low"]) / p["entry"]
+                    bad = (c["low"] - p["entry"]) / p["entry"] if side == "long" else (p["entry"] - c["high"]) / p["entry"]
+                    p["mfe_frac"] = round(max(p.get("mfe_frac") or 0.0, max(adv, 0)), 6)
+                    p["mae_frac"] = round(max(p.get("mae_frac") or 0.0, max(bad, 0)), 6)
             continue
         # lab-faithful sweep visibility: the lab's gate only ever saw the last
         # completed 15m candle WHILE ARMED. Candles closed while the machine
@@ -385,6 +393,12 @@ def process_pair(state):
         # ── 1. open position management ──
         pos = sv.get("pos")
         if pos:
+            if not pos.get("entry"):
+                # 2026-09-19 P0 fix: entry-0 orphan — excursion math divides by
+                # zero and tp/sl==0 would instantly fake-close on candles.
+                # Advance the cursor; _live_reconcile books the real close.
+                sv["walk_ms"] = ts
+                continue
             side = pos["side"]
             adv = (c["high"] - pos["entry"]) / pos["entry"] if side == "long" else (pos["entry"] - c["low"]) / pos["entry"]
             adv_bad = (c["low"] - pos["entry"]) / pos["entry"] if side == "long" else (pos["entry"] - c["high"]) / pos["entry"]
@@ -582,6 +596,10 @@ def process_pair(state):
     # ── live-price touch checks between candle closes (intra-tick safety;
     #    PAPER ONLY — in live mode the exchange's resting orders do this) ──
     pos = None if live_mode else sv.get("pos")
+    # 2026-09-19 P0 fix: entry-0 orphan must not hit tp/sl==0 touch checks
+    # (a long with tp=0 "fills" instantly at 0.0 — a fake close).
+    if pos and not pos.get("entry"):
+        pos = None
     if pos and action in ("observe", "hold"):
         side = pos["side"]
         if (side == "long" and price <= pos["sl"]) or (side == "short" and price >= pos["sl"]):

@@ -130,8 +130,13 @@ def compute_tp(T, symbol, side, entry):
     """Production TP path (engine/sovereign.py _live_place): 
     dp = ATR14(2m)/close * entry ; tp = entry +/- RR * dp. Single source of
     truth: imports atr_series and RR from sovereign. Raises on data problems."""
-    from engine.sovereign import atr_series, RR
-    candles = T.fetch_candles("2m", 300, symbol)
+    # 2026-09-19 fix: Bitget has NO native 2m granularity — fetch_candles("2m")
+    # returned HTTP 400 EVERY time (the exact "TP compute failed: HTTP Error
+    # 400" on the owner's tracked SOL short, so no manual TP could ever be
+    # computed). Mirror the production walk exactly: fetch 1m, drop the
+    # in-progress candle, resample to 2m locally, ATR14 on the resampled series.
+    from engine.sovereign import atr_series, RR, resample_2m
+    candles = resample_2m(T.fetch_candles("1m", 600, symbol)[:-1])
     series = atr_series(candles, 14)
     atr = next((a for a in reversed(series) if a is not None), None)
     if not atr or not candles or not candles[-1]["close"]:

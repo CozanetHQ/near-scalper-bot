@@ -90,12 +90,15 @@ class FakeTick:
         return self.master
 
     def fetch_candles(self, granularity, limit=5, symbol="NEARUSDT"):
-        # 300 synthetic 2m candles: close 100, high 101, low 99 -> TR = 2 constant
-        # -> ATR14 (RMA) converges to exactly 2.0 -> atr_frac 0.02
+        # 2026-09-19: compute_tp now mirrors production — fetch 1m (60s
+        # spacing) and resample to 2m locally (Bitget has no native 2m).
+        # Each 1m candle: close 100, high 101, low 99 -> any 2m bucket keeps
+        # high 101 / low 99 -> TR = 2 constant -> ATR14 (RMA) converges to
+        # exactly 2.0 -> atr_frac 0.02 (same expected values as before).
         out = []
         ts = 1_700_000_000_000
         for i in range(limit):
-            out.append({"ts": ts + i * 120_000, "open": 100.0, "high": 101.0,
+            out.append({"ts": ts + i * 60_000, "open": 100.0, "high": 101.0,
                         "low": 99.0, "close": 100.0, "vol": 1.0})
         return out
 
@@ -188,8 +191,11 @@ def main():
     print("\n== 2b. manual short adopted with ON ==")
     cli, T, store = fresh(config={"enabled": True})
     cli.rows = [pos("BTCUSDT", "short", 20, entry=200.0)]
+    # 2026-09-19: 1m candles (60s spacing) — compute_tp resamples to 2m.
+    # Each 2m bucket: high 202 / low 198 -> TR=4 -> ATR14=4.0 -> atr_frac
+    # 0.02 -> short TP = 200 - 2*0.02*200 = 192.0 (unchanged expectation).
     T.fetch_candles = lambda g, l=5, s="BTCUSDT": [
-        {"ts": i, "open": 200.0, "high": 202.0, "low": 198.0, "close": 200.0, "vol": 1}
+        {"ts": i * 60_000, "open": 200.0, "high": 202.0, "low": 198.0, "close": 200.0, "vol": 1}
         for i in range(l)]
     run(cli, T)
     check("short: adopted alert", len(alerts_with(T, "ADOPTED")) == 1)
@@ -269,8 +275,9 @@ def main():
     print("\n== 6. multiple manual positions, different symbols ==")
     cli, T, store = fresh(config={"enabled": True})
     cli.rows = [pos("NEARUSDT", "long", 10), pos("BTCUSDT", "short", 2, entry=200.0)]
+    # 2026-09-19: 1m candles (60s spacing) — compute_tp resamples to 2m.
     T.fetch_candles = lambda g, l=5, s=None: [
-        {"ts": i, "open": 200.0, "high": 202.0, "low": 198.0, "close": 200.0, "vol": 1}
+        {"ts": i * 60_000, "open": 200.0, "high": 202.0, "low": 198.0, "close": 200.0, "vol": 1}
         for i in range(l)]
     run(cli, T)
     st = MM.load_store()
