@@ -2,7 +2,29 @@
   "config": {
     "enabled": true
   },
-  "positions": {},
+  "positions": {
+    "ZECUSDT:long": {
+      "symbol": "ZECUSDT",
+      "side": "long",
+      "entry": 1486.4772,
+      "size": 0.025,
+      "leverage": 10,
+      "margin_mode": "isolated",
+      "created_ms": 1789847356453,
+      "detected_at": "2026-09-19T19:49:24.252387+00:00",
+      "status": "MANUAL_MANAGED",
+      "note": "no matching bot footprint",
+      "tp_price": 1492.3733,
+      "tp_order_id": null,
+      "atr_frac": 0.0019832478343000774,
+      "expected_tp_pct": 0.3966495668600155,
+      "last_seen_size": 0.025,
+      "key": "ZECUSDT:long",
+      "tp_fail_count": 10,
+      "tp_fail_alert_ms": 1789847365957,
+      "last_checked": "2026-09-19T19:51:39.399132+00:00"
+    }
+  },
   "closed": [
     {
       "symbol": "XRPUSDT",
