@@ -2,27 +2,7 @@
   "config": {
     "enabled": true
   },
-  "positions": {
-    "NEARUSDT:short": {
-      "symbol": "NEARUSDT",
-      "side": "short",
-      "entry": 3.6193,
-      "size": 10.0,
-      "leverage": 10,
-      "margin_mode": "isolated",
-      "created_ms": 1789842750798,
-      "detected_at": "2026-09-19T18:32:34.376662+00:00",
-      "status": "MANUAL_MANAGED",
-      "note": "no matching bot footprint",
-      "tp_price": 3.5929,
-      "tp_order_id": null,
-      "atr_frac": 0.003641578613427376,
-      "expected_tp_pct": 0.7283157226854752,
-      "last_seen_size": 10.0,
-      "key": "NEARUSDT:short",
-      "last_checked": "2026-09-19T18:35:50.180665+00:00"
-    }
-  },
+  "positions": {},
   "closed": [
     {
       "symbol": "XRPUSDT",
@@ -116,6 +96,25 @@
       "exit_order_type": null,
       "opened_at": 1789840624991,
       "closed_at": "2026-09-19T18:31:18.148712+00:00",
+      "status_at_close": "MANUAL_MANAGED",
+      "manual": true
+    },
+    {
+      "symbol": "NEARUSDT",
+      "side": "short",
+      "entry_price": 3.6193,
+      "exit_price": 3.6193,
+      "size": 10.0,
+      "leverage": 10,
+      "margin_mode": "isolated",
+      "tp_price": 3.5929,
+      "tp_order_id": null,
+      "pnl_gross": 0.0,
+      "pnl_net_est": -0.043432,
+      "exit_reason": "manual/external close",
+      "exit_order_type": null,
+      "opened_at": 1789842750798,
+      "closed_at": "2026-09-19T18:40:05.696017+00:00",
       "status_at_close": "MANUAL_MANAGED",
       "manual": true
     }
