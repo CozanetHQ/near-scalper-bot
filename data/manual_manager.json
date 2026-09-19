@@ -2,6 +2,26 @@
   "config": {
     "enabled": true
   },
-  "positions": {},
+  "positions": {
+    "XRPUSDT:short": {
+      "symbol": "XRPUSDT",
+      "side": "short",
+      "entry": 1.44,
+      "size": 22.0,
+      "leverage": 10,
+      "margin_mode": "crossed",
+      "created_ms": 1789823409976,
+      "detected_at": "2026-09-19T13:10:26.750458+00:00",
+      "status": "MANUAL_MANAGED",
+      "note": "no matching bot footprint",
+      "tp_price": 1.4321,
+      "tp_order_id": null,
+      "atr_frac": 0.002742214383922505,
+      "expected_tp_pct": 0.548442876784501,
+      "last_seen_size": 22.0,
+      "key": "XRPUSDT:short",
+      "last_checked": "2026-09-19T13:14:11.673927+00:00"
+    }
+  },
   "closed": []
 }
