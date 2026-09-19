@@ -2,7 +2,27 @@
   "config": {
     "enabled": true
   },
-  "positions": {},
+  "positions": {
+    "SOLUSDT:short": {
+      "symbol": "SOLUSDT",
+      "side": "short",
+      "entry": 111.627,
+      "size": 0.3,
+      "leverage": 10,
+      "margin_mode": "crossed",
+      "created_ms": 1789826290180,
+      "detected_at": "2026-09-19T13:58:23.582179+00:00",
+      "status": "MANUAL_MANAGED",
+      "note": "no matching bot footprint",
+      "tp_price": 111.388,
+      "tp_order_id": null,
+      "atr_frac": 0.0010703853184303794,
+      "expected_tp_pct": 0.21407706368607587,
+      "last_seen_size": 0.3,
+      "key": "SOLUSDT:short",
+      "last_checked": "2026-09-19T14:01:08.834303+00:00"
+    }
+  },
   "closed": [
     {
       "symbol": "XRPUSDT",
