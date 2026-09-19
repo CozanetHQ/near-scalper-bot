@@ -247,7 +247,13 @@ class BitgetPrivate:
         for r in rows or []:
             total = abs(float(r.get("total") or 0))
             if total > 0:
-                side = "long" if float(r.get("total")) > 0 else "short"
+                # 2026-09-19 P0: Bitget v2 returns total POSITIVE for BOTH
+                # sides with the direction in holdSide. The sign heuristic
+                # read every position (incl. the owner's manual SHORTS) as
+                # "long" — corrupting sovereign reconcile + uPnL math.
+                side = (r.get("holdSide") or "").strip().lower()
+                if side not in ("long", "short"):
+                    side = "long" if float(r.get("total")) > 0 else "short"
                 # 2026-09-19 fix: Bitget's single-position response field is
                 # "averageOpenPrice" (or "openPriceAvg" on some API
                 # versions) -- "avgPrice" isn't a field this endpoint

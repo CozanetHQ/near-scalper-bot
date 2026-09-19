@@ -929,7 +929,16 @@ def _live_reconcile(T, live_cli, state, symbol, sv, su, now_iso, _pt):
         if exit_px is None:
             exit_px = pos["tp"] if abs((pos.get("tp") or 0)) else pos["sl"]
             reason = "TP" if exit_px == pos.get("tp") else "SL"
-        trade = _close(T, state, pos, exit_px, reason, symbol, sv, su, now_iso, _pt)
+        # ── 2026-09-19 P0 data-integrity guard ────────────────────────────
+        # An exit price of 0 (orphan with unknown tp/sl) books a fake giant
+        # loss. NEVER book those: clear the state, report honestly, keep the
+        # ledger clean.
+        if not exit_px or exit_px <= 0:
+            sv.pop("pos", None)
+            su["position_open"] = False
+            _pt(f"POSITION_CLOSED {symbol} — exit price UNKNOWN (unattributed/orphan position) "
+                f"→ NO trade booked (data-integrity guard); if this was your manual position its PnL lives in the manual layer")
+            return
         try:
             su["balance"] = round(live_cli.account_equity(), 6)
         except Exception:
@@ -958,15 +967,55 @@ def _live_reconcile(T, live_cli, state, symbol, sv, su, now_iso, _pt):
             except Exception:
                 pass    # transient read; retry on the next tick
     elif not pos and ex:
-        # orphan position (crash between fill and state commit) — adopt
-        sv["pos"] = {
-            "side": ex["side"], "entry": ex["entry"], "qty": ex["size"],
-            "notional": ex["size"] * ex["entry"], "margin": ex["size"] * ex["entry"] / max(ex.get("leverage") or LEV_CAP, 1),
-            "sl": 0.0, "tp": 0.0,
-            "atr_frac_at_entry": 0.0, "entry_mode": "maker-live",
-            "exec_mode": ("DEMO" if sv.get("trading_env") == "DEMO_FALLBACK" else "LIVE"),
-            "opened_at": now_iso, "mfe_frac": 0.0, "mae_frac": 0.0,
-        }
-        sv["pos"]["detected_sent"] = True
-        _pt(f"POSITION_DETECTED {ex['side']} {symbol} @ {ex['entry']:.6g} size {ex['size']} "
-            f"lev {ex.get('leverage') or LEV_CAP}x — orphan adopted (exchange-side TP/SL active, verify in Bitget app)")
+        # orphan position (crash between fill and state commit) — adopt.
+        # ── 2026-09-19 P0 GUARD ──────────────────────────────────────────
+        # This path used to adopt ANY exchange-side position — including the
+        # owner's MANUALLY opened positions — and then booked phantom closes
+        # with exit 0.0 (fake -$30 losses, negative balance, corrupted
+        # stats) when the owner closed them. Two gates now:
+        #   (a) never adopt a position the manual-manager layer tracks;
+        #   (b) an unknown position must survive TWO consecutive reconcile
+        #       passes (~20s) before adoption, so the manual manager (15s
+        #       cadence, same tick loop) can claim it first.
+        # A genuine bot orphan is rare (crash between fill and commit) and is
+        # protected exchange-side by its preset TP/SL during the 20s deferral.
+        key = f"{symbol}:{ex['side']}"
+        manual_tracked = False
+        try:
+            from engine.manual_manager import STORE_FILE as _mm_store
+            with open(_mm_store) as _f:
+                _mm = json.load(_f)
+            manual_tracked = key in (_mm.get("positions") or {})
+        except Exception:
+            manual_tracked = False
+        if manual_tracked:
+            sv.pop("orphan_sighting", None)
+            if sv.get("manual_guard_key") != key:
+                sv["manual_guard_key"] = key
+                _pt(f"POSITION_DETECTED {ex['side']} {symbol} @ {ex['entry']:.6g} — "
+                    f"owner MANUAL position (tracked by manual-manager): sovereign does NOT adopt, does NOT manage")
+        else:
+            sight = sv.get("orphan_sighting") or {}
+            sight_key = sight.get("key")
+            first_ms = sight.get("first_seen_ms") or now_ms
+            if sight_key == key and now_ms - first_ms >= 20_000:
+                sv.pop("orphan_sighting", None)
+                sv["pos"] = {
+                    "side": ex["side"], "entry": ex["entry"], "qty": ex["size"],
+                    "notional": ex["size"] * ex["entry"], "margin": ex["size"] * ex["entry"] / max(ex.get("leverage") or LEV_CAP, 1),
+                    "sl": 0.0, "tp": 0.0,
+                    "atr_frac_at_entry": 0.0, "entry_mode": "maker-live",
+                    "exec_mode": ("DEMO" if sv.get("trading_env") == "DEMO_FALLBACK" else "LIVE"),
+                    "opened_at": now_iso, "mfe_frac": 0.0, "mae_frac": 0.0,
+                }
+                sv["pos"]["detected_sent"] = True
+                _pt(f"POSITION_DETECTED {ex['side']} {symbol} @ {ex['entry']:.6g} size {ex['size']} "
+                    f"lev {ex.get('leverage') or LEV_CAP}x — orphan adopted after deferral (exchange-side TP/SL active, verify in Bitget app)")
+            else:
+                sv["orphan_sighting"] = {
+                    "key": key,
+                    "first_seen_ms": first_ms if sight_key == key else now_ms,
+                }
+                if sight_key != key:
+                    _pt(f"POSITION_DETECTED {ex['side']} {symbol} @ {ex['entry']:.6g} — "
+                        f"unattributed position, adoption DEFERRED one cycle (manual-position guard)")

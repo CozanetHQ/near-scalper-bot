@@ -280,10 +280,22 @@ def _place_tp(T, cli, rec):
         oid = cli.place_reduce_limit(rec["symbol"], side, qty, rec["tp_price"],
                                      rec.get("margin_mode"))
     except Exception as e:
-        _alert(T, f"🔴 TP PLACEMENT FAILED\n{rec['symbol']} {_fmt_side(rec['side'])} "
-                  f"@ ${rec['tp_price']:.6g} — {e}")
+        # 2026-09-19 P0: this fired EVERY 15s cycle (Telegram error spam all
+        # day). Throttle: one failure alert per position per 10 minutes, with
+        # the running failure count in the message. The retry itself still
+        # happens every cycle.
+        now_ms = int(time.time() * 1000)
+        rec["tp_fail_count"] = int(rec.get("tp_fail_count") or 0) + 1
+        last = int(rec.get("tp_fail_alert_ms") or 0)
+        if now_ms - last >= 600_000:
+            rec["tp_fail_alert_ms"] = now_ms
+            _alert(T, f"🔴 TP PLACEMENT FAILED (attempt {rec['tp_fail_count']}, next alert in 10 min)\n"
+                      f"{rec['symbol']} {_fmt_side(rec['side'])} "
+                      f"@ ${rec['tp_price']:.6g} — {e}")
         return
     rec["tp_order_id"] = oid
+    rec.pop("tp_fail_count", None)
+    rec.pop("tp_fail_alert_ms", None)
     rec["tp_placed_at"] = _now_iso()
     _alert(T, f"✅ TP PLACED\n{rec['symbol']} {_fmt_side(rec['side'])} — reduce-only "
               f"limit {qty:g} @ ${rec['tp_price']:.6g} (order {oid})")
