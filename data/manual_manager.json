@@ -155,6 +155,25 @@
       "closed_at": "2026-09-19T20:24:57.814322+00:00",
       "status_at_close": "MANUAL_MANAGED",
       "manual": true
+    },
+    {
+      "symbol": "XRPUSDT",
+      "side": "long",
+      "entry_price": 1.4302,
+      "exit_price": 1.4302,
+      "size": 1.0,
+      "leverage": 15,
+      "margin_mode": "isolated",
+      "tp_price": 1.4348,
+      "tp_order_id": null,
+      "pnl_gross": 0.0,
+      "pnl_net_est": -0.001716,
+      "exit_reason": "manual/external close",
+      "exit_order_type": null,
+      "opened_at": 1789850418112,
+      "closed_at": "2026-09-19T20:41:38.139465+00:00",
+      "status_at_close": "MANUAL_MANAGED",
+      "manual": true
     }
   ]
 }
