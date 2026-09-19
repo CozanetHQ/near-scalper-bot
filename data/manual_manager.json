@@ -3,26 +3,25 @@
     "enabled": true
   },
   "positions": {
-    "ZECUSDT:long": {
-      "symbol": "ZECUSDT",
-      "side": "long",
-      "entry": 1486.4772,
-      "size": 0.025,
+    "NEARUSDT:short": {
+      "symbol": "NEARUSDT",
+      "side": "short",
+      "entry": 3.5306,
+      "size": 10.0,
       "leverage": 10,
       "margin_mode": "isolated",
-      "created_ms": 1789847356453,
-      "detected_at": "2026-09-19T19:49:24.252387+00:00",
+      "created_ms": 1789847737383,
+      "detected_at": "2026-09-19T19:55:50.629103+00:00",
       "status": "MANUAL_MANAGED",
       "note": "no matching bot footprint",
-      "tp_price": 1492.3733,
+      "tp_price": 3.4973,
       "tp_order_id": null,
-      "atr_frac": 0.0019832478343000774,
-      "expected_tp_pct": 0.3966495668600155,
-      "last_seen_size": 0.025,
-      "key": "ZECUSDT:long",
-      "tp_fail_count": 10,
-      "tp_fail_alert_ms": 1789847365957,
-      "last_checked": "2026-09-19T19:51:39.399132+00:00"
+      "atr_frac": 0.004709828840946689,
+      "expected_tp_pct": 0.9419657681893379,
+      "last_seen_size": 10.0,
+      "key": "NEARUSDT:short",
+      "tp_fail_count": 1,
+      "tp_fail_alert_ms": 1789847752252
     }
   },
   "closed": [
@@ -137,6 +136,25 @@
       "exit_order_type": null,
       "opened_at": 1789842750798,
       "closed_at": "2026-09-19T18:40:05.696017+00:00",
+      "status_at_close": "MANUAL_MANAGED",
+      "manual": true
+    },
+    {
+      "symbol": "ZECUSDT",
+      "side": "long",
+      "entry_price": 1486.4772,
+      "exit_price": 1486.4772,
+      "size": 0.025,
+      "leverage": 10,
+      "margin_mode": "isolated",
+      "tp_price": 1492.3733,
+      "tp_order_id": null,
+      "pnl_gross": 0.0,
+      "pnl_net_est": -0.044594,
+      "exit_reason": "manual/external close",
+      "exit_order_type": null,
+      "opened_at": 1789847356453,
+      "closed_at": "2026-09-19T19:53:49.593347+00:00",
       "status_at_close": "MANUAL_MANAGED",
       "manual": true
     }
