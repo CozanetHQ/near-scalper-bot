@@ -582,7 +582,14 @@ def send_telegram(text):
     try:
         http_post(
             f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
-            {"chat_id": TELEGRAM_CHAT_ID, "text": text, "parse_mode": "Markdown"},
+            # 2026-09-19 fix: parse_mode "Markdown" made Telegram reject any
+            # alert with an unpaired _, *, ` or [ with HTTP 400 (silently
+            # swallowed here) — e.g. every new execution-stage label
+            # (LIVE_SIGNAL, ORDER_REJECTED, EXECUTION_ERROR, ...) has an
+            # unpaired underscore, so NONE of those alerts were ever
+            # delivered. Nothing in this codebase relies on Markdown
+            # formatting (no bold/italic in any alert), so send plain text.
+            {"chat_id": TELEGRAM_CHAT_ID, "text": text},
         )
         log(f"Telegram sent: {text[:60]}...")
     except Exception as e:

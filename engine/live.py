@@ -27,6 +27,7 @@ import hmac
 import json
 import os
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -126,8 +127,36 @@ class BitgetPrivate:
         url = API + req_path
         req = urllib.request.Request(url, data=(body_str.encode() if body_str else None),
                                      headers=headers, method=method.upper())
-        with urllib.request.urlopen(req, timeout=10) as res:
-            data = json.loads(res.read().decode())
+        try:
+            with urllib.request.urlopen(req, timeout=10) as res:
+                data = json.loads(res.read().decode())
+        except urllib.error.HTTPError as e:
+            # 2026-09-19 fix: a non-2xx HTTP status (Bitget sometimes rejects
+            # bad params this way, not just via a 200+error-code body) used
+            # to propagate as urllib's bare "HTTP Error 400: Bad Request" —
+            # the ACTUAL rejection reason in the response body was silently
+            # discarded, so a real order rejection looked identical to a
+            # transport failure. Read the body and surface the real code/msg.
+            raw = e.read().decode(errors="replace") if hasattr(e, "read") else ""
+            try:
+                body_data = json.loads(raw) if raw else {}
+            except Exception:
+                body_data = {}
+            if 400 <= e.code < 500:
+                # client error: retrying the identical request won't change
+                # the outcome — surface as BitgetError (non-retryable), with
+                # the real code/msg when Bitget's body provided one.
+                if body_data.get("code"):
+                    raise BitgetError(f"bitget {path}: {body_data.get('code')} "
+                                      f"{body_data.get('msg')} (http {e.code})",
+                                      code=body_data.get("code"))
+                raise BitgetError(f"bitget {path}: http {e.code} {e.reason} — {raw[:300]}",
+                                  code=str(e.code))
+            # 5xx: infra-side, may well be transient — let the GET retry loop
+            # in _req handle it (raising plain, not BitgetError, keeps it
+            # retryable); re-raise as-is so the retry wrapper's generic
+            # except-Exception branch catches and retries it.
+            raise RuntimeError(f"bitget {path}: http {e.code} {e.reason} — {raw[:300]}")
         if data.get("code") != "00000":
             raise BitgetError(f"bitget {path}: {data.get('code')} {data.get('msg')}",
                               code=data.get("code"))
