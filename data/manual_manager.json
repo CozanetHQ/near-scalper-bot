@@ -41,6 +41,25 @@
       "closed_at": "2026-09-19T06:25:06.529073+00:00",
       "status_at_close": "MANUAL_IGNORED",
       "manual": true
+    },
+    {
+      "symbol": "NEARUSDT",
+      "side": "long",
+      "entry_price": 3.6673,
+      "exit_price": 3.6673,
+      "size": 9.0,
+      "leverage": 10,
+      "margin_mode": "isolated",
+      "tp_price": null,
+      "tp_order_id": null,
+      "pnl_gross": 0.0,
+      "pnl_net_est": -0.039607,
+      "exit_reason": "manual/external close",
+      "exit_order_type": null,
+      "opened_at": 1789799420330,
+      "closed_at": "2026-09-19T06:32:44.450351+00:00",
+      "status_at_close": "MANUAL_IGNORED",
+      "manual": true
     }
   ]
 }
