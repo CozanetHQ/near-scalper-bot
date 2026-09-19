@@ -248,9 +248,17 @@ class BitgetPrivate:
             total = abs(float(r.get("total") or 0))
             if total > 0:
                 side = "long" if float(r.get("total")) > 0 else "short"
+                # 2026-09-19 fix: Bitget's single-position response field is
+                # "averageOpenPrice" (or "openPriceAvg" on some API
+                # versions) -- "avgPrice" isn't a field this endpoint
+                # returns, so entry was always defaulting to 0 for any
+                # orphan-adopted position (a manually-opened position the
+                # bot detects but didn't place itself), which fed a 0
+                # entry/margin/notional straight into sv["pos"].
                 return {
                     "side": side, "size": total,
-                    "entry": float(r.get("avgPrice") or 0),
+                    "entry": float(r.get("averageOpenPrice") or r.get("openPriceAvg")
+                                   or r.get("avgPrice") or 0),
                     "leverage": int(float(r.get("leverage") or 10)),
                     "unrealized_pl": float(r.get("unrealizedPL") or 0),
                 }

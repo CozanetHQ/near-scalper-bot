@@ -692,7 +692,12 @@ def _close(T, state, pos, exit_px, reason, symbol, sv, su, iso, _pt):
     net = gross - fees
     new_balance = round(state["balance"] + net, 6)
 
-    tp_frac = abs(pos["tp"] - pos["entry"]) / pos["entry"]
+    # 2026-09-19 P0 fix: an orphan-adopted position (manually opened by the
+    # owner on the exchange, not by the bot) has entry/tp unknown -> 0.0, so
+    # this division crashed EVERY tick with "float division by zero" and
+    # never got past it -> sv["pos"] never cleared -> the pair looked
+    # permanently "position open" forever, spamming the same alert.
+    tp_frac = (abs(pos["tp"] - pos["entry"]) / pos["entry"]) if pos.get("entry") else 0.0
     mfe = pos.get("mfe_frac") or 0.0
     t_state = T.classify_trade_state(reason, mfe, tp_frac)
     held_min = None
