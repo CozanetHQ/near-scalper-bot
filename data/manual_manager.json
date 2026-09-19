@@ -2,7 +2,27 @@
   "config": {
     "enabled": true
   },
-  "positions": {},
+  "positions": {
+    "ETHUSDT:short": {
+      "symbol": "ETHUSDT",
+      "side": "short",
+      "entry": 2646.65,
+      "size": 0.01,
+      "leverage": 10,
+      "margin_mode": "isolated",
+      "created_ms": 1789840624991,
+      "detected_at": "2026-09-19T17:57:07.076956+00:00",
+      "status": "MANUAL_MANAGED",
+      "note": "no matching bot footprint",
+      "tp_price": 2640.3879,
+      "tp_order_id": null,
+      "atr_frac": 0.0011830311386321747,
+      "expected_tp_pct": 0.23660622772643494,
+      "last_seen_size": 0.01,
+      "key": "ETHUSDT:short",
+      "last_checked": "2026-09-19T17:57:37.921414+00:00"
+    }
+  },
   "closed": [
     {
       "symbol": "XRPUSDT",
