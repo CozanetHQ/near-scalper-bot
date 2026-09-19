@@ -2,7 +2,27 @@
   "config": {
     "_api_err_alerted": 1789774962.3634007
   },
-  "positions": {},
+  "positions": {
+    "AKEUSDT:short": {
+      "symbol": "AKEUSDT",
+      "side": "short",
+      "entry": 0.0,
+      "size": 487.0,
+      "leverage": 10,
+      "margin_mode": "crossed",
+      "created_ms": 1789799851419,
+      "detected_at": "2026-09-19T06:37:41.960715+00:00",
+      "status": "MANUAL_IGNORED",
+      "note": "no matching bot footprint; TP compute failed: HTTP Error 400: Bad Request",
+      "tp_price": null,
+      "tp_order_id": null,
+      "atr_frac": null,
+      "expected_tp_pct": null,
+      "last_seen_size": 487.0,
+      "key": "AKEUSDT:short",
+      "last_checked": "2026-09-19T06:38:11.477139+00:00"
+    }
+  },
   "closed": [
     {
       "symbol": "XRPUSDT",
@@ -58,6 +78,25 @@
       "exit_order_type": null,
       "opened_at": 1789799420330,
       "closed_at": "2026-09-19T06:32:44.450351+00:00",
+      "status_at_close": "MANUAL_IGNORED",
+      "manual": true
+    },
+    {
+      "symbol": "AKEUSDT",
+      "side": "long",
+      "entry_price": 0.0616027,
+      "exit_price": 0.0616027,
+      "size": 518.0,
+      "leverage": 10,
+      "margin_mode": "crossed",
+      "tp_price": null,
+      "tp_order_id": null,
+      "pnl_gross": 0.0,
+      "pnl_net_est": -0.038292,
+      "exit_reason": "manual/external close",
+      "exit_order_type": null,
+      "opened_at": 1789799758400,
+      "closed_at": "2026-09-19T06:37:27.388273+00:00",
       "status_at_close": "MANUAL_IGNORED",
       "manual": true
     }
