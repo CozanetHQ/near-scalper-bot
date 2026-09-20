@@ -2,7 +2,29 @@
   "config": {
     "enabled": true
   },
-  "positions": {},
+  "positions": {
+    "BTCUSDT:short": {
+      "symbol": "BTCUSDT",
+      "side": "short",
+      "entry": 81127.0,
+      "size": 0.0003,
+      "leverage": 10,
+      "margin_mode": "isolated",
+      "created_ms": 1789920834308,
+      "detected_at": "2026-09-20T16:13:56.282977+00:00",
+      "status": "MANUAL_MANAGED",
+      "note": "no matching bot footprint",
+      "tp_price": 80972.2067,
+      "tp_order_id": null,
+      "atr_frac": 0.0009540185810689899,
+      "expected_tp_pct": 0.19080371621379794,
+      "last_seen_size": 0.0003,
+      "key": "BTCUSDT:short",
+      "tp_fail_count": 13,
+      "tp_fail_alert_ms": 1789920838040,
+      "last_checked": "2026-09-20T16:16:56.358007+00:00"
+    }
+  },
   "closed": [
     {
       "symbol": "XRPUSDT",
