@@ -20,9 +20,9 @@
       "expected_tp_pct": 0.19080371621379794,
       "last_seen_size": 0.0003,
       "key": "BTCUSDT:short",
-      "tp_fail_count": 1597,
-      "tp_fail_alert_ms": 1789946095176,
-      "last_checked": "2026-09-20T23:24:48.585164+00:00"
+      "tp_fail_count": 1613,
+      "tp_fail_alert_ms": 1789946716823,
+      "last_checked": "2026-09-20T23:29:00.378998+00:00"
     },
     "BNBUSDT:short": {
       "symbol": "BNBUSDT",
@@ -41,9 +41,9 @@
       "expected_tp_pct": 0.23120278726664478,
       "last_seen_size": 0.04,
       "key": "BNBUSDT:short",
-      "tp_fail_count": 416,
-      "tp_fail_alert_ms": 1789946094042,
-      "last_checked": "2026-09-20T23:24:47.802824+00:00"
+      "tp_fail_count": 432,
+      "tp_fail_alert_ms": 1789946715423,
+      "last_checked": "2026-09-20T23:28:59.546467+00:00"
     }
   },
   "closed": [
