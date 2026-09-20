@@ -20,9 +20,9 @@
       "expected_tp_pct": 0.19080371621379794,
       "last_seen_size": 0.0003,
       "key": "BTCUSDT:short",
-      "tp_fail_count": 525,
-      "tp_fail_alert_ms": 1789928898840,
-      "last_checked": "2026-09-20T18:37:00.037525+00:00"
+      "tp_fail_count": 541,
+      "tp_fail_alert_ms": 1789929510993,
+      "last_checked": "2026-09-20T18:41:15.774258+00:00"
     }
   },
   "closed": [
