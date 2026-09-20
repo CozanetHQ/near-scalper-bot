@@ -20,9 +20,9 @@
       "expected_tp_pct": 0.5424699881302228,
       "last_seen_size": 16.0,
       "key": "NEARUSDT:short",
-      "tp_fail_count": 233,
+      "tp_fail_count": 249,
       "tp_fail_alert_ms": 1789862412290,
-      "last_checked": "2026-09-20T00:00:12.729718+00:00"
+      "last_checked": "2026-09-20T00:04:24.605480+00:00"
     }
   },
   "closed": [
