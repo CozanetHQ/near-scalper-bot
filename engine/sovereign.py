@@ -244,6 +244,11 @@ def process_pair(state):
         live_probe, live_eq = None, None
         try:
             live_probe = LIVE_EXEC.client(demo=False)
+            live_cli = live_probe          # 2026-09-21 fix: this was NEVER
+            # assigned — live_cli stayed None forever, so every downstream
+            # call (_live_reconcile, _live_place) crashed with
+            # AttributeError: 'NoneType' object has no attribute
+            # 'pending_orders' on EVERY pair, EVERY tick (owner screenshot).
             live_eq = live_probe.account_equity()
             sv["last_live_check"] = now.isoformat()
         except Exception as e:
