@@ -1,5 +1,27 @@
 {
   "config": {},
-  "positions": {},
+  "positions": {
+    "NEARUSDT:short": {
+      "symbol": "NEARUSDT",
+      "side": "short",
+      "entry": 4.4063,
+      "size": 14.0,
+      "leverage": 15,
+      "margin_mode": "isolated",
+      "created_ms": 1789967151911,
+      "detected_at": "2026-09-21T05:05:56.627302+00:00",
+      "status": "MANUAL_MANAGED",
+      "note": "no matching bot footprint",
+      "tp_price": 4.3522,
+      "tp_order_id": null,
+      "atr_frac": 0.00613598059122076,
+      "expected_tp_pct": 1.227196118244152,
+      "last_seen_size": 14.0,
+      "key": "NEARUSDT:short",
+      "tp_fail_count": 6,
+      "tp_fail_alert_ms": 1789967158266,
+      "last_checked": "2026-09-21T05:07:12.969373+00:00"
+    }
+  },
   "closed": []
 }
