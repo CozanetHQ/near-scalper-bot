@@ -18,9 +18,9 @@
       "expected_tp_pct": 0.5827013553379927,
       "last_seen_size": 58.0,
       "key": "XRPUSDT:short",
-      "tp_fail_count": 8,
+      "tp_fail_count": 24,
       "tp_fail_alert_ms": 1789985899873,
-      "last_checked": "2026-09-21T10:20:02.557578+00:00"
+      "last_checked": "2026-09-21T10:24:12.681975+00:00"
     }
   },
   "closed": [
