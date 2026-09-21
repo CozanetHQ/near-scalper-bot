@@ -73,12 +73,12 @@ def main():
         return 1
 
     sl, tp = px * (1 - SL_PCT), px * (1 + TP_PCT)
-    cli.set_leverage(SYMBOL, LEV)
     ts = datetime.now(timezone.utc).strftime("%H:%M:%S")
     tg(f"CONFIRM_SUBMITTED {SYMBOL} LONG market: qty {qty} (~${notional:.2f} @ "
        f"{px:.4g}) — cash ${notional/LEV:.2f} @ {LEV}x, SL {sl:.4g} / TP {tp:.4g} {ts} UTC")
 
     try:
+        cli.set_leverage(SYMBOL, LEV)
         data = cli._req("POST", "/api/v2/mix/order/place-order", body={
             "symbol": SYMBOL, "productType": LIVE.PRODUCT,
             "marginMode": "isolated", "marginCoin": LIVE.MARGIN_COIN,

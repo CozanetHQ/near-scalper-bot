@@ -197,8 +197,13 @@ class BitgetPrivate:
         return info
 
     def set_leverage(self, symbol, leverage):
+        # 2026-09-21 fix (found by the owner confirmation trade): Bitget v2
+        # set-leverage REQUIRES marginCoin — without it the API rejects with
+        # 400172 "Margin Coin cannot be empty". Every live engine entry called
+        # this before placing, so the bug would have crashed every real entry.
         self._req("POST", "/api/v2/mix/account/set-leverage", body={
             "symbol": symbol, "productType": PRODUCT,
+            "marginCoin": MARGIN_COIN,
             "marginMode": "isolated", "leverage": str(leverage),
         })
 
