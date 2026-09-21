@@ -39,6 +39,25 @@
       "closed_at": "2026-09-21T05:11:27.491649+00:00",
       "status_at_close": "MANUAL_MANAGED",
       "manual": true
+    },
+    {
+      "symbol": "PIUSDT",
+      "side": "long",
+      "entry_price": 0.0883,
+      "exit_price": 0.0883,
+      "size": 569.0,
+      "leverage": 10,
+      "margin_mode": "crossed",
+      "tp_price": 0.0887,
+      "tp_order_id": null,
+      "pnl_gross": 0.0,
+      "pnl_net_est": -0.060291,
+      "exit_reason": "manual/external close",
+      "exit_order_type": null,
+      "opened_at": 1789967610906,
+      "closed_at": "2026-09-21T05:15:09.004967+00:00",
+      "status_at_close": "MANUAL_MANAGED",
+      "manual": true
     }
   ]
 }
