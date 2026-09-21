@@ -18,9 +18,9 @@
       "expected_tp_pct": 0.24424935677202905,
       "last_seen_size": 0.7,
       "key": "SOLUSDT:short",
-      "tp_fail_count": 61,
-      "tp_fail_alert_ms": 1789968413050,
-      "last_checked": "2026-09-21T05:32:37.220301+00:00"
+      "tp_fail_count": 77,
+      "tp_fail_alert_ms": 1789969013153,
+      "last_checked": "2026-09-21T05:36:53.554681+00:00"
     }
   },
   "closed": [
