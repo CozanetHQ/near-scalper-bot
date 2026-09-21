@@ -1,6 +1,28 @@
 {
   "config": {},
-  "positions": {},
+  "positions": {
+    "SOLUSDT:short": {
+      "symbol": "SOLUSDT",
+      "side": "short",
+      "entry": 111.485,
+      "size": 0.7,
+      "leverage": 15,
+      "margin_mode": "isolated",
+      "created_ms": 1789967809068,
+      "detected_at": "2026-09-21T05:16:50.878005+00:00",
+      "status": "MANUAL_MANAGED",
+      "note": "no matching bot footprint",
+      "tp_price": 111.2127,
+      "tp_order_id": null,
+      "atr_frac": 0.0012212467838601452,
+      "expected_tp_pct": 0.24424935677202905,
+      "last_seen_size": 0.7,
+      "key": "SOLUSDT:short",
+      "tp_fail_count": 13,
+      "tp_fail_alert_ms": 1789967812696,
+      "last_checked": "2026-09-21T05:19:51.126049+00:00"
+    }
+  },
   "closed": [
     {
       "symbol": "NEARUSDT",
