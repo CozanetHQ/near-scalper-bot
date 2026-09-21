@@ -251,16 +251,17 @@ def process_pair(state):
             return "live-paused", f"live account unreachable: {e}"
 
         if live_eq is not None:
-            sv["last_live_equity"] = round(live_eq, 4)   # persisted (was su[]: lost)
+            # owner 2026-09-21: the account block in state.json froze on
+            # 09-19 — write the REAL equity through BOTH channels so the
+            # committed state always shows the wallet truth:
+            #   su[...] -> T.sync() special-cases these into account.*
+            #   sv[...] -> persists on the pair itself
+            sv["last_live_equity"] = round(live_eq, 4)
+            su["last_live_equity"] = round(live_eq, 4)
+            su["last_live_check"] = sv["last_live_check"]
+            su["balance"] = live_eq
             state["balance"] = live_eq        # risk sizing on REAL equity
             equity = live_eq
-            # owner 2026-09-21: state.json's account block froze on 09-19 —
-            # persist the REAL live equity + a fresh timestamp every tick so
-            # the committed state always shows the wallet truth.
-            acct = state.setdefault("account", {})
-            acct["balance"] = live_eq
-            acct["last_tick_at"] = now.isoformat()
-            acct["balance_source"] = "bitget_live_equity"
         sv["live_mode"] = True
         su.pop("trading_env", None)           # demo env tag never returns
         sv.pop("trading_env", None)

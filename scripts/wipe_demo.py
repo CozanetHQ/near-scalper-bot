@@ -43,9 +43,24 @@ def main(actor="wipe_demo.py"):
     now = datetime.now(timezone.utc).isoformat()
     s = json.load(open(STATE))
     acct = s.setdefault("account", {})
-    eq = float(acct.get("balance") or 0)          # current live-equity snapshot
+    # fresh live equity: per-pair sovereign probe (written every tick) beats
+    # the account block, which froze on 2026-09-19 before the 09-21 fix.
+    eq = 0.0
+    for ps in (s.get("pairs") or {}).values():
+        v = (ps.get("sovereign") or {}).get("last_live_equity")
+        try:
+            eq = max(eq, float(v or 0))
+        except (TypeError, ValueError):
+            pass
     if eq <= 0:
-        print("refusing to wipe: account.balance snapshot is not a live number");
+        try:
+            eq = float(acct.get("live_equity") or 0)
+        except (TypeError, ValueError):
+            eq = 0.0
+    if eq <= 0:
+        eq = float(acct.get("balance") or 0)
+    if eq <= 0:
+        print("refusing to wipe: no live equity snapshot found")
         sys.exit(1)
 
     wiped = []
@@ -64,6 +79,9 @@ def main(actor="wipe_demo.py"):
 
     n_trades = len(s.get("trades") or [])
     s["trades"] = []
+    for k in ("circuit_breaker_active", "circuit_breaker_tripped_at",
+              "circuit_breaker_streak", "circuit_breaker_session"):
+        acct.pop(k, None)      # tripped by the phantom 09-19 losses — wiped
     acct.update({
         "balance": eq,
         "peak_balance": eq,
