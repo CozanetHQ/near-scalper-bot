@@ -47,7 +47,10 @@ jobs:
           # trade Bitget demo until the wallet can fund them.
           SOVEREIGN_PAIRS: 'NEARUSDT,BTCUSDT,ETHUSDT,SOLUSDT,XRPUSDT'
           # ── LIVE TRADING (owner 2026-09-15) ──
-          # AUTO-FALLBACK (owner 2026-09-15): with BITGET_DEMO='0', if the
+          # LIVE-ONLY (owner 2026-09-21): demo auto-fallback REMOVED from the
+          # engine. If the live wallet is below MIN_LIVE_EQUITY, open positions
+          # manage live but no new entries are placed until it is funded.
+          # Legacy note (owner 2026-09-15): with BITGET_DEMO='0', if the
           # live wallet equity < MIN_LIVE_EQUITY the pair trades Bitget demo
           # instead and re-probes the live wallet every LIVE_RECHECK_MINUTES
           # until it can fund trades again (then auto-switches back).
@@ -66,7 +69,7 @@ jobs:
           # DEFAULT OFF (detect + Telegram alert only, no TP placement).
           # Runtime override lives in data/manual_manager.json config block
           # (set via scripts/set_manual_manager.py / manual-manager.yml).
-          AUTO_MANAGE_MANUAL_POSITIONS: '0'
+          AUTO_MANAGE_MANUAL_POSITIONS: '1'
           MANUAL_MANAGER_KILL_SWITCH: '0'
           BITGET_DEMO: '0'
           BITGET_API_KEY: ${{ secrets.BITGET_API_KEY }}

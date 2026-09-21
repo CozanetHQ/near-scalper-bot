@@ -3,3 +3,4 @@ __pycache__/
 *.pyc
 data_1m*.json
 data_*USDT_30d.json
+research/replay_cache/

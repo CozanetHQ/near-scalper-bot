@@ -222,13 +222,12 @@ def process_pair(state):
     now = datetime.now(timezone.utc)
 
     # ── live mode: real account, real orders (owner 2026-09-15) ──
-    # AUTO-FALLBACK (owner 2026-09-15): if the LIVE wallet can't fund a trade
-    # (equity < MIN_LIVE_EQUITY) while the account is flat, the pair flips to
-    # Bitget DEMO (same engine, pap:1 header, demo funds) and keeps trading.
-    # While on demo the live wallet is re-probed every LIVE_RECHECK_MINUTES;
-    # when it can fund trades again AND the demo side is flat, the pair flips
-    # back to live. A position or resting order on either side blocks the
-    # flip — it is never abandoned mid-trade.
+    # LIVE-ONLY (owner directive 2026-09-21): the demo auto-fallback is
+    # REMOVED. The engine trades the real wallet or waits — it never touches
+    # Bitget demo funds again. The live wallet is probed every tick; its
+    # equity is the ONLY balance truth (risk sizing on REAL equity). If the
+    # wallet is below MIN_LIVE_EQUITY, open positions keep managing live but
+    # NO new entries are placed until the wallet can fund them.
     su = {}                                   # (was created too late — live block wrote to it)
     live_mode = (getattr(T, "LIVE_TRADING", False)
                  and symbol in getattr(T, "LIVE_PAIRS", set())
@@ -239,75 +238,43 @@ def process_pair(state):
                  # ALL of them, not just this one.
                  and getattr(T, "current_mode", lambda: "PAPER")() == "LIVE")
     live_cli, equity = None, None
-    on_demo = sv.get("trading_env") == "DEMO_FALLBACK"
+    entries_allowed = True
     if live_mode:
         min_eq = getattr(LIVE_EXEC, "MIN_LIVE_EQUITY", 10.0)
-        recheck_s = getattr(LIVE_EXEC, "LIVE_RECHECK_MINUTES", 60.0) * 60
         live_probe, live_eq = None, None
+        try:
+            live_probe = LIVE_EXEC.client(demo=False)
+            live_eq = live_probe.account_equity()
+            sv["last_live_check"] = now.isoformat()
+        except Exception as e:
+            _pt(f"LIVE unreachable: {e} — trading paused this tick")
+            return "live-paused", f"live account unreachable: {e}"
 
-        # probe the LIVE wallet — every tick while live; on the demo-fallback
-        # only hourly (owner: "demo one hour, another hour" — keep trading,
-        # check the live wallet periodically until funds arrive).
-        probe_due = (not on_demo) or (now - datetime.fromisoformat(sv.get("last_live_check", "1970-01-01T00:00:00+00:00"))).total_seconds() >= recheck_s
-        if probe_due:
-            try:
-                live_probe = LIVE_EXEC.client(demo=False)
-                live_eq = live_probe.account_equity()
-                sv["last_live_check"] = now.isoformat()
-            except Exception as e:
-                if on_demo:
-                    _pt(f"live wallet recheck failed ({e}) — staying on demo")
-                else:
-                    _pt(f"LIVE unreachable: {e} — trading paused this tick")
-                    return "live-paused", f"live account unreachable: {e}"
-
-        if not on_demo:
-            if live_eq is not None:
-                su["last_live_equity"] = round(live_eq, 4)
-            if live_eq is not None and live_eq < min_eq and not sv.get("pos") \
-                    and not (sv.get("pending") or {}).get("order_id"):
-                sv["trading_env"] = "DEMO_FALLBACK"
-                on_demo = True
+        if live_eq is not None:
+            sv["last_live_equity"] = round(live_eq, 4)   # persisted (was su[]: lost)
+            state["balance"] = live_eq        # risk sizing on REAL equity
+            equity = live_eq
+            # owner 2026-09-21: state.json's account block froze on 09-19 —
+            # persist the REAL live equity + a fresh timestamp every tick so
+            # the committed state always shows the wallet truth.
+            acct = state.setdefault("account", {})
+            acct["balance"] = live_eq
+            acct["last_tick_at"] = now.isoformat()
+            acct["balance_source"] = "bitget_live_equity"
+        sv["live_mode"] = True
+        su.pop("trading_env", None)           # demo env tag never returns
+        sv.pop("trading_env", None)
+        if live_eq is not None and live_eq < min_eq:
+            entries_allowed = False
+            if sv.get("_low_eq_alerted") != now.strftime("%Y-%m-%d %H"):
+                sv["_low_eq_alerted"] = now.strftime("%Y-%m-%d %H")
                 _pt(f"live wallet ${live_eq:.2f} below ${min_eq:.0f} min — "
-                    f"AUTO-FALLBACK to Bitget demo; live rechecked every "
-                    f"{getattr(LIVE_EXEC, 'LIVE_RECHECK_MINUTES', 60.0):.0f}min")
-            elif live_eq is not None and live_eq < min_eq:
-                _pt(f"live wallet ${live_eq:.2f} below ${min_eq:.0f} min but a "
-                    f"position/order is open — managing it live, no new sizing")
-        elif live_probe is not None:
-            # on demo, hourly live probe returned — switch back when it can
-            # fund trades AND the demo side is flat
-            demo_flat = not sv.get("pos") and not (sv.get("pending") or {}).get("order_id")
-            if live_eq is not None and live_eq >= min_eq and demo_flat:
-                sv.pop("trading_env", None)
-                on_demo = False
-                _pt(f"live wallet funded (${live_eq:.2f} ≥ ${min_eq:.0f}) and demo flat — "
-                    f"SWITCHED BACK to live trading")
-
-        if on_demo:
-            live_cli = LIVE_EXEC.client(demo=True)
-            try:
-                equity = live_cli.account_equity()   # demo funds size the trade
-            except Exception as e:
-                _pt(f"demo account unreachable: {e} — trading paused this tick")
-                return "live-paused", f"demo account unreachable: {e}"
-            state["balance"] = equity
-            su["live_mode"] = True
-            su["trading_env"] = "DEMO_FALLBACK"
-            if sv.get("pending") and not sv["pending"].get("order_id"):
-                sv["pending"] = None            # stale paper pending from before the flip
-                _pt("paper pending cleared on demo activation")
-        elif live_eq is not None or live_probe is not None:
-            live_cli = live_probe or LIVE_EXEC.client(demo=False)
-            if live_eq is not None:
-                equity = live_eq
-                state["balance"] = equity      # risk sizing on REAL equity
-            su["live_mode"] = True
-            if sv.get("pending") and not sv["pending"].get("order_id"):
-                sv["pending"] = None            # stale paper pending from before the flip
-                _pt("paper pending cleared on live activation")
-        # (probe not due & on demo → handled above: live_cli stays None this
-        # tick only if unreachable; demo client set below)
+                    f"NO new entries (live-only; demo fallback removed 09-21). "
+                    f"Open positions keep managing live. Funding the wallet "
+                    f"re-enables entries automatically.")
+        if sv.get("pending") and not sv["pending"].get("order_id"):
+            sv["pending"] = None            # stale paper pending from a pre-wipe era
+            _pt("paper pending cleared on live activation")
 
     # ── fetch all timeframes (drop forming candles) ──
     c4h = T.fetch_candles("4H", _N4H, symbol)[:-1]
@@ -557,6 +524,10 @@ def process_pair(state):
                             note=f"L2 imbalance {ratio:.2f} < {L2_MIN}")
                 continue
 
+        if live_mode and not entries_allowed:
+            sv.update({"phase": "ARMED", "swept_level": None})
+            action, details = "hold-fire", f"wallet below min equity — setup held"
+            continue
         if live_mode:
             _z = find_zone(bull_zones if d == "bull" else bear_zones, ts, level) or {}
             sv["_trig_ctx"] = {"fvg_top": _z.get("high"), "fvg_bottom": _z.get("low"),
@@ -641,6 +612,7 @@ def process_pair(state):
     if pos and action == "observe":
         upnl = (price - pos["entry"]) * pos["qty"] * (1 if pos["side"] == "long" else -1)
         return "hold", f"sovereign pos {pos['side']} uPnL {upnl:+.4f}"
+    sv.update(su)          # owner 2026-09-21: su was never merged — writes were lost
     return action, details
 
 
@@ -854,7 +826,7 @@ def _live_reconcile(T, live_cli, state, symbol, sv, su, now_iso, _pt):
                 "margin": pending.get("margin", 0),
                 "sl": od["sl"] or pending["sl"], "tp": od["tp"] or pending["tp"],
                 "atr_frac_at_entry": pending["atr_frac"], "entry_mode": "maker-live",
-                "exec_mode": ("DEMO" if sv.get("trading_env") == "DEMO_FALLBACK" else "LIVE"),
+                "exec_mode": "LIVE",  # demo fallback removed 2026-09-21 (owner directive)
                 "opened_at": now_iso, "mfe_frac": 0.0, "mae_frac": 0.0,
                 "trade_id": None, "fvg_top": pending.get("fvg_top"),
                 "fvg_bottom": pending.get("fvg_bottom"),
@@ -1005,7 +977,7 @@ def _live_reconcile(T, live_cli, state, symbol, sv, su, now_iso, _pt):
                     "notional": ex["size"] * ex["entry"], "margin": ex["size"] * ex["entry"] / max(ex.get("leverage") or LEV_CAP, 1),
                     "sl": 0.0, "tp": 0.0,
                     "atr_frac_at_entry": 0.0, "entry_mode": "maker-live",
-                    "exec_mode": ("DEMO" if sv.get("trading_env") == "DEMO_FALLBACK" else "LIVE"),
+                    "exec_mode": "LIVE",  # demo fallback removed 2026-09-21 (owner directive)
                     "opened_at": now_iso, "mfe_frac": 0.0, "mae_frac": 0.0,
                 }
                 sv["pos"]["detected_sent"] = True
