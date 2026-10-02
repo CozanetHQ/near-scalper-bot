@@ -921,8 +921,60 @@ def _live_reconcile(T, live_cli, state, symbol, sv, su, now_iso, _pt):
             su["balance"] = round(live_cli.account_equity(), 6)
         except Exception:
             pass
+        # 2026-10-02 P0 fix: `trade` was referenced here but never built, so
+        # EVERY live close hit NameError before sv["pos"] could be cleared —
+        # the next tick saw the same already-closed exchange position again
+        # (pos set, ex None) and crashed the same way, forever. That's the
+        # "EXECUTION_ERROR reconcile ... NameError: name 'trade' is not
+        # defined" spam: the close was never booked, position never cleared.
+        # Build the trade record (same friction model _close() uses in
+        # paper mode) so the exchange-confirmed close is booked exactly
+        # once, right here, and sv["pos"] actually clears.
+        side = pos["side"]
+        gross = (exit_px - pos["entry"]) * pos["qty"] * (1 if side == "long" else -1)
+        entry_fee = pos["entry"] * pos["qty"] * MAKER
+        exit_fee = exit_px * pos["qty"] * (MAKER if reason == "TP" else TAKER + SLIP)
+        fees = entry_fee + exit_fee
+        net = gross - fees
+        tp_frac = (abs(pos["tp"] - pos["entry"]) / pos["entry"]) if pos.get("entry") else 0.0
+        mfe = pos.get("mfe_frac") or 0.0
+        t_state = T.classify_trade_state(reason, mfe, tp_frac)
+        held_min = None
+        try:
+            held_min = int((datetime.fromisoformat(now_iso) -
+                           datetime.fromisoformat(pos["opened_at"])).total_seconds() // 60)
+        except Exception:
+            pass
+        trade = {
+            "pair": symbol, "engine": "sovereign-v6", "side": side,
+            "trade_id": pos.get("trade_id"),
+            "entry_mode": pos.get("entry_mode", "maker-live"),
+            "trade_state": t_state, "mfe_frac": round(mfe, 6),
+            "mae_frac": round(pos.get("mae_frac") or 0.0, 6),
+            "minutes_held": held_min, "tp_frac": round(tp_frac, 6),
+            "entry_price": pos["entry"], "exit_price": exit_px,
+            "notional": pos["notional"], "margin": pos["margin"], "leverage": LEV_CAP,
+            "hard_sl": pos["atr_frac_at_entry"],
+            "gross_pnl": round(gross, 6), "fees": round(fees, 6), "net_pnl": round(net, 6),
+            "reason": reason, "balance_after": su["balance"],
+            "atr_frac_at_entry": pos["atr_frac_at_entry"], "regime_at_entry": "sovereign-v6",
+            "opened_at": pos["opened_at"], "closed_at": now_iso,
+            "mode": "LIVE",
+        }
+        wins = (state.get("wins") or 0) + (1 if net > 0 else 0)
+        losses = (state.get("losses") or 0) + (0 if net > 0 else 1)
+        sv.pop("pos", None)
+        su.update({
+            "position_open": False, "side": "none", "entry_price": 0,
+            "tp_price": 0, "sl_price": 0, "notional": 0, "margin": 0,
+            "opened_at": None, "last_error": "[]",
+            "wins": wins, "losses": losses,
+            "total_trades": (state.get("total_trades") or 0) + 1,
+            "sovereign": sv,
+        })
+        T.sync(symbol, state_update=su, trade=trade)
         _pt(f"POSITION_CLOSED {symbol} {reason} @ {exit_px:.6g} — confirmed closed on Bitget"
-            + (f", realized {trade['net_pnl']:+.4f} USDT (net of fees)" if trade else ""))
+            f", realized {net:+.4f} USDT (net of fees)")
     elif pos and ex:
         if ex["entry"]:
             pos["entry"] = ex["entry"]
